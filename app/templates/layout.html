@@ -6,82 +6,46 @@
     <title>Topp-NFS | Notfallsanitäter Training</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
-    <style>
-        body { min-height: 100vh; display: flex; flex-direction: column; }
-        main { flex: 1; }
-        .navbar-brand img { border-radius: 5px; }
-    </style>
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg border-bottom mb-4 shadow-sm" style="background-color: var(--bs-body-bg);">
+<body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg border-bottom mb-4 shadow-sm bg-body">
         <div class="container">
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
-                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" width="30" height="30" class="d-inline-block align-text-top me-2" onerror="this.style.display='none'">
-                Topp-NFS
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
-            <div class="collapse navbar-collapse" id="navbarNav">
+            <a class="navbar-brand fw-bold" href="/">🚑 Topp-NFS</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="nav">
                 <ul class="navbar-nav ms-auto align-items-center">
                     {% if current_user.is_authenticated %}
                         <li class="nav-item"><a class="nav-link" href="/">🏠 Übersicht</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/exam">🚑 Prüfung</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/profile">👤 Mein Profil</a></li>
-                        
+                        <li class="nav-item"><a class="nav-link" href="/exam">📝 Prüfung</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/leaderboard">🏆 Rangliste</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/profile">👤 Profil</a></li>
                         {% if current_user.is_admin %}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-warning" href="#" role="button" data-bs-toggle="dropdown">⚙️ Verwaltung</a>
+                            <a class="nav-link dropdown-toggle text-warning" href="#" data-bs-toggle="dropdown">⚙️ Admin</a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="/admin">Fragen verwalten</a></li>
-                                <li><a class="dropdown-item" href="/admin/users">Benutzer verwalten</a></li>
+                                <li><a class="dropdown-item" href="/admin">Content</a></li>
+                                <li><a class="dropdown-item" href="/admin/users">User</a></li>
                             </ul>
                         </li>
                         {% endif %}
-                        
-                        <li class="nav-item ms-lg-2"><a class="nav-link btn btn-outline-danger btn-sm px-3" href="/logout">Logout</a></li>
+                        <li class="nav-item ms-2"><a class="btn btn-sm btn-outline-danger" href="/logout">Logout</a></li>
                     {% else %}
-                        <li class="nav-item"><a class="nav-link btn btn-primary text-white btn-sm px-3" href="/login">Login</a></li>
+                        <li class="nav-item"><a class="btn btn-sm btn-primary" href="/login">Login</a></li>
                     {% endif %}
-                    <li class="nav-item ms-3 border-start ps-3">
-                        <button class="btn nav-link" id="themeToggle" onclick="toggleTheme()" title="Design wechseln"><i class="bi bi-moon-stars-fill" id="themeIcon"></i></button>
-                    </li>
+                    <li class="nav-item ms-3"><button class="btn nav-link" onclick="toggleTheme()"><i class="bi bi-moon-stars-fill" id="themeIcon"></i></button></li>
                 </ul>
             </div>
         </div>
     </nav>
-
-    <main class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+    <main class="container flex-grow-1">
+        {% with m=get_flashed_messages(with_categories=true) %}{% if m %}{% for c,t in m %}<div class="alert alert-{{c}}">{{t}}</div>{% endfor %}{% endif %}{% endwith %}
         {% block content %}{% endblock %}
     </main>
-
-    <footer class="bg-body-tertiary text-center text-muted py-3 mt-5 border-top">
-        <div class="container"><small>&copy; 2025 Topp-NFS Training. Alle Rechte vorbehalten.</small></div>
-    </footer>
-
+    <footer class="bg-body-tertiary py-3 mt-5 text-center text-muted"><small>&copy; 2025 Topp-NFS</small></footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        document.documentElement.setAttribute('data-bs-theme', savedTheme);
-        updateIcon(savedTheme);
-        function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-bs-theme');
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-bs-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateIcon(newTheme);
-        }
-        function updateIcon(theme) {
-            const icon = document.getElementById('themeIcon');
-            if(theme === 'dark') { icon.classList.remove('bi-moon-stars-fill'); icon.classList.add('bi-sun-fill'); }
-            else { icon.classList.remove('bi-sun-fill'); icon.classList.add('bi-moon-stars-fill'); }
-        }
+        const s=localStorage.getItem('t')||'light'; document.documentElement.setAttribute('data-bs-theme',s);
+        function toggleTheme(){const n=document.documentElement.getAttribute('data-bs-theme')==='light'?'dark':'light'; document.documentElement.setAttribute('data-bs-theme',n); localStorage.setItem('t',n);}
     </script>
 </body>
 </html>

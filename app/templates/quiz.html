@@ -4,43 +4,76 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <style>
+    .cursor-grab { cursor: grab; }
+    .cursor-grab:active { cursor: grabbing; }
+    /* Flip Card Styles */
     .flip-card { background-color: transparent; width: 100%; height: 400px; perspective: 1000px; }
-    .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
+    .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
     .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
     .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     .flip-card-front { background-color: var(--bs-body-bg); border: 2px solid var(--bs-border-color); }
     .flip-card-back { background-color: var(--bs-tertiary-bg); border: 2px solid var(--bs-primary); transform: rotateY(180deg); }
-    .cursor-grab { cursor: grab; }
 </style>
 
 <div class="container py-4">
-    <a href="/" class="btn btn-outline-secondary mb-4">← Zurück</a>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="/" class="btn btn-outline-secondary">← Zurück</a>
+        {% if waiting_count is defined and waiting_count > 0 %}
+            <span class="badge bg-light text-dark border">Noch {{ waiting_count }} in Warteschlange</span>
+        {% endif %}
+    </div>
 
     {% if finished %}
         <div class="alert alert-success text-center p-5 shadow rounded">
-            <h1>🎉</h1><h3>Kategorie gemeistert!</h3>
-            <a href="/learn/{{ category }}?force=true" class="btn btn-warning mt-3">Weiter üben</a>
-            <div class="mt-4"><a href="/" class="btn btn-outline-secondary">Übersicht</a></div>
+            <h1 class="display-1">🎉</h1>
+            <h3>Lerneinheit abgeschlossen!</h3>
+            <p>Du hast alle fälligen Karten für diese Auswahl bearbeitet.</p>
+            <div class="d-flex justify-content-center gap-2 mt-4">
+                <a href="/learn/{{ category }}?force=true" class="btn btn-warning">Alle wiederholen (Force Mode)</a>
+                <a href="/" class="btn btn-outline-secondary">Zur Übersicht</a>
+            </div>
         </div>
     {% else %}
 
         {% set start_time = now.timestamp() %}
 
+        <div class="text-center mb-3">
+            <span class="badge bg-primary mb-1">{{ card.category }}</span>
+            {% if card.subcategory %}
+                <span class="badge bg-info text-dark border mb-1">{{ card.subcategory }}</span>
+            {% endif %}
+            <br>
+            {% for tag in card.tags %}
+                <span class="badge bg-secondary text-light border" style="font-size: 0.7em;">#{{ tag.name }}</span>
+            {% endfor %}
+        </div>
+
         {% if card.type == 'mc' %}
             <div class="card shadow quiz-card mx-auto" style="max-width: 800px;">
                 <div class="card-body p-4 text-center">
-                    <span class="badge bg-info mb-3">{{ card.category }}</span><h3 class="mb-4">{{ card.question }}</h3>
-                    {% if card.image_url %}<img src="{{ card.image_url }}" class="img-fluid rounded mb-3" style="max-height: 300px;">{% endif %}
+                    <h3 class="mb-4">{{ card.question }}</h3>
+                    
+                    {% if card.image_url %}<img src="{{ card.image_url }}" class="img-fluid rounded mb-3 border" style="max-height: 300px;">{% endif %}
+                    {% if card.audio_url %}<div class="mb-3 p-2 bg-light border rounded"><audio controls class="w-100"><source src="{{ card.audio_url }}"></audio></div>{% endif %}
+
                     {% if feedback %}
                         <div class="d-grid gap-2 text-start">
                             {% for opt in options %}
-                                <button class="btn {% if opt==card.answer %}btn-success{% elif opt==user_answer %}btn-danger{% else %}btn-outline-secondary{% endif %}" disabled>{{ opt }}</button>
+                                <button class="btn {% if opt==card.answer %}btn-success{% elif opt==user_answer %}btn-danger{% else %}btn-outline-secondary{% endif %} p-3" disabled>
+                                    {{ opt }}
+                                    {% if opt==card.answer %} (Richtig){% elif opt==user_answer %} (Deine Wahl){% endif %}
+                                </button>
                             {% endfor %}
-                        </div><a href="/learn/{{ card.category }}" class="btn btn-primary w-100 mt-4">Weiter</a>
+                        </div>
+                        <a href="/learn/{{ card.category }}" class="btn btn-primary w-100 mt-4 btn-lg">Nächste Frage</a>
                     {% else %}
                         <form action="/submit/{{ card.id }}" method="POST">
                             <input type="hidden" name="start_time" value="{{ start_time }}">
-                            <div class="d-grid gap-2">{% for opt in options %}<button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary text-start p-3">{{ opt }}</button>{% endfor %}</div>
+                            <div class="d-grid gap-2">
+                                {% for opt in options %}
+                                    <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary text-start p-3 fw-bold">{{ opt }}</button>
+                                {% endfor %}
+                            </div>
                         </form>
                     {% endif %}
                 </div>
@@ -49,17 +82,28 @@
         {% elif card.type == 'anatomy' %}
             <div class="card shadow quiz-card mx-auto" style="max-width: 600px;">
                 <div class="card-body p-4">
-                    <h3 class="text-center">{{ card.question }}</h3>
-                    {% if card.image_url %}<img src="{{ card.image_url }}" class="img-fluid rounded mb-3 mx-auto d-block" style="max-height: 250px;">{% endif %}
+                    <h3 class="text-center mb-4">{{ card.question }}</h3>
+                    {% if card.image_url %}<img src="{{ card.image_url }}" class="img-fluid rounded mb-3 mx-auto d-block" style="max-height: 300px;">{% endif %}
+                    
                     {% if feedback_anatomy %}
-                        <div class="alert {% if result_de %}alert-success{% else %}alert-danger{% endif %}">DE: {% if result_de %}OK{% else %}{{ card.answer }}{% endif %}</div>
-                        <div class="alert {% if result_lat %}alert-success{% else %}alert-danger{% endif %}">LAT: {% if result_lat %}OK{% else %}{{ card.answer_lat }}{% endif %}</div>
-                        <a href="/learn/{{ card.category }}" class="btn btn-primary w-100">Weiter</a>
+                        <div class="alert {% if result_de %}alert-success{% else %}alert-danger{% endif %}">
+                            <strong>Deutsch:</strong> {{ card.answer }} {% if not result_de %}(Deine: Falsch){% endif %}
+                        </div>
+                        <div class="alert {% if result_lat %}alert-success{% else %}alert-danger{% endif %}">
+                            <strong>Latein:</strong> {{ card.answer_lat }} {% if not result_lat %}(Deine: Falsch){% endif %}
+                        </div>
+                        <a href="/learn/{{ card.category }}" class="btn btn-primary w-100 mt-3">Weiter</a>
                     {% else %}
                         <form action="/submit/{{ card.id }}" method="POST">
                             <input type="hidden" name="start_time" value="{{ start_time }}">
-                            <input type="text" name="input_de" class="form-control mb-2" placeholder="Deutsch" required>
-                            <input type="text" name="input_lat" class="form-control mb-3" placeholder="Latein" required>
+                            <div class="mb-3">
+                                <label>Bezeichnung (Deutsch)</label>
+                                <input type="text" name="input_de" class="form-control" autocomplete="off" required>
+                            </div>
+                            <div class="mb-3">
+                                <label>Fachbegriff (Latein)</label>
+                                <input type="text" name="input_lat" class="form-control" autocomplete="off" required>
+                            </div>
                             <button type="submit" class="btn btn-success w-100">Prüfen</button>
                         </form>
                     {% endif %}
@@ -71,32 +115,52 @@
                 <div class="card-body p-4">
                     <h3 class="mb-3 text-center">{{ card.question }}</h3>
                     <div class="row">
-                        <div class="col-lg-6 mb-3 text-center">{% if card.image_url %}<img src="{{ card.image_url }}" class="img-fluid rounded sticky-top" style="max-height: 600px; top: 20px;">{% endif %}</div>
+                        <div class="col-lg-6 mb-3 text-center">
+                            {% if card.image_url %}
+                                <img src="{{ card.image_url }}" class="img-fluid rounded sticky-top border" style="max-height: 600px; top: 20px;">
+                            {% else %}
+                                <div class="alert alert-warning">Bild fehlt!</div>
+                            {% endif %}
+                        </div>
                         <div class="col-lg-6">
-                            {% if not options and not feedback_multi %}<div class="alert alert-warning">⚠️ Keine Teil-Fragen.</div>{% endif %}
                             {% if feedback_multi %}
-                                <div class="table-responsive"><table class="table table-sm">
-                                    {% for res in multi_results %}
-                                        <tr>
-                                            <td><strong>{{ res.label }}</strong></td>
-                                            <td class="{{ 'table-success' if res.is_de_ok else 'table-danger' }}">{% if not res.correct_de %}—{% elif res.is_de_ok %}{{ res.correct_de }}{% else %}<del>{{ res.user_de }}</del> <small>{{ res.correct_de }}</small>{% endif %}</td>
-                                            <td class="{{ 'table-success' if res.is_lat_ok else 'table-danger' }}">{% if not res.correct_lat %}—{% elif res.is_lat_ok %}{{ res.correct_lat }}{% else %}<del>{{ res.user_lat }}</del> <small>{{ res.correct_lat }}</small>{% endif %}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </table></div><a href="/learn/{{ card.category }}" class="btn btn-primary w-100">Weiter</a>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <thead class="table-light"><tr><th>Nr</th><th>Dein Ergebnis</th><th>Lösung</th></tr></thead>
+                                        <tbody>
+                                        {% for res in multi_results %}
+                                            <tr>
+                                                <td class="fw-bold">{{ res.label }}</td>
+                                                <td class="{{ 'table-success' if res.is_de_ok and res.is_lat_ok else 'table-danger' }}">
+                                                    {{ res.user_de }} / {{ res.user_lat }}
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">{{ res.correct_de }} / {{ res.correct_lat }}</small>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <a href="/learn/{{ card.category }}" class="btn btn-primary w-100 mt-3">Weiter</a>
                             {% else %}
                                 <form action="/submit/{{ card.id }}" method="POST">
                                     <input type="hidden" name="start_time" value="{{ start_time }}">
-                                    <div style="max-height: 600px; overflow-y: auto;"><table class="table table-borderless">
-                                        {% for item in options %}
-                                            <tr>
-                                                <td class="h5">{{ item.id }}</td>
-                                                <td>{% if item.de %}<input type="text" name="de_{{ item.id }}" class="form-control form-control-sm" placeholder="DE">{% else %}<input disabled value="—" class="form-control form-control-sm">{% endif %}</td>
-                                                <td>{% if item.lat %}<input type="text" name="lat_{{ item.id }}" class="form-control form-control-sm" placeholder="LAT">{% else %}<input disabled value="—" class="form-control form-control-sm">{% endif %}</td>
-                                            </tr>
-                                        {% endfor %}
-                                    </table></div>
-                                    {% if options %}<button type="submit" class="btn btn-success w-100 mt-3">Prüfen</button>{% endif %}
+                                    <div style="max-height: 600px; overflow-y: auto;">
+                                        <table class="table table-borderless">
+                                            <thead><tr><th>#</th><th>Deutsch</th><th>Latein</th></tr></thead>
+                                            <tbody>
+                                            {% for item in options %}
+                                                <tr>
+                                                    <td class="h5 fw-bold align-middle">{{ item.id }}</td>
+                                                    <td>{% if item.de %}<input type="text" name="de_{{ item.id }}" class="form-control form-control-sm">{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                                    <td>{% if item.lat %}<input type="text" name="lat_{{ item.id }}" class="form-control form-control-sm">{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100 mt-3">Prüfen</button>
                                 </form>
                             {% endif %}
                         </div>
@@ -108,23 +172,55 @@
             <div class="card shadow quiz-card mx-auto" style="max-width: 600px;">
                 <div class="card-body p-4">
                     <h3 class="mb-3 text-center">{{ card.question }}</h3>
+                    <p class="text-muted text-center small"><i class="bi bi-arrow-down-up"></i> Ziehe die Elemente in die richtige Reihenfolge</p>
+                    
+                    {% if card.audio_url %}<div class="mb-3"><audio controls class="w-100"><source src="{{ card.audio_url }}"></audio></div>{% endif %}
+
                     {% if feedback_ordering %}
-                        <div class="alert {{ 'alert-success' if is_correct else 'alert-danger' }}">{{ 'Richtig!' if is_correct else 'Falsch.' }}</div>
+                        <div class="alert {{ 'alert-success' if is_correct else 'alert-danger' }}">
+                            {{ 'Richtig!' if is_correct else 'Leider falsch.' }}
+                        </div>
                         <div class="row">
-                            <div class="col-6"><h6>Deine Lösung:</h6><ul class="list-group">{% for item in user_order %}<li class="list-group-item">{{ loop.index }}. {{ item }}</li>{% endfor %}</ul></div>
-                            <div class="col-6"><h6>Richtig:</h6><ul class="list-group">{% for item in correct_order %}<li class="list-group-item list-group-item-light">{{ loop.index }}. {{ item }}</li>{% endfor %}</ul></div>
-                        </div><a href="/learn/{{ card.category }}" class="btn btn-primary w-100 mt-3">Weiter</a>
+                            <div class="col-6">
+                                <h6>Deine Lösung:</h6>
+                                <ol class="list-group list-group-numbered">
+                                    {% for item in user_order %}
+                                        <li class="list-group-item">{{ item }}</li>
+                                    {% endfor %}
+                                </ol>
+                            </div>
+                            <div class="col-6">
+                                <h6>Korrekte Lösung:</h6>
+                                <ol class="list-group list-group-numbered">
+                                    {% for item in correct_order %}
+                                        <li class="list-group-item list-group-item-success">{{ item }}</li>
+                                    {% endfor %}
+                                </ol>
+                            </div>
+                        </div>
+                        <a href="/learn/{{ card.category }}" class="btn btn-primary w-100 mt-3">Weiter</a>
                     {% else %}
-                        <div class="alert alert-info small py-2">Reihenfolge ziehen!</div>
                         <form action="/submit/{{ card.id }}" method="POST" id="orderForm">
                             <input type="hidden" name="start_time" value="{{ start_time }}">
-                            <ul id="sortable-list" class="list-group mb-4">{% for item in options %}<li class="list-group-item bg-light cursor-grab" data-id="{{ item }}">{{ item }}</li>{% endfor %}</ul>
+                            
+                            <ul id="sortable-list" class="list-group mb-4 shadow-sm">
+                                {% for item in options %}
+                                    <li class="list-group-item bg-light cursor-grab border" data-id="{{ item }}">
+                                        <i class="bi bi-grip-vertical text-muted me-2"></i> {{ item }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                            
                             <input type="hidden" name="order_json" id="orderInput">
-                            <button type="submit" class="btn btn-success w-100">Prüfen</button>
+                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold">Prüfen</button>
                         </form>
+                        
                         <script>
-                            var el=document.getElementById('sortable-list'); var sortable=Sortable.create(el, {animation:150});
-                            document.getElementById('orderForm').addEventListener('submit', function(){ document.getElementById('orderInput').value=JSON.stringify(sortable.toArray()); });
+                            var el = document.getElementById('sortable-list');
+                            var sortable = Sortable.create(el, { animation: 150, ghostClass: 'bg-primary-subtle' });
+                            document.getElementById('orderForm').addEventListener('submit', function(e) {
+                                document.getElementById('orderInput').value = JSON.stringify(sortable.toArray());
+                            });
                         </script>
                     {% endif %}
                 </div>
@@ -134,49 +230,84 @@
             <div class="card shadow quiz-card mx-auto" style="max-width: 1100px;">
                 <div class="card-body p-4">
                     <h3 class="mb-4 text-center">{{ card.question }}</h3>
+                    
                     {% if feedback_assignment %}
-                        <div class="alert {{ 'alert-success' if all_correct else 'alert-warning' }}">{{ 'Perfekt!' if all_correct else 'Fehler gefunden:' }}</div>
-                        <div class="row">
+                        <div class="alert {{ 'alert-success' if all_correct else 'alert-warning' }}">
+                            {{ 'Perfekt gelöst!' if all_correct else 'Da waren Fehler dabei.' }}
+                        </div>
+                        <div class="row g-3">
                             {% for group in assignment_results %}
-                                <div class="col-md mb-3"><div class="card h-100"><div class="card-header fw-bold text-center bg-light">{{ group.name }}</div>
-                                <ul class="list-group list-group-flush">
-                                    {% for item in group.group_items %}
-                                        <li class="list-group-item {{ 'list-group-item-success' if item.correct else 'list-group-item-danger' }}">
-                                            <strong>{{ loop.index }}.</strong> {{ item.text }}
-                                            {% if not item.correct %}
-                                                <br><small class="badge bg-white text-danger border border-danger">
-                                                    {% if item.reason == 'wrong_group' %}Falsche Gruppe -> {{ item.actual_group }}
-                                                    {% elif item.reason == 'wrong_order' %}Falsche Position{% endif %}
-                                                </small>
-                                            {% endif %}
-                                        </li>
-                                    {% endfor %}
-                                    {% for missing in group.missing %}<li class="list-group-item list-group-item-warning"><small>Fehlt: {{ missing }}</small></li>{% endfor %}
-                                </ul></div></div>
+                                <div class="col-md">
+                                    <div class="card h-100 border">
+                                        <div class="card-header fw-bold text-center bg-light">{{ group.name }}</div>
+                                        <ul class="list-group list-group-flush">
+                                            {% for item in group.group_items %}
+                                                <li class="list-group-item {{ 'list-group-item-success' if item.correct else 'list-group-item-danger' }}">
+                                                    {{ item.text }}
+                                                </li>
+                                            {% endfor %}
+                                            {% for missing in group.missing %}
+                                                <li class="list-group-item list-group-item-warning text-muted fst-italic">Fehlt: {{ missing }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
                             {% endfor %}
-                        </div><a href="/learn/{{ card.category }}" class="btn btn-primary w-100 mt-4">Weiter</a>
+                        </div>
+                        <a href="/learn/{{ card.category }}" class="btn btn-primary w-100 mt-4">Weiter</a>
                     {% else %}
                         <form action="/submit/{{ card.id }}" method="POST" id="assignForm">
                             <input type="hidden" name="start_time" value="{{ start_time }}">
-                            <div class="row">
+                            
+                            <div class="row g-3 mb-4">
                                 {% for group in options %}
-                                    <div class="col-md mb-3"><div class="card h-100 border-primary"><div class="card-header bg-primary text-white text-center">{{ group.name }}</div>
-                                    <div class="card-body p-2 bg-light"><ul class="list-group min-vh-25 sortable-group h-100" data-group-name="{{ group.name }}" style="min-height: 150px;"></ul></div></div></div>
+                                    <div class="col-md">
+                                        <div class="card h-100 border-primary">
+                                            <div class="card-header bg-primary text-white text-center fw-bold">{{ group.name }}</div>
+                                            <div class="card-body p-2 bg-light">
+                                                <ul class="list-group min-vh-25 sortable-group h-100" 
+                                                    data-group-name="{{ group.name }}" 
+                                                    style="min-height: 200px; border: 2px dashed #ccc; border-radius: 5px;">
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
                                 {% endfor %}
-                            </div><hr>
-                            <h5 class="text-center">Bausteine</h5>
-                            <div class="card bg-light"><div class="card-body p-2"><ul class="list-group d-flex flex-row flex-wrap gap-2 justify-content-center" id="poolList">
-                                {% for item in pool_items %}<li class="list-group-item shadow-sm border cursor-grab" style="width:auto;" data-val="{{ item.val }}">{{ item.val }}</li>{% endfor %}
-                            </ul></div></div>
+                            </div>
+
+                            <h5 class="text-center text-muted mb-2">Verfügbare Bausteine (ziehen)</h5>
+                            <div class="card bg-white border shadow-sm">
+                                <div class="card-body p-3">
+                                    <ul class="list-group d-flex flex-row flex-wrap gap-2 justify-content-center" id="poolList">
+                                        {% for item in pool_items %}
+                                            <li class="list-group-item shadow-sm border border-secondary cursor-grab px-3 py-2" 
+                                                style="width: auto; list-style: none;" 
+                                                data-val="{{ item.val }}">
+                                                {{ item.val }}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+
                             <input type="hidden" name="assignment_json" id="assignmentInput">
-                            <button type="submit" class="btn btn-success w-100 mt-4">Prüfen</button>
+                            <button type="submit" class="btn btn-success w-100 mt-4 py-3 fw-bold">Prüfen</button>
                         </form>
+
                         <script>
-                            new Sortable(document.getElementById('poolList'), {group:'shared', animation:150});
-                            document.querySelectorAll('.sortable-group').forEach(el=>{new Sortable(el, {group:'shared', animation:150});});
-                            document.getElementById('assignForm').addEventListener('submit', function(){
-                                let r={}; document.querySelectorAll('.sortable-group').forEach(g=>{let n=g.getAttribute('data-group-name'); let i=[]; g.querySelectorAll('li').forEach(l=>i.push(l.getAttribute('data-val'))); r[n]=i;});
-                                document.getElementById('assignmentInput').value=JSON.stringify(r);
+                            new Sortable(document.getElementById('poolList'), { group: 'shared', animation: 150 });
+                            document.querySelectorAll('.sortable-group').forEach(el => {
+                                new Sortable(el, { group: 'shared', animation: 150 });
+                            });
+                            document.getElementById('assignForm').addEventListener('submit', function() {
+                                let result = {};
+                                document.querySelectorAll('.sortable-group').forEach(groupList => {
+                                    let groupName = groupList.getAttribute('data-group-name');
+                                    let items = [];
+                                    groupList.querySelectorAll('li').forEach(li => { items.push(li.getAttribute('data-val')); });
+                                    result[groupName] = items;
+                                });
+                                document.getElementById('assignmentInput').value = JSON.stringify(result);
                             });
                         </script>
                     {% endif %}
@@ -187,8 +318,25 @@
             <div class="mx-auto" style="max-width: 600px;">
                 <div class="flip-card" id="myCard" onclick="document.getElementById('myCard').classList.toggle('flipped')">
                     <div class="flip-card-inner">
-                        <div class="flip-card-front"><span class="badge bg-secondary mb-3">{{ card.category }}</span><h3>{{ card.question }}</h3>{% if card.image_url %}<img src="{{ card.image_url }}" class="img-fluid rounded mt-2" style="max-height: 200px;">{% endif %}<p class="text-muted mt-4 small">(Tippen)</p></div>
-                        <div class="flip-card-back"><h5 class="text-success">Lösung</h5><p class="lead">{{ card.answer }}</p><div class="mt-4 w-100" onclick="event.stopPropagation();"><form action="/submit/{{ card.id }}" method="POST" class="d-flex gap-2"><button type="submit" name="result" value="unknown" class="btn btn-danger flex-grow-1">👎</button><button type="submit" name="result" value="known" class="btn btn-success flex-grow-1">👍</button></form></div></div>
+                        <div class="flip-card-front">
+                            <h3 class="px-3">{{ card.question }}</h3>
+                            {% if card.image_url %}
+                                <img src="{{ card.image_url }}" class="img-fluid rounded mt-2 border" style="max-height: 200px;">
+                            {% endif %}
+                            <p class="text-muted mt-4 small"><i class="bi bi-hand-index-thumb"></i> Tippen zum Umdrehen</p>
+                        </div>
+                        <div class="flip-card-back">
+                            <h5 class="text-success mb-3">Lösung</h5>
+                            <p class="lead px-3">{{ card.answer }}</p>
+                            
+                            <div class="mt-4 w-100 px-4" onclick="event.stopPropagation();">
+                                <form action="/submit/{{ card.id }}" method="POST" class="d-flex gap-2">
+                                    <input type="hidden" name="start_time" value="{{ start_time }}">
+                                    <button type="submit" name="result" value="unknown" class="btn btn-danger flex-grow-1 py-3">👎 Nicht gewusst</button>
+                                    <button type="submit" name="result" value="known" class="btn btn-success flex-grow-1 py-3">👍 Gewusst</button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

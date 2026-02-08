@@ -3,167 +3,120 @@
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+{% for m in messages %}
+<div class="alert alert-warning shadow-sm"><i class="bi bi-megaphone"></i> {{ m.content }}</div>
+{% endfor %}
+
 <div class="row align-items-center mb-5">
     <div class="col-md-8">
-        <h1 class="display-4 fw-bold">Willkommen{% if current_user.is_authenticated %}, {{ current_user.username }}{% endif %}!</h1>
-        <p class="lead text-muted">Bereit für die nächste Lerneinheit? Wähle eine Kategorie.</p>
-        
+        <h1 class="display-5 fw-bold">Hallo, {{ current_user.username if current_user.is_authenticated else 'Gast' }}!</h1>
         {% if current_user.is_authenticated %}
-            <div class="d-flex gap-2 mt-3">
-                <a href="/exam" class="btn btn-danger btn-lg shadow-sm">
-                    <i class="bi bi-lightning-charge-fill"></i> Prüfung starten
-                </a>
-                <a href="/profile" class="btn btn-outline-secondary btn-lg">
-                    <i class="bi bi-person-circle"></i> Mein Profil
-                </a>
+            <div class="d-flex gap-3 mb-4">
+                <span class="badge bg-danger p-2"><i class="bi bi-fire"></i> {{ current_user.streak }} Tage</span>
+                <span class="badge bg-warning text-dark p-2"><i class="bi bi-trophy"></i> {{ current_user.badges|length }} Badges</span>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="/exam" class="btn btn-danger"><i class="bi bi-clipboard-check"></i> Prüfung</a>
+                <a href="/learn/errors" class="btn btn-warning text-dark"><i class="bi bi-bandaid"></i> Fehler üben</a>
+                <a href="/leaderboard" class="btn btn-dark"><i class="bi bi-bar-chart"></i> Rangliste</a>
             </div>
         {% else %}
             <a href="/login" class="btn btn-primary btn-lg mt-3">Jetzt anmelden</a>
         {% endif %}
     </div>
-    <div class="col-md-4 text-center d-none d-md-block">
-        <i class="bi bi-activity text-danger" style="font-size: 8rem; opacity: 0.8;"></i>
+    
+    <div class="col-md-4">
+        {% if current_user.is_authenticated and global_stats.total > 0 %}
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="text-center text-muted">Gesamtfortschritt</h6>
+                <canvas id="overviewChart"></canvas>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center"><i class="bi bi-heart-pulse text-danger" style="font-size: 6rem;"></i></div>
+        {% endif %}
     </div>
 </div>
 
 {% if current_user.is_authenticated %}
-    <div class="row mb-4">
-        <div class="col-lg-8">
-            <h4 class="mb-3">Lern-Kategorien</h4>
-            <div class="row g-3">
-                {% for category, data in stats.items() %}
-                <div class="col-md-6">
-                    <div class="card h-100 shadow-sm hover-effect border-0">
-                        <div class="card-body d-flex flex-column">
-                            <h5 class="card-title fw-bold text-primary">{{ category }}</h5>
+<form action="/learn/custom" method="POST" id="learnForm">
+    <div class="card shadow border-0">
+        <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Themen (Ordner)</h4>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-play-fill"></i> Auswahl lernen</button>
+        </div>
+        <div class="card-body p-0">
+            
+            {% macro render_tree(nodes, level=0) %}
+                <div class="list-group list-group-flush">
+                {% for key, val in nodes.items() %}
+                    <div class="list-group-item border-0 p-0 mb-1">
+                        <div class="d-flex align-items-center p-2 hover-bg" style="padding-left: {{ level * 25 + 10 }}px !important;">
                             
-                            <div class="mt-auto">
-                                <div class="d-flex justify-content-between small text-muted mb-1">
-                                    <span>Fortschritt</span>
-                                    <span>{{ data.learned }} / {{ data.total }}</span>
+                            <div class="me-2">
+                                <input class="form-check-input" type="checkbox" name="categories" value="{{ val._path }}" style="transform: scale(1.2);">
+                            </div>
+
+                            {% if val._subs %}
+                                <a class="me-2 text-dark text-decoration-none" data-bs-toggle="collapse" href="#collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}">
+                                    <i class="bi bi-folder-fill text-warning" style="font-size: 1.2em;"></i>
+                                </a>
+                            {% else %}
+                                <i class="bi bi-file-earmark-text text-secondary me-2"></i>
+                            {% endif %}
+                            
+                            <div class="flex-grow-1">
+                                <span class="fw-bold">{{ key }}</span>
+                                <small class="text-muted ms-2">({{ val._stats.learned }} / {{ val._stats.total }})</small>
+                                <div class="progress mt-1" style="height: 3px; width: 100px;">
+                                    <div class="progress-bar bg-success" style="width: {{ (val._stats.learned / val._stats.total * 100) if val._stats.total > 0 else 0 }}%"></div>
                                 </div>
-                                <div class="progress" style="height: 10px;">
-                                    {% set percent = (data.learned / data.total * 100) if data.total > 0 else 0 %}
-                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ percent }}%"></div>
-                                </div>
-                                <a href="/learn/{{ category }}" class="btn btn-sm btn-outline-primary w-100 mt-3 stretched-link">Lernen</a>
+                            </div>
+
+                            <div class="ms-3 d-flex gap-2">
+                                <a href="/learn/{{ val._path }}" class="btn btn-sm btn-outline-secondary" title="Nur diesen Ordner"><i class="bi bi-play"></i></a>
+                                <button type="button" class="btn btn-sm btn-outline-danger border-0" 
+                                        onclick="if(confirm('Reset {{key}}?')) { var f=document.createElement('form'); f.method='POST'; f.action='/reset/{{val._path}}'; document.body.appendChild(f); f.submit(); }">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
                         </div>
+
+                        {% if val._subs %}
+                            <div class="collapse show" id="collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}">
+                                {{ render_tree(val._subs, level + 1) }}
+                            </div>
+                        {% endif %}
                     </div>
-                </div>
-                {% else %}
-                <div class="col-12">
-                    <div class="alert alert-info">
-                        Noch keine Fragen angelegt. <a href="/admin">Als Admin Fragen hinzufügen</a>.
-                    </div>
-                </div>
                 {% endfor %}
-            </div>
-        </div>
+                </div>
+            {% endmacro %}
 
-        <div class="col-lg-4 mt-4 mt-lg-0">
-            <div class="card shadow border-0">
-                <div class="card-header bg-transparent fw-bold">Gesamtfortschritt</div>
-                <div class="card-body">
-                    <div style="position: relative; height: 250px; width: 100%;">
-                        <canvas id="overviewChart"></canvas>
-                    </div>
-                    <div class="text-center mt-3 small text-muted" id="chartLegend">
-                        </div>
-                </div>
-            </div>
-            
-            <div class="card shadow border-0 mt-3 bg-light">
-                <div class="card-body text-center">
-                    <h6 class="text-muted mb-2">Tools</h6>
-                    <a href="/tools" class="btn btn-outline-dark btn-sm w-100 mb-2">🛠️ Rechner & Tools</a>
-                </div>
-            </div>
+            {{ render_tree(tree) }}
+
         </div>
     </div>
+</form>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            // Daten aus Jinja2 extrahieren
-            let totalQuestions = 0;
-            let totalLearned = 0;
-
-            {% for cat, data in stats.items() %}
-                totalQuestions += {{ data.total }};
-                totalLearned += {{ data.learned }};
-            {% endfor %}
-
-            let totalOpen = totalQuestions - totalLearned;
-
-            // Wenn gar keine Fragen da sind, Dummy anzeigen damit Chart nicht leer ist
-            if (totalQuestions === 0) {
-                totalQuestions = 1; 
-                totalOpen = 1; 
-            }
-
-            const ctx = document.getElementById('overviewChart').getContext('2d');
-            
-            // Farben basierend auf Bootstrap Variables (grob)
-            const colorLearned = '#198754'; // success
-            const colorOpen = '#e9ecef';    // gray-200
-
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Gelernt', 'Offen'],
-                    datasets: [{
-                        data: [totalLearned, totalOpen],
-                        backgroundColor: [colorLearned, colorOpen],
-                        borderWidth: 0,
-                        hoverOffset: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { usePointStyle: true }
-                        }
-                    },
-                    cutout: '70%', // Macht den Ring dünner
-                }
-            });
-
-            // Text in der Mitte (Optional)
-            document.getElementById('chartLegend').innerHTML = 
-                `<strong>${totalLearned}</strong> von <strong>${totalQuestions}</strong> Fragen gemeistert`;
-        });
-    </script>
-{% else %}
-    <div class="row mt-5">
-        <div class="col-md-4 mb-4">
-            <div class="card h-100 border-0 shadow-sm text-center p-4">
-                <div class="fs-1 text-primary mb-3"><i class="bi bi-card-text"></i></div>
-                <h5>Karteikarten</h5>
-                <p class="text-muted">Lerne systematisch mit dem bewährten Karteikarten-System.</p>
-            </div>
-        </div>
-        <div class="col-md-4 mb-4">
-            <div class="card h-100 border-0 shadow-sm text-center p-4">
-                <div class="fs-1 text-success mb-3"><i class="bi bi-diagram-3"></i></div>
-                <h5>Algorithmen</h5>
-                <p class="text-muted">Trainiere komplexe Abläufe und Medikamentengaben.</p>
-            </div>
-        </div>
-        <div class="col-md-4 mb-4">
-            <div class="card h-100 border-0 shadow-sm text-center p-4">
-                <div class="fs-1 text-danger mb-3"><i class="bi bi-heart-pulse"></i></div>
-                <h5>Prüfungssimulation</h5>
-                <p class="text-muted">Teste dein Wissen unter realistischen Bedingungen.</p>
-            </div>
-        </div>
-    </div>
+{% if global_stats.total > 0 %}
+<script>
+    new Chart(document.getElementById('overviewChart'), {
+        type: 'doughnut', 
+        data: {
+            labels: ['Gelernt', 'Offen'], 
+            datasets: [{
+                data: [{{global_stats.learned}}, {{global_stats.total - global_stats.learned}}], 
+                backgroundColor: ['#198754', '#e9ecef']
+            }]
+        },
+        options: { cutout: '70%', plugins: { legend: { display: false } } }
+    });
+</script>
 {% endif %}
 
 <style>
-    .hover-effect { transition: transform 0.2s; }
-    .hover-effect:hover { transform: translateY(-3px); }
+    .hover-bg:hover { background-color: #f8f9fa; }
 </style>
+{% endif %}
 {% endblock %}
