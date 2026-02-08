@@ -1,0 +1,66 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container py-4">
+    
+    <div class="text-center mb-5">
+        {% if passed %}
+            <div class="display-1">🎉</div>
+            <h1 class="display-4 fw-bold text-success">Bestanden!</h1>
+        {% else %}
+            <div class="display-1">⚠️</div>
+            <h1 class="display-4 fw-bold text-danger">Nicht bestanden</h1>
+        {% endif %}
+        
+        <p class="lead mt-3">Du hast <strong>{{ score }}</strong> von <strong>{{ total }}</strong> Fragen richtig beantwortet.</p>
+        
+        <div class="progress mt-3" style="height: 30px;">
+            <div class="progress-bar {% if passed %}bg-success{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ percent }}%">
+                {{ percent }}%
+            </div>
+        </div>
+        <small class="text-muted">Benötigt: 60%</small>
+        
+        <div class="mt-4">
+            <a href="/exam" class="btn btn-primary">Neue Prüfung starten</a>
+            <a href="/" class="btn btn-outline-secondary">Zurück zur Übersicht</a>
+        </div>
+    </div>
+
+    <h3 class="mb-4">Detaillierte Auswertung:</h3>
+    
+    {% for res in results %}
+    <div class="card mb-3 shadow-sm border-start border-5 {% if res.is_correct %}border-success{% else %}border-danger{% endif %}">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <span class="badge bg-secondary mb-1">{{ res.category }}</span>
+                    <h5 class="card-title">{{ res.question }}</h5>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    {% if res.is_correct %}
+                        <span class="badge bg-success p-2">Richtig</span>
+                    {% else %}
+                        <span class="badge bg-danger p-2">Falsch</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <hr>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <small class="text-muted">Deine Antwort:</small><br>
+                    <span class="{% if not res.is_correct %}text-danger fw-bold{% endif %}">
+                        {{ res.user_answer }}
+                    </span>
+                </div>
+                <div class="col-md-6">
+                    <small class="text-muted">Richtige Lösung:</small><br>
+                    <span class="text-success fw-bold">{{ res.correct_answer }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

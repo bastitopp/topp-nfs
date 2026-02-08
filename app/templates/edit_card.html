@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="card shadow">
+    <div class="card-header bg-primary text-white">Frage #{{ card.id }} bearbeiten</div>
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            
+            <div class="mb-3">
+                <label>Kategorie</label>
+                <div class="input-group">
+                    <select name="category_select" class="form-select">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {% if cat == card.category %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="category_new" class="form-control" placeholder="Oder umbenennen in...">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label>Typ</label>
+                <select name="type" class="form-select" id="typeSelect" onchange="toggleOptions()">
+                    <option value="flashcard" {% if card.type == 'flashcard' %}selected{% endif %}>Karteikarte</option>
+                    <option value="mc" {% if card.type == 'mc' %}selected{% endif %}>Multiple Choice</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label>Frage</label>
+                <textarea name="question" class="form-control" rows="3">{{ card.question }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label>Antwort</label>
+                <textarea name="answer" class="form-control" rows="3">{{ card.answer }}</textarea>
+            </div>
+
+            <div class="mb-3" id="mcOptions" style="display: {% if card.type == 'mc' %}block{% else %}none{% endif %};">
+                <label>MC Optionen (Alle Optionen inkl. Antwort, Komma-getrennt)</label>
+                <input type="text" name="options" class="form-control" value="{{ options_str }}">
+            </div>
+
+            {% if card.image_url %}
+            <div class="mb-3">
+                <p>Aktuelles Bild:</p>
+                <img src="{{ card.image_url }}" style="max-height: 100px;">
+            </div>
+            {% endif %}
+            
+            <div class="mb-3">
+                <label>Neues Bild hochladen (überschreibt altes)</label>
+                <input type="file" name="image" class="form-control">
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="/admin" class="btn btn-secondary">Abbrechen</a>
+                <button type="submit" class="btn btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleOptions() {
+    var type = document.getElementById("typeSelect").value;
+    document.getElementById("mcOptions").style.display = (type === "mc") ? "block" : "none";
+}
+</script>
+{% endblock %}

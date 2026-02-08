@@ -1,0 +1,27 @@
+services:
+  web:
+    build: ./app
+    container_name: topp_nfs_web
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://topp_nfs:sani_passwort@db:5432/topp_nfs_db
+    depends_on:
+      - db
+    volumes:
+      - ./uploads:/app/static/uploads
+    restart: always
+
+  db:
+    image: postgres:15
+    container_name: topp_nfs_db
+    environment:
+      POSTGRES_USER: topp_nfs
+      POSTGRES_PASSWORD: sani_passwort
+      POSTGRES_DB: topp_nfs_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_data:

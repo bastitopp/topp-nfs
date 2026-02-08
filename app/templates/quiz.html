@@ -1,0 +1,183 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<style>
+    /* --- FLIP CARD CSS --- */
+    .flip-card {
+        background-color: transparent;
+        width: 100%;
+        height: 400px;
+        perspective: 1000px;
+    }
+    
+    .flip-card-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+        cursor: pointer;
+    }
+    
+    .flip-card.flipped .flip-card-inner {
+        transform: rotateY(180deg);
+    }
+    
+    .flip-card-front, .flip-card-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        border-radius: 15px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .flip-card-front {
+        background-color: var(--bs-body-bg);
+        border: 2px solid var(--bs-border-color);
+        color: var(--bs-body-color);
+    }
+    
+    .flip-card-back {
+        background-color: var(--bs-tertiary-bg); 
+        border: 2px solid var(--bs-primary);
+        color: var(--bs-body-color);
+        transform: rotateY(180deg);
+    }
+</style>
+
+<div class="container py-4">
+    <a href="/" class="btn btn-outline-secondary mb-4">← Zurück zur Übersicht</a>
+
+    {% if finished %}
+        <div class="alert alert-success text-center p-5 shadow rounded">
+            <h1 class="display-1">🎉</h1>
+            
+            {% if waiting_count > 0 %}
+                <h2 class="mt-3">Pause verdient!</h2>
+                <p class="lead">
+                    Alle fälligen Fragen erledigt.<br>
+                    <strong>{{ waiting_count }} Karten</strong> sind gerade in der "Lernsperre" (Wartezeit nach Fehler).
+                </p>
+                <hr>
+                <p>Willst du sie trotzdem jetzt sofort wiederholen?</p>
+                
+                <a href="/learn/{{ category }}?force=true" class="btn btn-warning btn-lg shadow fw-bold">
+                    🚀 Jetzt weiterlernen (Sperre ignorieren)
+                </a>
+                
+                <div class="mt-4">
+                     <a href="/" class="btn btn-outline-secondary">Zur Übersicht</a>
+                </div>
+
+            {% else %}
+                <h2 class="mt-3">Kategorie gemeistert!</h2>
+                <p class="lead">Es gibt keine neuen oder fälligen Karten mehr in <strong>{{ category }}</strong>.</p>
+                
+                <div class="d-flex justify-content-center gap-3 mt-4">
+                    <a href="/" class="btn btn-primary">Zur Übersicht</a>
+                    
+                    <form action="/reset/{{ category }}" method="POST" onsubmit="return confirm('Wirklich den gesamten Fortschritt für {{ category }} löschen? Alle Karten werden auf Box 0 gesetzt.');">
+                        <button type="submit" class="btn btn-outline-danger">
+                            ♻️ Alles zurücksetzen (Neu starten)
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+
+    {% else %}
+
+        {% if card.type == 'mc' %}
+            <div class="card shadow quiz-card mx-auto" style="max-width: 800px;">
+                <div class="card-body p-4 text-center">
+                    <span class="badge bg-info mb-3">{{ card.category }}</span>
+                    <h3 class="mb-4">{{ card.question }}</h3>
+
+                    {% if card.image_url %}
+                        <img src="{{ card.image_url }}" class="img-fluid rounded mb-3" style="max-height: 300px;">
+                    {% endif %}
+
+                    {% if feedback %}
+                        <div class="d-grid gap-2 text-start">
+                            {% for opt in options %}
+                                {% if opt == card.answer %}
+                                    <button class="btn btn-success" disabled>✓ {{ opt }} (Richtige Lösung)</button>
+                                {% elif opt == user_answer and not is_correct %}
+                                    <button class="btn btn-danger" disabled>✗ {{ opt }} (Deine Antwort)</button>
+                                {% else %}
+                                    <button class="btn btn-outline-secondary" disabled>{{ opt }}</button>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="mt-4 pt-3 border-top">
+                             <a href="/learn/{{ card.category }}{{ '?force=true' if force_mode else '' }}" class="btn btn-primary w-100 btn-lg">
+                                Nächste Frage ➔
+                             </a>
+                        </div>
+                    {% else %}
+                        <form action="/submit/{{ card.id }}" method="POST">
+                            <div class="d-grid gap-2">
+                                {% for opt in options %}
+                                    <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary text-start p-3">{{ opt }}</button>
+                                {% endfor %}
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-muted text-center small">Box: {{ box }}</div>
+            </div>
+
+        {% else %}
+            <div class="mx-auto" style="max-width: 600px;">
+                
+                <div class="flip-card" id="myCard" onclick="flipCard()">
+                    <div class="flip-card-inner">
+                        
+                        <div class="flip-card-front">
+                            <span class="badge bg-secondary mb-3">{{ card.category }}</span>
+                            <h3 class="fw-bold">{{ card.question }}</h3>
+                            {% if card.image_url %}
+                                <img src="{{ card.image_url }}" class="img-fluid rounded mt-2" style="max-height: 200px;">
+                            {% endif %}
+                            <p class="text-muted mt-4 small">(Tippen zum Umdrehen)</p>
+                        </div>
+                        
+                        <div class="flip-card-back">
+                            <h5 class="text-success text-uppercase small fw-bold">Lösung</h5>
+                            <p class="lead fw-bold">{{ card.answer }}</p>
+                            
+                            <div class="mt-4 w-100" onclick="event.stopPropagation();">
+                                <p class="small text-muted mb-2">Gewusst?</p>
+                                <form action="/submit/{{ card.id }}" method="POST" class="d-flex gap-2">
+                                    <button type="submit" name="result" value="unknown" class="btn btn-danger flex-grow-1">Nein 👎</button>
+                                    <button type="submit" name="result" value="known" class="btn btn-success flex-grow-1">Ja 👍</button>
+                                </form>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                
+                <div class="text-center text-muted mt-3 small">
+                    Aktuelle Lernstufe: Box {{ box }}
+                </div>
+            </div>
+
+            <script>
+                function flipCard() {
+                    document.getElementById('myCard').classList.toggle('flipped');
+                }
+            </script>
+        {% endif %}
+
+    {% endif %}
+</div>
+{% endblock %}
