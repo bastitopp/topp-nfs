@@ -1,84 +1,67 @@
 {% extends "layout.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>⚙️ Verwaltung</h2>
+    <h2>⚙️ Fragen-Verwaltung</h2>
     <div>
-        <a href="/admin/users" class="btn btn-warning me-2">👥 Benutzer verwalten</a>
-        
-        <button class="btn btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#createForm">
-            + Neue Frage
-        </button>
+        <a href="/admin/users" class="btn btn-outline-dark me-2">👥 Zu den Benutzern</a>
+        <button class="btn btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#createForm">+ Neue Frage</button>
     </div>
 </div>
-<div class="card shadow mb-4 border-info">
-    <div class="card-header bg-info text-dark">
-        📥 Massen-Import (CSV)
-    </div>
-    <div class="card-body">
-        <form action="/admin/import" method="POST" enctype="multipart/form-data" class="row align-items-center">
-            <div class="col-auto">
-                <label>CSV-Datei wählen:</label>
-            </div>
-            <div class="col-auto">
-                <input type="file" name="file" class="form-control" accept=".csv" required>
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-primary">Hochladen</button>
-            </div>
-        </form>
-        <div class="mt-2 text-muted small">
-            <p class="mb-0"><strong>Format (Trennzeichen: Semikolon):</strong></p>
-            <code>Kategorie; Typ; Frage; Antwort; [Optionen bei MC]</code>
-            <br>
-            <em>Beispiel:</em> <code>Recht; mc; Was ist §34 StGB?; Rechtfertigender Notstand; Notwehr, Garantenstellung</code>
-        </div>
-    </div>
-</div>
+
 <div class="collapse mb-5" id="createForm">
     <div class="card shadow border-success">
         <div class="card-header bg-success text-white">Neue Frage anlegen</div>
         <div class="card-body">
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" id="createFormElem">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label>Kategorie</label>
                         <select name="category_select" class="form-select mb-2">
-                            {% for cat in categories %}
-                            <option value="{{ cat }}">{{ cat }}</option>
-                            {% endfor %}
+                            {% for cat in categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
                         </select>
-                        <input type="text" name="category_new" class="form-control" placeholder="...oder NEUE Kategorie erstellen">
+                        <input type="text" name="category_new" class="form-control" placeholder="Neue Kategorie">
                     </div>
-                    
                     <div class="col-md-6 mb-3">
                         <label>Typ</label>
-                        <select name="type" class="form-select" id="typeSelect" onchange="toggleOptions('typeSelect', 'mcOptions')">
+                        <select name="type" class="form-select" id="typeSelect" onchange="toggleOptions()">
                             <option value="flashcard">Karteikarte</option>
                             <option value="mc">Multiple Choice</option>
+                            <option value="anatomy">Anatomie (Single)</option>
+                            <option value="anatomy_multi">Anatomie (Multi-Parts)</option>
+                            <option value="ordering">Reihenfolge (Sortieren)</option>
+                            <option value="assignment">Zuordnung (Zweige)</option>
                         </select>
                     </div>
                 </div>
 
-                <div class="mb-3">
-                    <label>Frage</label>
-                    <textarea name="question" class="form-control" required></textarea>
+                <div class="mb-3"><label>Frage</label><textarea name="question" class="form-control" required></textarea></div>
+                <div class="mb-3"><label>Antwort / Lösungstext</label><textarea name="answer" class="form-control"></textarea></div>
+
+                <div class="mb-3" id="mcOptions" style="display:none;"><label>Falsche Antworten (Komma-getrennt)</label><input type="text" name="options" class="form-control"></div>
+                <div class="mb-3" id="anatomyField" style="display:none;"><label>Fachbegriff (Latein)</label><input type="text" name="answer_lat" class="form-control"></div>
+                
+                <div class="mb-3" id="anatomyMultiOptions" style="display:none;">
+                    <label class="fw-bold">Beschriftungen</label>
+                    <div id="multiFieldsContainer"></div>
+                    <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="addMultiRow()">+ Zeile</button>
+                    <input type="hidden" name="multi_json" id="multiJsonInput">
                 </div>
 
-                <div class="mb-3">
-                    <label>Antwort (Lösung)</label>
-                    <textarea name="answer" class="form-control" required></textarea>
+                <div class="mb-3" id="orderingOptions" style="display:none;">
+                    <label class="fw-bold">Korrekte Reihenfolge (1. bis Letzter)</label>
+                    <div id="orderFieldsContainer"></div>
+                    <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="addOrderRow()">+ Schritt</button>
+                    <input type="hidden" name="ordering_json" id="orderingJsonInput">
                 </div>
 
-                <div class="mb-3" id="mcOptions" style="display:none;">
-                    <label>Falsche Antworten (Komma-getrennt)</label>
-                    <input type="text" name="options" class="form-control">
+                <div class="mb-3" id="assignmentOptions" style="display:none;">
+                    <label class="fw-bold">Gruppen & Items (Reihenfolge wichtig!)</label>
+                    <div id="assignmentContainer" class="d-grid gap-3"></div>
+                    <button type="button" class="btn btn-sm btn-info mt-3" onclick="addAssignGroup()">+ Neue Gruppe</button>
+                    <input type="hidden" name="assignment_json" id="assignmentJsonInput">
                 </div>
 
-                <div class="mb-3">
-                    <label>Bild (Optional)</label>
-                    <input type="file" name="image" class="form-control">
-                </div>
-
+                <div class="mb-3"><label>Bild</label><input type="file" name="image" class="form-control"></div>
                 <button type="submit" class="btn btn-success w-100">Speichern</button>
             </form>
         </div>
@@ -86,50 +69,76 @@
 </div>
 
 <div class="card shadow">
-    <div class="card-header bg-dark text-white">Fragen-Datenbank ({{ cards|length }} Fragen)</div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-striped table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Kat.</th>
-                        <th>Frage</th>
-                        <th>Box</th>
-                        <th>Aktionen</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for card in cards %}
-                    <tr>
-                        <td>{{ card.id }}</td>
-                        <td><span class="badge bg-secondary">{{ card.category }}</span></td>
-                        <td>{{ card.question[:50] }}...</td>
-                        <td>
-                            <span class="badge bg-info">{{ card.box }}</span>
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="/admin/edit/{{ card.id }}" class="btn btn-primary">✏️</a>
-                                
-                                <form action="/admin/delete/{{ card.id }}" method="POST" onsubmit="return confirm('Wirklich löschen?');" style="display:inline;">
-                                    <button type="submit" class="btn btn-danger">🗑️</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <table class="table table-hover mb-0">
+            <thead><tr><th>ID</th><th>Typ</th><th>Frage</th><th></th></tr></thead>
+            <tbody>
+                {% for card in cards %}
+                <tr>
+                    <td>{{ card.id }}</td>
+                    <td><small>{{ card.type }}</small></td>
+                    <td>{{ card.question[:50] }}...</td>
+                    <td><a href="/admin/edit/{{ card.id }}" class="btn btn-sm btn-primary">✏️</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-function toggleOptions(selectId, divId) {
-    var type = document.getElementById(selectId).value;
-    document.getElementById(divId).style.display = (type === "mc") ? "block" : "none";
+function toggleOptions() {
+    var type = document.getElementById('typeSelect').value;
+    if(document.getElementById('mcOptions')) document.getElementById('mcOptions').style.display = (type==="mc")?"block":"none";
+    if(document.getElementById('anatomyField')) document.getElementById('anatomyField').style.display = (type==="anatomy")?"block":"none";
+    if(document.getElementById('anatomyMultiOptions')) document.getElementById('anatomyMultiOptions').style.display = (type==="anatomy_multi")?"block":"none";
+    if(document.getElementById('orderingOptions')) document.getElementById('orderingOptions').style.display = (type==="ordering")?"block":"none";
+    if(document.getElementById('assignmentOptions')) document.getElementById('assignmentOptions').style.display = (type==="assignment")?"block":"none";
 }
+
+function addMultiRow(id="", de="", lat="") {
+    const d=document.createElement('div'); d.className="input-group mb-2 multi-row";
+    d.innerHTML=`<span class="input-group-text">#</span><input type="text" class="form-control" placeholder="Nr" value="${id||document.getElementById('multiFieldsContainer').children.length+1}" name="row_id"><input type="text" class="form-control" placeholder="DE" value="${de}"><input type="text" class="form-control" placeholder="LAT" value="${lat}"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">X</button>`;
+    document.getElementById('multiFieldsContainer').appendChild(d);
+}
+
+function addOrderRow(val="") {
+    const d=document.createElement('div'); d.className="input-group mb-2 order-row";
+    d.innerHTML=`<span class="input-group-text">.</span><input type="text" class="form-control" placeholder="Schritt..." value="${val}"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">X</button>`;
+    document.getElementById('orderFieldsContainer').appendChild(d);
+}
+
+function addAssignGroup(name="", items=[]) {
+    const d=document.createElement('div'); d.className="card border-secondary assignment-group";
+    d.innerHTML=`<div class="card-header bg-secondary text-white d-flex gap-2"><input type="text" class="form-control form-control-sm group-name" placeholder="Gruppen-Name" value="${name}"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.card').remove()">X</button></div><div class="card-body p-2"><div class="item-list d-grid gap-2 mb-2"></div><button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="addAssignItem(this)">+ Item</button></div>`;
+    document.getElementById('assignmentContainer').appendChild(d);
+    const list = d.querySelector('.item-list');
+    items.forEach(i => addAssignItemToContainer(list, i));
+}
+function addAssignItem(btn) { addAssignItemToContainer(btn.previousElementSibling, ""); }
+function addAssignItemToContainer(c, v) {
+    const d=document.createElement('div'); d.className="input-group input-group-sm";
+    d.innerHTML=`<input type="text" class="form-control item-input" placeholder="Baustein" value="${v}"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">X</button>`;
+    c.appendChild(d);
+}
+
+document.getElementById('createFormElem').addEventListener('submit', function(e) {
+    var type = document.getElementById('typeSelect').value;
+    if (type === 'anatomy_multi') {
+        let d=[]; document.querySelectorAll('#createFormElem .multi-row').forEach(r=>{let i=r.querySelectorAll('input'); d.push({id:i[0].value.trim(),de:i[1].value.trim(),lat:i[2].value.trim()});});
+        document.getElementById('multiJsonInput').value = JSON.stringify(d);
+        if(!this.querySelector('[name="answer"]').value) this.querySelector('[name="answer"]').value=".";
+    }
+    if (type === 'ordering') {
+        let d=[]; document.querySelectorAll('#createFormElem .order-row input').forEach(i=>{if(i.value.trim())d.push(i.value.trim());});
+        document.getElementById('orderingJsonInput').value = JSON.stringify(d);
+        if(!this.querySelector('[name="answer"]').value) this.querySelector('[name="answer"]').value=".";
+    }
+    if (type === 'assignment') {
+        let g=[]; document.querySelectorAll('.assignment-group').forEach(c=>{let n=c.querySelector('.group-name').value.trim(); if(n){let i=[]; c.querySelectorAll('.item-input').forEach(inp=>{if(inp.value.trim())i.push(inp.value.trim())}); g.push({name:n,items:i});}});
+        document.getElementById('assignmentJsonInput').value = JSON.stringify(g);
+        if(!this.querySelector('[name="answer"]').value) this.querySelector('[name="answer"]').value=".";
+    }
+});
 </script>
 {% endblock %}

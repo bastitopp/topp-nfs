@@ -1,82 +1,169 @@
 {% extends "layout.html" %}
-{% block content %}
 
-<div class="text-center mb-5 p-4 rounded bg-body shadow-sm border-bottom border-primary border-4">
-    <h1 class="display-5 fw-bold text-primary">🚑 Topp-NFS</h1>
-    <p class="lead text-muted">Dein Lernfortschritt im Überblick</p>
-    
-    <a href="/exam" class="btn btn-danger btn-lg shadow mt-3 px-5 fw-bold">
-        📝 Prüfungssimulation starten
-    </a>
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="row align-items-center mb-5">
+    <div class="col-md-8">
+        <h1 class="display-4 fw-bold">Willkommen{% if current_user.is_authenticated %}, {{ current_user.username }}{% endif %}!</h1>
+        <p class="lead text-muted">Bereit für die nächste Lerneinheit? Wähle eine Kategorie.</p>
+        
+        {% if current_user.is_authenticated %}
+            <div class="d-flex gap-2 mt-3">
+                <a href="/exam" class="btn btn-danger btn-lg shadow-sm">
+                    <i class="bi bi-lightning-charge-fill"></i> Prüfung starten
+                </a>
+                <a href="/profile" class="btn btn-outline-secondary btn-lg">
+                    <i class="bi bi-person-circle"></i> Mein Profil
+                </a>
+            </div>
+        {% else %}
+            <a href="/login" class="btn btn-primary btn-lg mt-3">Jetzt anmelden</a>
+        {% endif %}
+    </div>
+    <div class="col-md-4 text-center d-none d-md-block">
+        <i class="bi bi-activity text-danger" style="font-size: 8rem; opacity: 0.8;"></i>
+    </div>
 </div>
 
-<div class="row g-4">
-    {% for cat, data in stats.items() %}
-    <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm border-0 hover-shadow">
-            <div class="card-body d-flex flex-column align-items-center">
-                <h5 class="card-title fw-bold mb-3">{{ cat }}</h5>
-                
-                <div style="width: 150px; height: 150px; position: relative;">
-                    <canvas id="chart-{{ loop.index }}"></canvas>
-                    {% set percent = (data.learned / data.total * 100)|round|int if data.total > 0 else 0 %}
-                    <div class="position-absolute top-50 start-50 translate-middle fw-bold text-muted">
-                        {{ percent }}%
+{% if current_user.is_authenticated %}
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h4 class="mb-3">Lern-Kategorien</h4>
+            <div class="row g-3">
+                {% for category, data in stats.items() %}
+                <div class="col-md-6">
+                    <div class="card h-100 shadow-sm hover-effect border-0">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title fw-bold text-primary">{{ category }}</h5>
+                            
+                            <div class="mt-auto">
+                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                    <span>Fortschritt</span>
+                                    <span>{{ data.learned }} / {{ data.total }}</span>
+                                </div>
+                                <div class="progress" style="height: 10px;">
+                                    {% set percent = (data.learned / data.total * 100) if data.total > 0 else 0 %}
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ percent }}%"></div>
+                                </div>
+                                <a href="/learn/{{ category }}" class="btn btn-sm btn-outline-primary w-100 mt-3 stretched-link">Lernen</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                <div class="mt-3 text-center text-muted small">
-                    {{ data.learned }} von {{ data.total }} gelernt
+                {% else %}
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        Noch keine Fragen angelegt. <a href="/admin">Als Admin Fragen hinzufügen</a>.
+                    </div>
                 </div>
-                
-                <a href="/learn/{{ cat }}" class="btn btn-outline-primary mt-3 w-100 rounded-pill">
-                    Starten ▶
-                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-lg-4 mt-4 mt-lg-0">
+            <div class="card shadow border-0">
+                <div class="card-header bg-transparent fw-bold">Gesamtfortschritt</div>
+                <div class="card-body">
+                    <div style="position: relative; height: 250px; width: 100%;">
+                        <canvas id="overviewChart"></canvas>
+                    </div>
+                    <div class="text-center mt-3 small text-muted" id="chartLegend">
+                        </div>
+                </div>
+            </div>
+            
+            <div class="card shadow border-0 mt-3 bg-light">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Tools</h6>
+                    <a href="/tools" class="btn btn-outline-dark btn-sm w-100 mb-2">🛠️ Rechner & Tools</a>
+                </div>
             </div>
         </div>
     </div>
-    {% endfor %}
-</div>
 
-{% if not stats %}
-<div class="text-center py-5">
-    <h3 class="text-muted">Noch keine Daten vorhanden.</h3>
-    {% if current_user.is_authenticated and current_user.is_admin %}
-    <a href="/admin" class="btn btn-primary mt-3">Erste Fragen erstellen</a>
-    {% endif %}
-</div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Daten aus Jinja2 extrahieren
+            let totalQuestions = 0;
+            let totalLearned = 0;
+
+            {% for cat, data in stats.items() %}
+                totalQuestions += {{ data.total }};
+                totalLearned += {{ data.learned }};
+            {% endfor %}
+
+            let totalOpen = totalQuestions - totalLearned;
+
+            // Wenn gar keine Fragen da sind, Dummy anzeigen damit Chart nicht leer ist
+            if (totalQuestions === 0) {
+                totalQuestions = 1; 
+                totalOpen = 1; 
+            }
+
+            const ctx = document.getElementById('overviewChart').getContext('2d');
+            
+            // Farben basierend auf Bootstrap Variables (grob)
+            const colorLearned = '#198754'; // success
+            const colorOpen = '#e9ecef';    // gray-200
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Gelernt', 'Offen'],
+                    datasets: [{
+                        data: [totalLearned, totalOpen],
+                        backgroundColor: [colorLearned, colorOpen],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { usePointStyle: true }
+                        }
+                    },
+                    cutout: '70%', // Macht den Ring dünner
+                }
+            });
+
+            // Text in der Mitte (Optional)
+            document.getElementById('chartLegend').innerHTML = 
+                `<strong>${totalLearned}</strong> von <strong>${totalQuestions}</strong> Fragen gemeistert`;
+        });
+    </script>
+{% else %}
+    <div class="row mt-5">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm text-center p-4">
+                <div class="fs-1 text-primary mb-3"><i class="bi bi-card-text"></i></div>
+                <h5>Karteikarten</h5>
+                <p class="text-muted">Lerne systematisch mit dem bewährten Karteikarten-System.</p>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm text-center p-4">
+                <div class="fs-1 text-success mb-3"><i class="bi bi-diagram-3"></i></div>
+                <h5>Algorithmen</h5>
+                <p class="text-muted">Trainiere komplexe Abläufe und Medikamentengaben.</p>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm text-center p-4">
+                <div class="fs-1 text-danger mb-3"><i class="bi bi-heart-pulse"></i></div>
+                <h5>Prüfungssimulation</h5>
+                <p class="text-muted">Teste dein Wissen unter realistischen Bedingungen.</p>
+            </div>
+        </div>
+    </div>
 {% endif %}
 
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    const statsData = {{ stats|tojson }};
-    let index = 1;
-
-    for (const [category, data] of Object.entries(statsData)) {
-        const ctx = document.getElementById('chart-' + index).getContext('2d');
-        const learned = data.learned;
-        const total = data.total;
-        const remaining = total - learned;
-        
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Gelernt', 'Offen'],
-                datasets: [{
-                    data: [learned, remaining],
-                    backgroundColor: ['#198754', '#e9ecef'],
-                    borderWidth: 0,
-                    hoverOffset: 4
-                }]
-            },
-            options: {
-                cutout: '75%',
-                plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                responsive: true
-            }
-        });
-        index++;
-    }
-});
-</script>
+<style>
+    .hover-effect { transition: transform 0.2s; }
+    .hover-effect:hover { transform: translateY(-3px); }
+</style>
 {% endblock %}

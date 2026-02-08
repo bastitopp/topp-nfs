@@ -1,89 +1,87 @@
 <!DOCTYPE html>
 <html lang="de" data-bs-theme="light">
 <head>
-    <title>Topp-NFS Trainer</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topp-NFS | Notfallsanitäter Training</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#0d6efd">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.png') }}">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
     <style>
-        body { transition: background-color 0.3s, color 0.3s; }
-        .cursor-pointer { cursor: pointer; }
+        body { min-height: 100vh; display: flex; flex-direction: column; }
+        main { flex: 1; }
+        .navbar-brand img { border-radius: 5px; }
     </style>
 </head>
-<body class="bg-body-tertiary">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+<body>
+    <nav class="navbar navbar-expand-lg border-bottom mb-4 shadow-sm" style="background-color: var(--bs-body-bg);">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="/">🚑 Topp-NFS</a>
-            
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" width="30" height="30" class="d-inline-block align-text-top me-2" onerror="this.style.display='none'">
+                Topp-NFS
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                {% if current_user.is_authenticated %}
-                <form class="d-flex ms-auto me-3 my-2 my-lg-0" action="/search" method="GET">
-                    <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Suche (z.B. Herz)" aria-label="Search">
-                    <button class="btn btn-outline-light btn-sm" type="submit">🔍</button>
-                </form>
-                {% endif %}
-
-                <div class="navbar-nav align-items-center">
-                    <button class="btn btn-link nav-link text-white me-2" id="darkModeToggle" title="Dark Mode">
-                        🌙
-                    </button>
-
+                <ul class="navbar-nav ms-auto align-items-center">
                     {% if current_user.is_authenticated %}
+                        <li class="nav-item"><a class="nav-link" href="/">🏠 Übersicht</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/exam">🚑 Prüfung</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/profile">👤 Mein Profil</a></li>
+                        
                         {% if current_user.is_admin %}
-                            <a class="nav-item nav-link fw-bold text-warning" href="/admin">⚙️ Admin</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-warning" href="#" role="button" data-bs-toggle="dropdown">⚙️ Verwaltung</a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="/admin">Fragen verwalten</a></li>
+                                <li><a class="dropdown-item" href="/admin/users">Benutzer verwalten</a></li>
+                            </ul>
+                        </li>
                         {% endif %}
-                        <a class="nav-item nav-link btn btn-outline-light btn-sm px-3 text-white ms-2" href="/logout">Logout</a>
+                        
+                        <li class="nav-item ms-lg-2"><a class="nav-link btn btn-outline-danger btn-sm px-3" href="/logout">Logout</a></li>
                     {% else %}
-                        <a class="nav-item nav-link" href="/login">Login</a>
+                        <li class="nav-item"><a class="nav-link btn btn-primary text-white btn-sm px-3" href="/login">Login</a></li>
                     {% endif %}
-                </div>
+                    <li class="nav-item ms-3 border-start ps-3">
+                        <button class="btn nav-link" id="themeToggle" onclick="toggleTheme()" title="Design wechseln"><i class="bi bi-moon-stars-fill" id="themeIcon"></i></button>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
 
-    <div class="container">
+    <main class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
+                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        
         {% block content %}{% endblock %}
-    </div>
+    </main>
+
+    <footer class="bg-body-tertiary text-center text-muted py-3 mt-5 border-top">
+        <div class="container"><small>&copy; 2025 Topp-NFS Training. Alle Rechte vorbehalten.</small></div>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
     <script>
-        const htmlElement = document.documentElement;
-        const toggleButton = document.getElementById('darkModeToggle');
         const savedTheme = localStorage.getItem('theme') || 'light';
-        htmlElement.setAttribute('data-bs-theme', savedTheme);
-
-        toggleButton.addEventListener('click', () => {
-            const currentTheme = htmlElement.getAttribute('data-bs-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            htmlElement.setAttribute('data-bs-theme', newTheme);
+        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+        updateIcon(savedTheme);
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-bs-theme', newTheme);
             localStorage.setItem('theme', newTheme);
-        });
+            updateIcon(newTheme);
+        }
+        function updateIcon(theme) {
+            const icon = document.getElementById('themeIcon');
+            if(theme === 'dark') { icon.classList.remove('bi-moon-stars-fill'); icon.classList.add('bi-sun-fill'); }
+            else { icon.classList.remove('bi-sun-fill'); icon.classList.add('bi-moon-stars-fill'); }
+        }
     </script>
 </body>
 </html>

@@ -1,64 +1,149 @@
 {% extends "layout.html" %}
+
 {% block content %}
 <div class="container py-4">
-    
-    <div class="text-center mb-5">
-        {% if passed %}
-            <div class="display-1">🎉</div>
-            <h1 class="display-4 fw-bold text-success">Bestanden!</h1>
-        {% else %}
-            <div class="display-1">⚠️</div>
-            <h1 class="display-4 fw-bold text-danger">Nicht bestanden</h1>
-        {% endif %}
-        
-        <p class="lead mt-3">Du hast <strong>{{ score }}</strong> von <strong>{{ total }}</strong> Fragen richtig beantwortet.</p>
-        
-        <div class="progress mt-3" style="height: 30px;">
-            <div class="progress-bar {% if passed %}bg-success{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ percent }}%">
-                {{ percent }}%
+    <div class="card shadow mb-4">
+        <div class="card-body text-center p-5">
+            {% if passed %}
+                <h1 class="display-1 text-success">🎉</h1>
+                <h2 class="text-success fw-bold">Bestanden!</h2>
+            {% else %}
+                <h1 class="display-1 text-danger">⚠️</h1>
+                <h2 class="text-danger fw-bold">Nicht bestanden</h2>
+            {% endif %}
+            
+            <div class="row justify-content-center mt-4">
+                <div class="col-auto text-center border-end px-4">
+                    <small class="text-muted d-block">Ergebnis</small>
+                    <span class="h3 fw-bold">{{ score }} / {{ total }}</span>
+                </div>
+                <div class="col-auto text-center px-4">
+                    <small class="text-muted d-block">Quote</small>
+                    <span class="h3 fw-bold">{{ percent }}%</span>
+                </div>
             </div>
-        </div>
-        <small class="text-muted">Benötigt: 60%</small>
-        
-        <div class="mt-4">
-            <a href="/exam" class="btn btn-primary">Neue Prüfung starten</a>
-            <a href="/" class="btn btn-outline-secondary">Zurück zur Übersicht</a>
+            
+            {% if date %}
+            <p class="text-muted mt-3 small">Geprüft am: {{ date.strftime('%d.%m.%Y um %H:%M') }}</p>
+            {% endif %}
+
+            <div class="mt-4">
+                <a href="/profile" class="btn btn-outline-secondary">Zum Profil</a>
+                <a href="/exam" class="btn btn-primary">Neue Prüfung</a>
+            </div>
         </div>
     </div>
 
-    <h3 class="mb-4">Detaillierte Auswertung:</h3>
+    <h3 class="mb-3">Detailauswertung</h3>
     
     {% for res in results %}
-    <div class="card mb-3 shadow-sm border-start border-5 {% if res.is_correct %}border-success{% else %}border-danger{% endif %}">
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-8">
-                    <span class="badge bg-secondary mb-1">{{ res.category }}</span>
-                    <h5 class="card-title">{{ res.question }}</h5>
-                </div>
-                <div class="col-md-4 text-md-end">
-                    {% if res.is_correct %}
-                        <span class="badge bg-success p-2">Richtig</span>
-                    {% else %}
-                        <span class="badge bg-danger p-2">Falsch</span>
-                    {% endif %}
-                </div>
-            </div>
+    <div class="card mb-3 border-{{ 'success' if res.is_correct else 'danger' }}">
+        <div class="card-header d-flex justify-content-between align-items-center {{ 'bg-success text-white' if res.is_correct else 'bg-danger text-white' }}">
+            <span>Frage {{ loop.index }}: {{ res.question }}</span>
+            <span>{{ 'Richtig' if res.is_correct else 'Falsch' }}</span>
+        </div>
+        <div class="card-body bg-light">
             
-            <hr>
-            
-            <div class="row">
-                <div class="col-md-6">
-                    <small class="text-muted">Deine Antwort:</small><br>
-                    <span class="{% if not res.is_correct %}text-danger fw-bold{% endif %}">
-                        {{ res.user_answer }}
-                    </span>
+            {% if res.type == 'mc' %}
+                <div class="row">
+                    <div class="col-md-6"><strong>Deine Antwort:</strong> {{ res.user_data }}</div>
+                    <div class="col-md-6 text-success"><strong>Lösung:</strong> {{ res.correct_data }}</div>
                 </div>
-                <div class="col-md-6">
-                    <small class="text-muted">Richtige Lösung:</small><br>
-                    <span class="text-success fw-bold">{{ res.correct_answer }}</span>
+
+            {% elif res.type == 'anatomy' %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Dein:</strong> {{ res.user_data.de }} / {{ res.user_data.lat }}
+                    </div>
+                    <div class="col-md-6 text-success">
+                        <strong>Lösung:</strong> {{ res.correct_data.de }} / {{ res.correct_data.lat }}
+                    </div>
                 </div>
-            </div>
+
+            {% elif res.type == 'anatomy_multi' %}
+                <table class="table table-sm">
+                    <thead><tr><th>ID</th><th>Dein (DE/LAT)</th><th>Lösung (DE/LAT)</th></tr></thead>
+                    <tbody>
+                        {% for item in res.correct_data %}
+                            {% set ns = namespace(u_item=None) %}
+                            {% for u in res.user_data %}
+                                {% if u.id == item.id %}{% set ns.u_item = u %}{% endif %}
+                            {% endfor %}
+                            
+                            <tr class="{{ 'table-danger' if (ns.u_item.de != item.de or ns.u_item.lat != item.lat) else 'table-success' }}">
+                                <td>{{ item.id }}</td>
+                                <td>{{ ns.u_item.de }} / {{ ns.u_item.lat }}</td>
+                                <td>{{ item.de }} / {{ item.lat }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+            {% elif res.type == 'ordering' %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Deine Reihenfolge:</h6>
+                        <ol class="list-group list-group-numbered">
+                            {% for item in res.user_data %}
+                                {% set is_pos_correct = (loop.index0 < res.correct_data|length) and (item == res.correct_data[loop.index0]) %}
+                                <li class="list-group-item {{ 'list-group-item-success' if is_pos_correct else 'list-group-item-danger' }}">
+                                    {{ item }}
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-success">Korrekte Reihenfolge:</h6>
+                        <ol class="list-group list-group-numbered">
+                            {% for item in res.correct_data %}
+                                <li class="list-group-item">{{ item }}</li>
+                            {% endfor %}
+                        </ol>
+                    </div>
+                </div>
+
+            {% elif res.type == 'assignment' %}
+                <div class="row">
+                    <div class="col-md-6 border-end">
+                        <h6 class="text-muted text-center">Deine Zuordnung</h6>
+                        {% for grp_name, items in res.user_data.items() %}
+                            <div class="card mb-2">
+                                <div class="card-header py-1 small fw-bold">{{ grp_name }}</div>
+                                <ul class="list-group list-group-flush small">
+                                    {% for item in items %}
+                                        {% set is_item_here_correct = false %}
+                                        {% for c_grp in res.correct_data %}
+                                            {% if c_grp.name == grp_name and item in c_grp.get('items', []) %}
+                                                {% set is_item_here_correct = true %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        <li class="list-group-item {{ 'text-danger fw-bold' if not is_item_here_correct else 'text-success' }}">
+                                            {{ item }} {{ '❌' if not is_item_here_correct else '✓' }}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <h6 class="text-success text-center">Korrekte Lösung</h6>
+                        {% for grp in res.correct_data %}
+                            <div class="card mb-2 border-success">
+                                <div class="card-header py-1 small fw-bold bg-success text-white">{{ grp.name }}</div>
+                                <ul class="list-group list-group-flush small">
+                                    {% for item in grp.get('items', []) %}
+                                        <li class="list-group-item">{{ item }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            {% endif %}
+
         </div>
     </div>
     {% endfor %}

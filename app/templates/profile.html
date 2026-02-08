@@ -1,0 +1,129 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow border-0">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        {% if user.profile_image %}
+                            <img src="{{ user.profile_image }}" class="rounded-circle border" style="width: 150px; height: 150px; object-fit: cover;">
+                        {% else %}
+                            <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto" style="width: 150px; height: 150px; font-size: 60px;">
+                                {{ user.username[0] | upper }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <h4 class="fw-bold mb-0">{{ user.real_name if user.real_name else user.username }}</h4>
+                    <p class="text-muted small">{{ 'Administrator' if user.is_admin else 'Benutzer' }}</p>
+
+                    <div class="d-flex justify-content-center gap-2 mb-3">
+                        <span class="badge bg-light text-dark border"><i class="bi bi-clock"></i> {{ user.total_learning_time | format_duration }} gelernt</span>
+                        {% if user.age %}
+                        <span class="badge bg-light text-dark border"><i class="bi bi-calendar"></i> {{ user.age }} Jahre</span>
+                        {% endif %}
+                    </div>
+
+                    {% if user.bio %}
+                        <p class="text-muted fst-italic px-2">"{{ user.bio }}"</p>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <button class="btn btn-outline-primary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#editProfile">
+                        <i class="bi bi-pencil"></i> Profil bearbeiten
+                    </button>
+                    
+                    <div class="collapse mt-3 text-start" id="editProfile">
+                        <form method="POST" enctype="multipart/form-data">
+                            <div class="mb-2">
+                                <label class="form-label small">Echter Name</label>
+                                <input type="text" name="real_name" class="form-control form-control-sm" value="{{ user.real_name or '' }}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Alter</label>
+                                <input type="number" name="age" class="form-control form-control-sm" value="{{ user.age or '' }}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Über mich (Bio)</label>
+                                <textarea name="bio" class="form-control form-control-sm" rows="2">{{ user.bio or '' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Profilbild</label>
+                                <input type="file" name="profile_image" class="form-control form-control-sm">
+                            </div>
+                            
+                            <hr>
+                            <h6 class="small fw-bold">Passwort ändern</h6>
+                            <div class="mb-2">
+                                <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Neues Passwort">
+                            </div>
+                            <div class="mb-2">
+                                <input type="password" name="confirm_password" class="form-control form-control-sm" placeholder="Bestätigen">
+                            </div>
+
+                            <button type="submit" class="btn btn-success btn-sm w-100">Speichern</button>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow border-0 mb-4">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-journal-check"></i> Meine Prüfungen
+                </div>
+                <div class="card-body p-0">
+                    {% if attempts %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Ergebnis</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for attempt in attempts %}
+                                <tr>
+                                    <td>{{ attempt.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
+                                    <td>
+                                        <strong>{{ attempt.score }} / {{ attempt.total_questions }}</strong>
+                                        <small class="text-muted">({{ (attempt.score / attempt.total_questions * 100)|int }}%)</small>
+                                    </td>
+                                    <td>
+                                        {% if attempt.passed %}
+                                            <span class="badge bg-success">Bestanden</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Nicht bestanden</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="/profile/exam/{{ attempt.id }}" class="btn btn-sm btn-outline-primary">Details</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                        <div class="p-4 text-center text-muted">
+                            <i class="bi bi-clipboard-x display-4 d-block mb-3"></i>
+                            Noch keine Prüfungen absolviert.
+                            <br>
+                            <a href="/exam" class="btn btn-primary mt-3">Jetzt Prüfung starten</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
