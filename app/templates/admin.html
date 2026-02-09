@@ -2,159 +2,168 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>⚙️ Admin-Dashboard</h2>
-    <a href="/admin/users" class="btn btn-outline-primary">👥 Benutzerverwaltung</a>
+    <h2 class="fw-bold"><i class="bi bi-gear-fill text-warning"></i> Admin Dashboard</h2>
+    <a href="/admin/users" class="btn btn-outline-primary rounded-pill"><i class="bi bi-people-fill"></i> Benutzer verwalten</a>
 </div>
 
-<ul class="nav nav-tabs mb-4" id="adminTab" role="tablist">
-    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#questions">Fragen</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#messages">Nachrichten</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tags">Tags</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#io">Import / Export</button></li>
+<ul class="nav nav-pills mb-4 gap-2" id="adminTab" role="tablist">
+    <li class="nav-item"><button class="nav-link active rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#questions">Fragen</button></li>
+    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#reports">Meldungen {% if reports|length > 0 %}<span class="badge bg-danger">{{ reports|length }}</span>{% endif %}</button></li>
+    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#messages">News</button></li>
+    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#tags">Tags</button></li>
+    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#io">Backup</button></li>
 </ul>
 
 <div class="tab-content">
     
     <div class="tab-pane fade show active" id="questions">
-        <div class="card shadow border-success mb-4">
-            <div class="card-header bg-success text-white cursor-pointer" data-bs-toggle="collapse" data-bs-target="#createForm">+ Neue Frage</div>
-            <div class="collapse show" id="createForm">
-                <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" id="questionForm">
-                        <div class="row mb-3">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white border-bottom-0 py-3">
+                <button class="btn btn-success w-100 rounded-pill fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#createForm">
+                    <i class="bi bi-plus-circle"></i> Neue Frage erstellen
+                </button>
+            </div>
+            <div class="collapse" id="createForm">
+                <div class="card-body bg-light">
+                    <form method="POST" enctype="multipart/form-data" id="questionForm" onsubmit="prepareMultiJson()">
+                        <input type="hidden" name="multi_json" id="multi_json_input">
+
+                        <div class="row g-3 mb-3">
                             <div class="col-md-8">
-                                <label class="fw-bold">Kategorie-Pfad</label>
-                                <input type="text" name="category_path" class="form-control" list="catList" placeholder="z.B. Notfall/Herz (Unterordner mit / trennen)" required>
+                                <label class="fw-bold small">Kategorie-Pfad</label>
+                                <input type="text" name="category_path" class="form-control" list="catList" placeholder="z.B. Innere/Herz" required>
                                 <datalist id="catList">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
                             </div>
                             <div class="col-md-4">
-                                <label class="fw-bold">Typ</label>
-                                <select name="type" id="typeSelect" class="form-select" onchange="toggleOptions()">
+                                <label class="fw-bold small">Typ</label>
+                                <select name="type" id="typeSelect" class="form-select" onchange="updateFormFields()">
+                                    <option value="flashcard">Karteikarte</option>
                                     <option value="mc">Multiple Choice</option>
-                                    <option value="anatomy">Anatomie</option>
-                                    <option value="anatomy_multi">Anatomie (Multi)</option>
+                                    <option value="anatomy">Anatomie (Einfach)</option>
+                                    <option value="anatomy_multi">Anatomie (Multi-ID)</option>
                                     <option value="ordering">Sortieren</option>
                                     <option value="assignment">Zuordnung</option>
-                                    <option value="flashcard">Karteikarte</option>
                                 </select>
                             </div>
                         </div>
 
-                        <label class="fw-bold">Frage</label>
-                        <textarea name="question" class="form-control mb-3" rows="2" required></textarea>
+                        <label class="fw-bold small">Frage / Titel</label>
+                        <textarea name="question" class="form-control mb-3" rows="2" required placeholder="Frage eingeben..."></textarea>
                         
-                        <label>Tags</label>
-                        <input name="tags_input" class="form-control mb-3" placeholder="Komma-getrennt">
-
-                        <div class="p-3 bg-light border rounded mb-3">
-                            <div id="opt_mc" class="type-option"><label>Lösung</label><input name="answer" class="form-control mb-1"><label>Falsche (Komma)</label><input name="options" class="form-control"></div>
-                            <div id="opt_anatomy" class="type-option" style="display:none;"><div class="row"><div class="col"><input name="answer_de_field" class="form-control" placeholder="DE"></div><div class="col"><input name="answer_lat" class="form-control" placeholder="LAT"></div></div></div>
-                            <div id="opt_anatomy_multi" class="type-option" style="display:none;"><div id="multiContainer"></div><button type="button" class="btn btn-sm btn-secondary mt-1" onclick="addMultiRow()">+ Zeile</button><input type="hidden" name="multi_json" id="multiJson"></div>
-                            <div id="opt_ordering" class="type-option" style="display:none;"><div id="orderContainer"></div><button type="button" class="btn btn-sm btn-secondary mt-1" onclick="addOrderRow()">+ Schritt</button><input type="hidden" name="ordering_json" id="orderingJson"></div>
-                            <div id="opt_assignment" class="type-option" style="display:none;"><div id="assignContainer"></div><button type="button" class="btn btn-sm btn-secondary mt-1" onclick="addAssignGroup()">+ Gruppe</button><input type="hidden" name="assignment_json" id="assignmentJson"></div>
+                        <div id="field_standard_answer" class="mb-3">
+                            <label class="fw-bold small">Richtige Antwort</label>
+                            <input name="answer" class="form-control" placeholder="Lösung...">
+                        </div>
+                        <div id="field_options" class="mb-3 d-none">
+                            <label class="fw-bold small">Falsche Optionen (Komma-getrennt)</label>
+                            <input name="options" class="form-control" placeholder="Falsch 1, Falsch 2, Falsch 3">
+                        </div>
+                        <div id="field_anatomy" class="row g-3 mb-3 d-none">
+                            <div class="col-md-6"><label class="fw-bold small">Deutsch</label><input name="answer_de_field" class="form-control"></div>
+                            <div class="col-md-6"><label class="fw-bold small">Latein</label><input name="answer_lat" class="form-control"></div>
+                        </div>
+                        <div id="field_anatomy_multi" class="mb-3 d-none p-3 bg-white rounded border">
+                            <label class="fw-bold small mb-2">Strukturen zuweisen</label>
+                            <table class="table table-sm table-bordered">
+                                <thead><tr><th style="width:10%">ID</th><th>Deutsch</th><th>Latein</th><th></th></tr></thead>
+                                <tbody id="multiTableBody"></tbody>
+                            </table>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addMultiRow()">+ Zeile</button>
+                        </div>
+                        <div id="field_json" class="mb-3 d-none">
+                            <label class="fw-bold small">JSON Konfiguration</label>
+                            <textarea name="ordering_json" class="form-control" rows="3"></textarea>
                         </div>
 
-                        <div class="row mb-3">
-                            <div class="col"><label>Bild</label><input type="file" name="image" class="form-control"></div>
-                            <div class="col"><label>Audio</label><input type="file" name="audio" class="form-control"></div>
+                        <div class="row g-2 mt-3 border-top pt-3">
+                             <div class="col-md-6"><label class="small text-muted">Bild</label><input type="file" name="image" class="form-control form-control-sm"></div>
+                             <div class="col-md-6"><label class="small text-muted">Tags</label><input type="text" name="tags_input" class="form-control form-control-sm"></div>
                         </div>
-                        <button class="btn btn-success w-100">Speichern</button>
+                        <button class="btn btn-primary w-100 mt-4 rounded-pill">Speichern</button>
                     </form>
                 </div>
             </div>
         </div>
-        <table class="table table-hover">
-            <thead><tr><th>Pfad</th><th>Frage</th><th></th></tr></thead>
-            <tbody>
-                {% for c in cards %}
-                <tr>
-                    <td><small>{{ c.category }}</small></td>
-                    <td class="text-truncate" style="max-width:300px;">{{ c.question }}</td>
-                    <td class="text-end"><form action="/admin/delete/{{c.id}}" method="POST" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger">X</button></form></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <div class="tab-pane fade" id="messages">
-        <form action="/admin/messages" method="POST" class="mb-4 d-flex gap-2">
-            <input name="content" class="form-control" placeholder="Neue Nachricht..." required>
-            <button class="btn btn-warning">Senden</button>
-        </form>
-        <ul class="list-group">
-            {% for m in messages %}
-            <li class="list-group-item d-flex justify-content-between">{{ m.content }} <a href="/admin/messages/delete/{{m.id}}" class="text-danger">Löschen</a></li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    <div class="tab-pane fade" id="tags">
-        <form method="POST" class="d-flex gap-2 mb-3">
-            <input name="tag_name" class="form-control" placeholder="Tag Name" required>
-            <button class="btn btn-secondary">Add</button>
-        </form>
-        <div>{% for t in tags %}<span class="badge bg-secondary me-1">{{t.name}}</span>{% endfor %}</div>
-    </div>
-
-    <div class="tab-pane fade" id="io">
-        <div class="row g-4">
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header fw-bold">Import (CSV)</div>
-                    <div class="card-body">
-                        <p class="small text-muted">Format: Kategorie;Typ;Frage;Antwort;Optionen</p>
-                        <form action="/admin/import" method="POST" enctype="multipart/form-data">
-                            <input type="file" name="file" class="form-control mb-3" required>
-                            <button class="btn btn-success w-100">Hochladen</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm text-center p-4">
-                    <h4>Datenbank Backup</h4>
-                    <a href="/admin/export" class="btn btn-primary mt-3">Backup herunterladen (.json)</a>
-                </div>
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light"><tr><th>Kat</th><th>Typ</th><th>Frage</th><th class="text-end">Aktion</th></tr></thead>
+                    <tbody>
+                        {% for c in cards %}
+                        <tr>
+                            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">{{ c.category }}</span></td>
+                            <td><small class="text-muted">{{ c.type }}</small></td>
+                            <td class="text-truncate" style="max-width: 250px;">{{ c.question }}</td>
+                            <td class="text-end text-nowrap">
+                                <a href="/admin/edit/{{ c.id }}" class="btn btn-sm btn-outline-primary rounded-circle me-1"><i class="bi bi-pencil-fill"></i></a>
+                                <form action="/admin/delete/{{c.id}}" method="POST" class="d-inline" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button></form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+
+    <div class="tab-pane fade" id="reports">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                {% if reports %}
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light"><tr><th>Frage</th><th>Grund</th><th>Melder</th><th>Aktion</th></tr></thead>
+                    <tbody>
+                        {% for r in reports %}
+                        <tr>
+                            <td><a href="/admin/edit/{{ r.card_id }}" class="fw-bold text-decoration-none">{{ r.card.question }}</a><br><small class="text-muted">ID: {{ r.card_id }}</small></td>
+                            <td>{{ r.reason }}</td>
+                            <td><small>{{ r.user.username if r.user else 'Gast' }}</small></td>
+                            <td>
+                                <form action="/admin/reports/dismiss/{{ r.id }}" method="POST">
+                                    <button class="btn btn-sm btn-success rounded-pill">Erledigt</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-5 text-center text-muted">Keine offenen Fehlermeldungen.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="messages">
+        <form action="/admin/messages" method="POST" class="mb-4 d-flex gap-2"><input name="content" class="form-control rounded-pill" placeholder="Nachricht..." required><button class="btn btn-warning rounded-circle"><i class="bi bi-send-fill"></i></button></form>
+        <div class="list-group">{% for m in messages %}<div class="list-group-item d-flex justify-content-between">{{ m.content }} <a href="/admin/messages/delete/{{m.id}}" class="text-danger"><i class="bi bi-x-circle"></i></a></div>{% endfor %}</div>
+    </div>
+    <div class="tab-pane fade" id="tags"><div class="alert alert-info">Tags...</div></div>
+    <div class="tab-pane fade" id="io"><form action="/admin/import" method="POST" enctype="multipart/form-data"><input type="file" name="file" class="form-control mb-3"><button class="btn btn-success">Upload</button></form></div>
 </div>
 
 <script>
-    function toggleOptions() {
-        const t = document.getElementById('typeSelect').value;
-        document.querySelectorAll('.type-option').forEach(e=>e.style.display='none');
-        if(t=='mc'||t=='flashcard') document.getElementById('opt_mc').style.display='block';
-        if(t=='anatomy') document.getElementById('opt_anatomy').style.display='block';
-        if(t=='anatomy_multi') document.getElementById('opt_anatomy_multi').style.display='block';
-        if(t=='ordering') document.getElementById('opt_ordering').style.display='block';
-        if(t=='assignment') document.getElementById('opt_assignment').style.display='block';
+let nextId = 1;
+function updateFormFields() {
+    const type = document.getElementById('typeSelect').value;
+    ['field_standard_answer','field_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id=>document.getElementById(id).classList.add('d-none'));
+    if(type==='flashcard'||type==='mc') { document.getElementById('field_standard_answer').classList.remove('d-none'); if(type==='mc') document.getElementById('field_options').classList.remove('d-none'); }
+    else if(type==='anatomy') document.getElementById('field_anatomy').classList.remove('d-none');
+    else if(type==='anatomy_multi') { document.getElementById('field_anatomy_multi').classList.remove('d-none'); if(nextId===1) addMultiRow(); }
+    else if(type==='ordering'||type==='assignment') document.getElementById('field_json').classList.remove('d-none');
+}
+function addMultiRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input class="form-control form-control-sm row-id" value="${nextId++}"></td><td><input class="form-control form-control-sm row-de" placeholder="Deu"></td><td><input class="form-control form-control-sm row-lat" placeholder="Lat"></td><td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>`;
+    document.getElementById('multiTableBody').appendChild(tr);
+}
+function prepareMultiJson() {
+    if(document.getElementById('typeSelect').value === 'anatomy_multi') {
+        const rows = [];
+        document.querySelectorAll('#multiTableBody tr').forEach(tr => { rows.push({id: tr.querySelector('.row-id').value, de: tr.querySelector('.row-de').value, lat: tr.querySelector('.row-lat').value}); });
+        document.getElementById('multi_json_input').value = JSON.stringify(rows);
     }
-    document.addEventListener('DOMContentLoaded', toggleOptions);
-    
-    function addMultiRow(){const d=document.createElement('div'); d.className='input-group mb-1 multi-row'; d.innerHTML='<input class="form-control key-id" placeholder="ID"><input class="form-control val-de" placeholder="DE"><input class="form-control val-lat" placeholder="LAT"><button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">x</button>'; document.getElementById('multiContainer').appendChild(d);}
-    function addOrderRow(){const d=document.createElement('div'); d.className='input-group mb-1 order-row'; d.innerHTML='<input class="form-control val-item" placeholder="Schritt"><button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">x</button>'; document.getElementById('orderContainer').appendChild(d);}
-    function addAssignGroup(){const d=document.createElement('div'); d.className='assign-group border p-2 mb-1'; d.innerHTML='<input class="form-control mb-1 val-group-name" placeholder="Gruppe"><div class="items"></div><button type="button" class="btn btn-sm btn-link" onclick="addAssignItem(this)">+ Item</button>'; document.getElementById('assignContainer').appendChild(d);}
-    function addAssignItem(b){const d=document.createElement('div'); d.className='input-group mb-1 assign-item'; d.innerHTML='<input class="form-control val-item-text"><button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">x</button>'; b.previousElementSibling.appendChild(d);}
-
-    document.getElementById('questionForm').addEventListener('submit', function() {
-        const type=document.getElementById('typeSelect').value;
-        if(type=='anatomy_multi'){
-            let d=[]; document.querySelectorAll('.multi-row').forEach(r=>d.push({id:r.querySelector('.key-id').value, de:r.querySelector('.val-de').value, lat:r.querySelector('.val-lat').value}));
-            document.getElementById('multiJson').value=JSON.stringify(d);
-            if(!this.querySelector('[name="answer"]').value) this.querySelector('[name="answer"]').value=".";
-        }
-        if(type=='ordering'){
-            let d=[]; document.querySelectorAll('.order-row .val-item').forEach(i=>d.push(i.value));
-            document.getElementById('orderingJson').value=JSON.stringify(d);
-            if(!this.querySelector('[name="answer"]').value) this.querySelector('[name="answer"]').value=".";
-        }
-        if(type=='assignment'){
-            let d=[]; document.querySelectorAll('.assign-group').forEach(g=>{let n=g.querySelector('.val-group-name').value; let i=[]; g.querySelectorAll('.val-item-text').forEach(x=>i.push(x.value)); d.push({name:n,items:i})});
-            document.getElementById('assignmentJson').value=JSON.stringify(d);
-            if(!this.querySelector('[name="answer"]').value) this.querySelector('[name="answer"]').value=".";
-        }
-    });
+}
+document.addEventListener('DOMContentLoaded', updateFormFields);
 </script>
 {% endblock %}

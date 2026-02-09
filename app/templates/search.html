@@ -2,31 +2,26 @@
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>🔍 Suchergebnisse für "{{ query }}"</h2>
-        <a href="/" class="btn btn-outline-secondary">Zurück</a>
+        <h4><i class="bi bi-search"></i> Ergebnisse für "{{ query }}"</h4>
+        <a href="/" class="btn btn-light rounded-pill px-4">Zurück</a>
     </div>
 
     {% if results %}
-        <p class="text-muted">{{ results|length }} Treffer gefunden.</p>
-        
-        <div class="row">
+        <div class="row g-3">
             {% for card in results %}
-            <div class="col-md-6 mb-4">
-                <div class="card h-100 shadow-sm border-start border-primary border-4">
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
                     <div class="card-body">
-                        <span class="badge bg-secondary mb-2">{{ card.category }}</span>
-                        {% if card.type == 'mc' %}<span class="badge bg-light text-dark border">MC</span>{% endif %}
-                        
-                        <h5 class="card-title fw-bold">{{ card.question }}</h5>
-                        
-                        <div class="alert alert-light border mt-3">
-                            <strong>Lösung:</strong> {{ card.answer }}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10">{{ card.category }}</span>
+                            {% if current_user.is_admin %}
+                                <a href="/admin/edit/{{ card.id }}" class="text-decoration-none small text-muted"><i class="bi bi-pencil"></i> Edit</a>
+                            {% endif %}
                         </div>
                         
-                        <div class="mt-3 text-end">
-                            {% if current_user.is_admin %}
-                                <a href="/admin/edit/{{ card.id }}" class="btn btn-sm btn-outline-primary">Bearbeiten</a>
-                            {% endif %}
+                        <h6 class="fw-bold mb-3">{{ card.question }}</h6>
+                        <div class="p-2 bg-light rounded text-muted small">
+                            {{ card.answer | truncate(100) }}
                         </div>
                     </div>
                 </div>
@@ -34,10 +29,10 @@
             {% endfor %}
         </div>
     {% else %}
-        <div class="alert alert-warning text-center p-5">
-            <h4>Keine Ergebnisse gefunden.</h4>
-            <p>Versuche es mit einem anderen Begriff (z.B. "Pharma", "Herz", "Gesetz").</p>
-            <a href="/" class="btn btn-primary mt-3">Zur Startseite</a>
+        <div class="text-center py-5">
+            <i class="bi bi-search display-1 text-muted opacity-25"></i>
+            <h5 class="mt-3 text-muted">Nichts gefunden.</h5>
+            <p class="small">Versuche Begriffe wie "Herz", "Medikamente" oder "Recht".</p>
         </div>
     {% endif %}
 </div>

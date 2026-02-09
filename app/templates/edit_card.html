@@ -1,102 +1,92 @@
 {% extends "layout.html" %}
+
 {% block content %}
-<div class="card shadow">
-    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-        <span>Frage #{{ card.id }} bearbeiten</span>
-        <form action="/admin/delete/{{ card.id }}" method="POST" onsubmit="return confirm('Löschen?');" class="m-0">
-            <button type="submit" class="btn btn-sm btn-danger border-white">🗑️ Löschen</button>
-        </form>
-    </div>
-    <div class="card-body">
-        <form method="POST" enctype="multipart/form-data" id="editFormElem">
-            <div class="row">
-                <div class="col-md-6 mb-3"><label>Kategorie</label><input type="text" name="category_new" class="form-control" value="{{ card.category }}"></div>
-                <div class="col-md-6 mb-3"><label>Typ</label>
-                    <select name="type" class="form-select" id="typeSelect" onchange="toggleOptions()">
-                        <option value="flashcard" {% if card.type=='flashcard' %}selected{% endif %}>Karteikarte</option>
-                        <option value="mc" {% if card.type=='mc' %}selected{% endif %}>Multiple Choice</option>
-                        <option value="anatomy" {% if card.type=='anatomy' %}selected{% endif %}>Anatomie (Single)</option>
-                        <option value="anatomy_multi" {% if card.type=='anatomy_multi' %}selected{% endif %}>Anatomie (Multi)</option>
-                        <option value="ordering" {% if card.type=='ordering' %}selected{% endif %}>Reihenfolge</option>
-                        <option value="assignment" {% if card.type=='assignment' %}selected{% endif %}>Zuordnung</option>
-                    </select>
+<div class="container py-4">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white">
+            <h4 class="mb-0 fw-bold">Karte bearbeiten</h4>
+        </div>
+        <div class="card-body bg-light">
+            <form method="POST" enctype="multipart/form-data">
+                
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label class="fw-bold small">Kategorie</label>
+                        <input type="text" name="category_new" value="{{ card.category }}" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold small">Typ (nicht änderbar)</label>
+                        <input type="text" name="type" value="{{ card.type }}" class="form-control" readonly>
+                    </div>
                 </div>
-            </div>
 
-            <div class="mb-3"><textarea name="question" class="form-control" required>{{ card.question }}</textarea></div>
-            <div class="mb-3"><textarea name="answer" class="form-control">{{ card.answer }}</textarea></div>
+                <div class="mb-3">
+                    <label class="fw-bold small">Frage</label>
+                    <textarea name="question" class="form-control" rows="2">{{ card.question }}</textarea>
+                </div>
 
-            <div class="mb-3" id="mcOptions" style="display:none;"><input type="text" name="options" class="form-control" value="{{ options_str }}"></div>
-            <div class="mb-3" id="anatomyField" style="display:none;"><input type="text" name="answer_lat" class="form-control" value="{{ card.answer_lat or '' }}"></div>
-            
-            <div class="mb-3" id="anatomyMultiOptions" style="display:none;"><div id="multiFieldsContainer"></div><button type="button" class="btn btn-sm btn-secondary" onclick="addMultiRow()">+ Zeile</button><input type="hidden" name="multi_json" id="multiJsonInput"></div>
-            <div class="mb-3" id="orderingOptions" style="display:none;"><div id="orderFieldsContainer"></div><button type="button" class="btn btn-sm btn-secondary" onclick="addOrderRow()">+ Schritt</button><input type="hidden" name="ordering_json" id="orderingJsonInput"></div>
-            <div class="mb-3" id="assignmentOptions" style="display:none;"><div id="assignmentContainer" class="d-grid gap-3"></div><button type="button" class="btn btn-sm btn-info" onclick="addAssignGroup()">+ Gruppe</button><input type="hidden" name="assignment_json" id="assignmentJsonInput"></div>
+                <div class="row g-3 mb-3 p-3 bg-white rounded border">
+                    <div class="col-md-6">
+                        <label class="fw-bold small">Tags (Komma-getrennt)</label>
+                        <input type="text" name="tags_input" value="{{ card.tags|join(', ', attribute='name') }}" class="form-control" placeholder="Tag1, Tag2">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-bold small">Bild ändern</label>
+                        {% if card.image_url %}
+                            <div class="mb-2"><img src="{{ card.image_url }}" height="50" class="rounded border"></div>
+                        {% endif %}
+                        <input type="file" name="image" class="form-control form-control-sm">
+                    </div>
+                </div>
 
-            <button type="submit" class="btn btn-primary">Speichern</button>
-        </form>
+                {% if card.type in ['flashcard', 'mc'] %}
+                    <div class="mb-3">
+                        <label class="fw-bold small">Antwort</label>
+                        <input name="answer" value="{{ card.answer }}" class="form-control">
+                    </div>
+                {% endif %}
+
+                {% if card.type == 'mc' %}
+                    <div class="mb-3">
+                        <label class="fw-bold small">Optionen (JSON oder Komma)</label>
+                        <input name="options" value="{{ options_str }}" class="form-control">
+                    </div>
+                {% endif %}
+
+                {% if card.type == 'anatomy' %}
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6"><label class="fw-bold small">Deutsch</label><input name="answer" value="{{ card.answer }}" class="form-control"></div>
+                        <div class="col-md-6"><label class="fw-bold small">Latein</label><input name="answer_lat" value="{{ card.answer_lat }}" class="form-control"></div>
+                    </div>
+                {% endif %}
+
+                {% if card.type == 'anatomy_multi' %}
+                    <div class="mb-3">
+                        <label class="fw-bold small">JSON Daten (Struktur: [{"id":1,"de":"..","lat":".."}])</label>
+                        <textarea name="multi_json" class="form-control font-monospace" rows="5">{{ multi_json }}</textarea>
+                    </div>
+                {% endif %}
+
+                {% if card.type == 'ordering' %}
+                    <div class="mb-3">
+                        <label class="fw-bold small">JSON Reihenfolge</label>
+                        <textarea name="ordering_json" class="form-control font-monospace" rows="3">{{ ordering_json }}</textarea>
+                    </div>
+                {% endif %}
+
+                {% if card.type == 'assignment' %}
+                    <div class="mb-3">
+                        <label class="fw-bold small">JSON Zuordnung</label>
+                        <textarea name="assignment_json" class="form-control font-monospace" rows="5">{{ assignment_json }}</textarea>
+                    </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="/admin" class="btn btn-secondary rounded-pill">Abbrechen</a>
+                    <button class="btn btn-primary rounded-pill px-5">Speichern</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
-
-<script>
-const datM = {{ multi_json | safe if multi_json else '[]' }};
-const datO = {{ ordering_json | safe if ordering_json else '[]' }};
-const datA = {{ assignment_json | safe if assignment_json else '[]' }};
-
-function toggleOptions() {
-    var type = document.getElementById('typeSelect').value;
-    if(document.getElementById('mcOptions')) document.getElementById('mcOptions').style.display = (type==="mc")?"block":"none";
-    if(document.getElementById('anatomyField')) document.getElementById('anatomyField').style.display = (type==="anatomy")?"block":"none";
-    if(document.getElementById('anatomyMultiOptions')) document.getElementById('anatomyMultiOptions').style.display = (type==="anatomy_multi")?"block":"none";
-    if(document.getElementById('orderingOptions')) document.getElementById('orderingOptions').style.display = (type==="ordering")?"block":"none";
-    if(document.getElementById('assignmentOptions')) document.getElementById('assignmentOptions').style.display = (type==="assignment")?"block":"none";
-}
-
-function addMultiRow(id="", de="", lat="") {
-    const d=document.createElement('div'); d.className="input-group mb-2 multi-row";
-    d.innerHTML=`<input type="text" class="form-control" value="${id||'#'}" name="row_id"><input type="text" class="form-control" value="${de}"><input type="text" class="form-control" value="${lat}"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">X</button>`;
-    document.getElementById('multiFieldsContainer').appendChild(d);
-}
-function addOrderRow(val="") {
-    const d=document.createElement('div'); d.className="input-group mb-2 order-row";
-    d.innerHTML=`<input type="text" class="form-control" value="${val}"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">X</button>`;
-    document.getElementById('orderFieldsContainer').appendChild(d);
-}
-function addAssignGroup(name="", items=[]) {
-    const d=document.createElement('div'); d.className="card border-secondary assignment-group";
-    d.innerHTML=`<div class="card-header bg-secondary text-white d-flex gap-2"><input type="text" class="form-control form-control-sm group-name" value="${name}"><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.card').remove()">X</button></div><div class="card-body p-2"><div class="item-list d-grid gap-2 mb-2"></div><button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="addAssignItem(this)">+ Item</button></div>`;
-    document.getElementById('assignmentContainer').appendChild(d);
-    const list = d.querySelector('.item-list');
-    items.forEach(i => addAssignItemToContainer(list, i));
-}
-function addAssignItem(btn) { addAssignItemToContainer(btn.previousElementSibling, ""); }
-function addAssignItemToContainer(c, v) {
-    const d=document.createElement('div'); d.className="input-group input-group-sm";
-    d.innerHTML=`<input type="text" class="form-control item-input" value="${v}"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">X</button>`;
-    c.appendChild(d);
-}
-
-document.addEventListener("DOMContentLoaded", function() {
-    toggleOptions();
-    if(datM.length) datM.forEach(i=>addMultiRow(i.id,i.de,i.lat));
-    if(datO.length) datO.forEach(i=>addOrderRow(i));
-    if(datA.length) datA.forEach(g=>addAssignGroup(g.name, g.items));
-});
-
-document.getElementById('editFormElem').addEventListener('submit', function(e) {
-    var type = document.getElementById('typeSelect').value;
-    if (type === 'anatomy_multi') {
-        let d=[]; document.querySelectorAll('#editFormElem .multi-row').forEach(r=>{let i=r.querySelectorAll('input'); d.push({id:i[0].value.trim(),de:i[1].value.trim(),lat:i[2].value.trim()});});
-        document.getElementById('multiJsonInput').value = JSON.stringify(d);
-    }
-    if (type === 'ordering') {
-        let d=[]; document.querySelectorAll('#editFormElem .order-row input').forEach(i=>{if(i.value.trim())d.push(i.value.trim());});
-        document.getElementById('orderingJsonInput').value = JSON.stringify(d);
-    }
-    if (type === 'assignment') {
-        let g=[]; document.querySelectorAll('.assignment-group').forEach(c=>{let n=c.querySelector('.group-name').value.trim(); if(n){let i=[]; c.querySelectorAll('.item-input').forEach(inp=>{if(inp.value.trim())i.push(inp.value.trim())}); g.push({name:n,items:i});}});
-        document.getElementById('assignmentJsonInput').value = JSON.stringify(g);
-    }
-});
-</script>
 {% endblock %}

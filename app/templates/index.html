@@ -9,114 +9,70 @@
 
 <div class="row align-items-center mb-5">
     <div class="col-md-8">
-        <h1 class="display-5 fw-bold">Hallo, {{ current_user.username if current_user.is_authenticated else 'Gast' }}!</h1>
+        <h1 class="display-6 fw-bold">Hallo, {{ current_user.real_name if current_user.real_name else current_user.username }}!</h1>
+        
         {% if current_user.is_authenticated %}
-            <div class="d-flex gap-3 mb-4">
-                <span class="badge bg-danger p-2"><i class="bi bi-fire"></i> {{ current_user.streak }} Tage</span>
-                <span class="badge bg-warning text-dark p-2"><i class="bi bi-trophy"></i> {{ current_user.badges|length }} Badges</span>
+            <div class="d-flex gap-2 mb-4">
+                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 p-2"><i class="bi bi-fire"></i> {{ current_user.streak }} Tage</span>
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 p-2 text-dark"><i class="bi bi-trophy"></i> {{ current_user.badges|length }} Badges</span>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="/exam" class="btn btn-danger"><i class="bi bi-clipboard-check"></i> Prüfung</a>
-                <a href="/learn/errors" class="btn btn-warning text-dark"><i class="bi bi-bandaid"></i> Fehler üben</a>
-                <a href="/leaderboard" class="btn btn-dark"><i class="bi bi-bar-chart"></i> Rangliste</a>
+                <a href="/learn/errors" class="btn btn-warning w-100 text-dark py-3 shadow-sm"><i class="bi bi-bandaid"></i> Meine Fehler üben</a>
             </div>
         {% else %}
-            <a href="/login" class="btn btn-primary btn-lg mt-3">Jetzt anmelden</a>
-        {% endif %}
-    </div>
-    
-    <div class="col-md-4">
-        {% if current_user.is_authenticated and global_stats.total > 0 %}
-        <div class="card shadow-sm border-0">
-            <div class="card-body">
-                <h6 class="text-center text-muted">Gesamtfortschritt</h6>
-                <canvas id="overviewChart"></canvas>
-            </div>
-        </div>
-        {% else %}
-        <div class="text-center"><i class="bi bi-heart-pulse text-danger" style="font-size: 6rem;"></i></div>
+            <a href="/login" class="btn btn-primary btn-lg mt-3 w-100">Jetzt anmelden</a>
         {% endif %}
     </div>
 </div>
 
 {% if current_user.is_authenticated %}
-<form action="/learn/custom" method="POST" id="learnForm">
-    <div class="card shadow border-0">
-        <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center">
-            <h4 class="mb-0">Themen (Ordner)</h4>
-            <button type="submit" class="btn btn-primary"><i class="bi bi-play-fill"></i> Auswahl lernen</button>
-        </div>
-        <div class="card-body p-0">
-            
-            {% macro render_tree(nodes, level=0) %}
-                <div class="list-group list-group-flush">
-                {% for key, val in nodes.items() %}
-                    <div class="list-group-item border-0 p-0 mb-1">
-                        <div class="d-flex align-items-center p-2 hover-bg" style="padding-left: {{ level * 25 + 10 }}px !important;">
-                            
-                            <div class="me-2">
-                                <input class="form-check-input" type="checkbox" name="categories" value="{{ val._path }}" style="transform: scale(1.2);">
-                            </div>
-
-                            {% if val._subs %}
-                                <a class="me-2 text-dark text-decoration-none" data-bs-toggle="collapse" href="#collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}">
-                                    <i class="bi bi-folder-fill text-warning" style="font-size: 1.2em;"></i>
-                                </a>
-                            {% else %}
-                                <i class="bi bi-file-earmark-text text-secondary me-2"></i>
-                            {% endif %}
-                            
-                            <div class="flex-grow-1">
-                                <span class="fw-bold">{{ key }}</span>
-                                <small class="text-muted ms-2">({{ val._stats.learned }} / {{ val._stats.total }})</small>
-                                <div class="progress mt-1" style="height: 3px; width: 100px;">
-                                    <div class="progress-bar bg-success" style="width: {{ (val._stats.learned / val._stats.total * 100) if val._stats.total > 0 else 0 }}%"></div>
-                                </div>
-                            </div>
-
-                            <div class="ms-3 d-flex gap-2">
-                                <a href="/learn/{{ val._path }}" class="btn btn-sm btn-outline-secondary" title="Nur diesen Ordner"><i class="bi bi-play"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger border-0" 
-                                        onclick="if(confirm('Reset {{key}}?')) { var f=document.createElement('form'); f.method='POST'; f.action='/reset/{{val._path}}'; document.body.appendChild(f); f.submit(); }">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
+<form action="/learn/custom" method="POST" id="learnForm" class="mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Deine Themen</h5>
+        <button type="submit" class="btn btn-primary rounded-pill px-4"><i class="bi bi-play-fill"></i> Lernen</button>
+    </div>
+    
+    <div class="list-group">
+        {% macro render_tree(nodes, level=0) %}
+            {% for key, val in nodes.items() %}
+                <div class="list-group-item border-0 p-0 mb-2 bg-transparent">
+                    <div class="d-flex align-items-center p-3 bg-body rounded-4 shadow-sm border position-relative" style="margin-left: {{ level * 15 }}px;">
+                        
+                        <div class="me-3 z-2">
+                            <input class="form-check-input p-2 border-2 rounded-3" type="checkbox" name="categories" value="{{ val._path }}" style="width: 1.5em; height: 1.5em;">
                         </div>
 
                         {% if val._subs %}
-                            <div class="collapse show" id="collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}">
-                                {{ render_tree(val._subs, level + 1) }}
-                            </div>
+                            <a class="me-3 text-warning stretched-link" data-bs-toggle="collapse" href="#collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}" style="font-size: 1.5rem;">
+                                <i class="bi bi-folder-fill"></i>
+                            </a>
+                        {% else %}
+                            <i class="bi bi-file-text text-secondary me-3" style="font-size: 1.5rem;"></i>
                         {% endif %}
+                        
+                        <div class="flex-grow-1 pointer-event-none">
+                            <h6 class="mb-0 fw-bold">{{ key }}</h6>
+                            <div class="progress mt-2" style="height: 6px; border-radius: 10px;">
+                                <div class="progress-bar bg-primary rounded-pill" style="width: {{ (val._stats.learned / val._stats.total * 100) if val._stats.total > 0 else 0 }}%"></div>
+                            </div>
+                        </div>
+
+                        <div class="ms-3 z-2">
+                             <a href="/learn/{{ val._path }}" class="btn btn-light btn-sm rounded-circle shadow-sm text-primary" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-play-fill fs-5"></i></a>
+                        </div>
                     </div>
-                {% endfor %}
+
+                    {% if val._subs %}
+                        <div class="collapse show" id="collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}">
+                            {{ render_tree(val._subs, level + 1) }}
+                        </div>
+                    {% endif %}
                 </div>
-            {% endmacro %}
+            {% endfor %}
+        {% endmacro %}
 
-            {{ render_tree(tree) }}
-
-        </div>
+        {{ render_tree(tree) }}
     </div>
 </form>
-
-{% if global_stats.total > 0 %}
-<script>
-    new Chart(document.getElementById('overviewChart'), {
-        type: 'doughnut', 
-        data: {
-            labels: ['Gelernt', 'Offen'], 
-            datasets: [{
-                data: [{{global_stats.learned}}, {{global_stats.total - global_stats.learned}}], 
-                backgroundColor: ['#198754', '#e9ecef']
-            }]
-        },
-        options: { cutout: '70%', plugins: { legend: { display: false } } }
-    });
-</script>
-{% endif %}
-
-<style>
-    .hover-bg:hover { background-color: #f8f9fa; }
-</style>
 {% endif %}
 {% endblock %}

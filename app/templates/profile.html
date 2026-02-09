@@ -1,126 +1,72 @@
 {% extends "layout.html" %}
-
 {% block content %}
 <div class="container py-4">
+    <h2 class="fw-bold mb-4">Mein Profil</h2>
     
-    <div class="row">
-        <div class="col-lg-4 mb-4">
-            <div class="card shadow border-0">
-                <div class="card-body text-center">
-                    <div class="mb-3">
-                        {% if user.profile_image %}
-                            <img src="{{ user.profile_image }}" class="rounded-circle border" style="width: 150px; height: 150px; object-fit: cover;">
-                        {% else %}
-                            <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto" style="width: 150px; height: 150px; font-size: 60px;">
-                                {{ user.username[0] | upper }}
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white fw-bold">Daten bearbeiten</div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="text-center mb-4">
+                            {% if user.profile_image %}
+                                <img src="{{ user.profile_image }}" class="rounded-circle shadow-sm" style="width: 100px; height: 100px; object-fit: cover;">
+                            {% else %}
+                                <div class="bg-secondary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 100px; height: 100px;">
+                                    <i class="bi bi-person-fill fs-1 text-muted"></i>
+                                </div>
+                            {% endif %}
+                            <div class="mt-2">
+                                <label class="btn btn-sm btn-outline-primary rounded-pill">
+                                    Bild ändern <input type="file" name="profile_image" hidden onchange="form.submit()">
+                                </label>
                             </div>
-                        {% endif %}
-                    </div>
-                    
-                    <h4 class="fw-bold mb-0">{{ user.real_name if user.real_name else user.username }}</h4>
-                    <p class="text-muted small">{{ 'Administrator' if user.is_admin else 'Benutzer' }}</p>
+                        </div>
 
-                    <div class="d-flex justify-content-center gap-2 mb-3">
-                        <span class="badge bg-light text-dark border"><i class="bi bi-clock"></i> {{ user.total_learning_time | format_duration }} gelernt</span>
-                        {% if user.age %}
-                        <span class="badge bg-light text-dark border"><i class="bi bi-calendar"></i> {{ user.age }} Jahre</span>
-                        {% endif %}
-                    </div>
+                        <div class="mb-3"><label class="form-label small fw-bold">Benutzername</label><input type="text" class="form-control" value="{{ user.username }}" disabled></div>
+                        <div class="mb-3"><label class="form-label small fw-bold">Echter Name</label><input type="text" name="real_name" class="form-control" value="{{ user.real_name or '' }}"></div>
+                        <div class="mb-3"><label class="form-label small fw-bold">E-Mail Adresse</label><input type="email" name="email" class="form-control" value="{{ user.email or '' }}" placeholder="name@beispiel.de"></div>
 
-                    {% if user.bio %}
-                        <p class="text-muted fst-italic px-2">"{{ user.bio }}"</p>
-                    {% endif %}
-                    
-                    <hr>
-                    
-                    <button class="btn btn-outline-primary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#editProfile">
-                        <i class="bi bi-pencil"></i> Profil bearbeiten
-                    </button>
-                    
-                    <div class="collapse mt-3 text-start" id="editProfile">
-                        <form method="POST" enctype="multipart/form-data">
-                            <div class="mb-2">
-                                <label class="form-label small">Echter Name</label>
-                                <input type="text" name="real_name" class="form-control form-control-sm" value="{{ user.real_name or '' }}">
-                            </div>
-                            <div class="mb-2">
-                                <label class="form-label small">Alter</label>
-                                <input type="number" name="age" class="form-control form-control-sm" value="{{ user.age or '' }}">
-                            </div>
-                            <div class="mb-2">
-                                <label class="form-label small">Über mich (Bio)</label>
-                                <textarea name="bio" class="form-control form-control-sm" rows="2">{{ user.bio or '' }}</textarea>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small">Profilbild</label>
-                                <input type="file" name="profile_image" class="form-control form-control-sm">
-                            </div>
-                            
-                            <hr>
-                            <h6 class="small fw-bold">Passwort ändern</h6>
-                            <div class="mb-2">
-                                <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Neues Passwort">
-                            </div>
-                            <div class="mb-2">
-                                <input type="password" name="confirm_password" class="form-control form-control-sm" placeholder="Bestätigen">
-                            </div>
-
-                            <button type="submit" class="btn btn-success btn-sm w-100">Speichern</button>
-                        </form>
-                    </div>
-
+                        <hr>
+                        <h6 class="text-primary mb-3">Passwort ändern</h6>
+                        <div class="mb-3"><input type="password" name="new_password" class="form-control" placeholder="Neues Passwort"></div>
+                        <div class="mb-4"><input type="password" name="confirm_password" class="form-control" placeholder="Bestätigen"></div>
+                        <button class="btn btn-success w-100 rounded-pill">Speichern</button>
+                    </form>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-8">
-            <div class="card shadow border-0 mb-4">
-                <div class="card-header bg-white fw-bold">
-                    <i class="bi bi-journal-check"></i> Meine Prüfungen
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div><h6 class="text-muted mb-1">Lernzeit Gesamt</h6><h3 class="fw-bold mb-0">{{ user.total_learning_time | format_duration }}</h3></div>
+                    <div class="text-end"><h6 class="text-muted mb-1">Streak</h6><h3 class="fw-bold text-danger mb-0"><i class="bi bi-fire"></i> {{ user.streak }}</h3></div>
                 </div>
-                <div class="card-body p-0">
-                    {% if attempts %}
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Datum</th>
-                                    <th>Ergebnis</th>
-                                    <th>Status</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for attempt in attempts %}
-                                <tr>
-                                    <td>{{ attempt.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
-                                    <td>
-                                        <strong>{{ attempt.score }} / {{ attempt.total_questions }}</strong>
-                                        <small class="text-muted">({{ (attempt.score / attempt.total_questions * 100)|int }}%)</small>
-                                    </td>
-                                    <td>
-                                        {% if attempt.passed %}
-                                            <span class="badge bg-success">Bestanden</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">Nicht bestanden</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end">
-                                        <a href="/profile/exam/{{ attempt.id }}" class="btn btn-sm btn-outline-primary">Details</a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white fw-bold">Letzte Prüfungen</div>
+                <div class="list-group list-group-flush">
+                    {% for att in attempts %}
+                    <a href="/profile/exam/{{ att.id }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div><div class="fw-bold">{{ att.timestamp.strftime('%d.%m.%Y %H:%M') }}</div><small class="{{ 'text-success' if att.passed else 'text-danger' }}">{{ att.score }}/{{ att.total_questions }} Punkte</small></div>
+                        <i class="bi bi-chevron-right text-muted"></i>
+                    </a>
                     {% else %}
-                        <div class="p-4 text-center text-muted">
-                            <i class="bi bi-clipboard-x display-4 d-block mb-3"></i>
-                            Noch keine Prüfungen absolviert.
-                            <br>
-                            <a href="/exam" class="btn btn-primary mt-3">Jetzt Prüfung starten</a>
-                        </div>
-                    {% endif %}
+                        <div class="p-3 text-center text-muted small">Noch keine Prüfungen absolviert.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card border-danger shadow-sm">
+                <div class="card-header bg-danger text-white fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> Gefahrenzone</div>
+                <div class="card-body">
+                    <p class="small text-muted">Hiermit wird dein gesamter Lernfortschritt unwiderruflich gelöscht. Deine Statistiken (Zeit/Streak) bleiben erhalten.</p>
+                    <form action="/profile/reset_all" method="POST" onsubmit="return confirm('Bist du sicher? Alle gelernten Karten werden zurückgesetzt!');">
+                        <button class="btn btn-outline-danger w-100">Fortschritt zurücksetzen</button>
+                    </form>
                 </div>
             </div>
         </div>

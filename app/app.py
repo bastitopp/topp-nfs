@@ -1,20 +1,18 @@
 import os
 import datetime
 import json
-import csv
-import io
 import random
-import traceback
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy.sql.expression import func, or_, and_
+from sqlalchemy.sql.expression import func, or_
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_mail import Mail
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'geheimnis_fuer_topp_nfs_dev_key'
@@ -26,12 +24,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav'}
 
-# Dummy Mail Config
-app.config['MAIL_SERVER'] = 'smtp.example.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'user@example.com'
-app.config['MAIL_PASSWORD'] = 'password'
+# Mail Config
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.example.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True') == 'True'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', 'user@example.com')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', 'password')
+app.config['MAIL_DEFAULT_SENDER'] = app.config['MAIL_USERNAME']
 
 db = SQLAlchemy(app)
 mail = Mail(app)
@@ -40,7 +39,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# --- TABELLEN ---
+# --- MODELS ---
 card_tags = db.Table('card_tags', db.Column('card_id', db.Integer, db.ForeignKey('card.id')), db.Column('tag_id', db.Integer, db.ForeignKey('tag.id')))
 user_badges = db.Table('user_badges', db.Column('user_id', db.Integer, db.ForeignKey('user.id')), db.Column('badge_id', db.Integer, db.ForeignKey('badge.id')), db.Column('earned_at', db.DateTime, default=datetime.datetime.utcnow))
 
@@ -52,6 +51,16 @@ class Group(db.Model):
 class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
+
+class CardReport(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    card_id = db.Column(db.Integer, db.ForeignKey('card.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    reason = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    resolved = db.Column(db.Boolean, default=False)
+    card = db.relationship('Card', backref='reports')
+    user = db.relationship('User', backref='reports')
 
 class Badge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,6 +77,7 @@ class DashboardMessage(db.Model):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     real_name = db.Column(db.String(100), nullable=True)
@@ -84,7 +94,7 @@ class User(UserMixin, db.Model):
 
 class Card(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    category = db.Column(db.String(200), nullable=False) # Pfad-String
+    category = db.Column(db.String(200), nullable=False)
     type = db.Column(db.String(20))     
     question = db.Column(db.Text, nullable=False)
     answer = db.Column(db.Text, nullable=False) 
@@ -118,8 +128,6 @@ class ExamDetail(db.Model):
     attempt_id = db.Column(db.Integer, db.ForeignKey('exam_attempt.id'), nullable=False)
     question_text = db.Column(db.Text)
     question_type = db.Column(db.String(20))
-    user_response_json = db.Column(db.Text)
-    correct_solution_json = db.Column(db.Text)
     is_correct = db.Column(db.Boolean, default=False)
 
 @login_manager.user_loader
@@ -144,7 +152,10 @@ def format_duration(s):
 @app.context_processor
 def inject_globals(): return {'now': datetime.datetime.utcnow()}
 
-# --- HELPER FUNCTIONS ---
+def get_serializer():
+    return URLSafeTimedSerializer(app.config['SECRET_KEY'])
+
+# --- HELPER ---
 def check_gamification(user):
     today = datetime.datetime.utcnow().date()
     last = user.last_active.date() if user.last_active else None
@@ -164,24 +175,14 @@ def award_badges(user):
             if b not in user.badges: user.badges.append(b); new.append(n)
     if new: db.session.commit(); flash(f"🎉 Neu: {', '.join(new)}", "warning")
 
-# MULTI-SELECT LOGIK: Akzeptiert Liste von Pfaden und sucht rekursiv
 def get_next_card(user, paths, force=False):
     now = datetime.datetime.utcnow()
-    
-    # Baue Filter: (category LIKE 'Pfad1%' OR category LIKE 'Pfad2%')
-    conditions = []
-    for p in paths:
-        conditions.append(Card.category.like(f"{p}%"))
-    
+    conditions = [Card.category.like(f"{p}%") for p in paths]
     filter_cond = or_(*conditions)
-    
     query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id, filter_cond)
-    
     if not force: due = query.filter(UserProgress.next_review <= now).order_by(UserProgress.next_review.asc()).first()
     else: due = query.order_by(UserProgress.next_review.asc()).first()
-    
     if due: return due.card, due
-    
     sub = db.session.query(UserProgress.card_id).filter(UserProgress.user_id==user.id)
     new = Card.query.filter(filter_cond, ~Card.id.in_(sub)).order_by(func.random()).first()
     return new, None
@@ -210,23 +211,31 @@ def build_category_tree(cards, user):
             current = current[part]['_subs']
     return tree
 
+def render_learn_card(card):
+    p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first(); box = p.box if p else 0
+    # Safe JSON load
+    try: opts = json.loads(card.options) if card.options else []
+    except: opts = []
+
+    if card.type=='ordering': random.shuffle(opts)
+    elif card.type=='assignment':
+        pool=[]; [([pool.append({'val':i, 'group':g.get('name')}) for i in g.get('items',[])] if isinstance(opts,list) else None) for g in (opts if isinstance(opts,list) else [])]; random.shuffle(pool)
+        return render_template('quiz.html', card=card, options=opts, pool_items=pool, finished=False, box=box)
+    return render_template('quiz.html', card=card, options=opts, finished=False, box=box)
+
 # --- ROUTES ---
 
 @app.route('/')
 def index():
     if current_user.is_authenticated: check_gamification(current_user)
-    
-    # Global Stats für das Chart
     global_stats = {'total': 0, 'learned': 0}
     if current_user.is_authenticated:
         global_stats['total'] = Card.query.count()
         global_stats['learned'] = UserProgress.query.join(Card).filter(UserProgress.user_id==current_user.id, UserProgress.box>0).count()
-    
     all_cards = Card.query.all()
     u = current_user if current_user.is_authenticated else type('obj', (object,), {'id':0, 'is_authenticated':False})
     tree = build_category_tree(all_cards, u)
     msgs = DashboardMessage.query.filter_by(active=True).order_by(DashboardMessage.created_at.desc()).all()
-    
     return render_template('index.html', tree=tree, messages=msgs, global_stats=global_stats)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -235,222 +244,209 @@ def login():
     if request.method=='POST':
         u = User.query.filter_by(username=request.form['username']).first()
         if u and u.check_password(request.form['password']): login_user(u); return redirect(url_for('index'))
-        flash('Fehler', 'danger')
+        flash('Fehler: Benutzer oder Passwort falsch', 'danger')
     return render_template('login.html')
 
 @app.route('/logout')
 @login_required
 def logout(): logout_user(); return redirect(url_for('index'))
 
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+        if user:
+            s = get_serializer(); token = s.dumps(user.email, salt='password-reset-salt')
+            link = url_for('reset_password_with_token', token=token, _external=True)
+            try:
+                msg = Message('Passwort zurücksetzen', recipients=[user.email])
+                msg.body = f'Link: {link}'
+                mail.send(msg)
+            except Exception as e: print("Mail Error:", e)
+        flash('Link gesendet (falls E-Mail existiert).', 'info'); return redirect(url_for('login'))
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password_with_token(token):
+    s = get_serializer()
+    try: email = s.loads(token, salt='password-reset-salt', max_age=3600)
+    except: flash('Link ungültig.', 'danger'); return redirect(url_for('forgot_password'))
+    if request.method == 'POST':
+        if request.form.get('password') != request.form.get('confirm'): flash('Ungleiche Passwörter', 'warning')
+        else:
+            u = User.query.filter_by(email=email).first()
+            if u: u.set_password(request.form.get('password')); db.session.commit(); flash('OK!', 'success'); return redirect(url_for('login'))
+    return render_template('reset_password.html')
+
 @app.route('/learn/custom', methods=['POST'])
 @login_required
 def learn_custom():
     cats = request.form.getlist('categories')
-    if not cats: flash("Bitte mindestens eine Kategorie wählen", "warning"); return redirect(url_for('index'))
-    # Wir übergeben die Liste als String, getrennt durch Pipe '|', da Komma in Namen sein könnte
+    if not cats: flash("Kategorie wählen", "warning"); return redirect(url_for('index'))
     return redirect(url_for('learn', category_path="|".join(cats)))
 
 @app.route('/learn/<path:category_path>')
 @login_required
 def learn(category_path):
-    # Pfade trennen (Pipe |)
-    paths = category_path.split('|')
-    f = request.args.get('force') == 'true'
-    
+    paths = category_path.split('|'); f = request.args.get('force') == 'true'
     card, p = get_next_card(current_user, paths, force=f)
-    
     if not card: 
-        # Waiting Count Berechnung (komplexer bei mehreren Pfaden)
         conds = [Card.category.like(f"{p}%") for p in paths]
         w = UserProgress.query.join(Card).filter(UserProgress.user_id==current_user.id, or_(*conds), UserProgress.next_review>datetime.datetime.utcnow()).count()
         return render_template('quiz.html', finished=True, category=category_path, waiting_count=w)
     return render_learn_card(card)
 
-def render_learn_card(card):
-    p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first(); box = p.box if p else 0
-    opts = json.loads(card.options) if card.options else []
-    if card.type=='ordering': random.shuffle(opts)
-    elif card.type=='assignment':
-        pool=[]; [([pool.append({'val':i, 'group':g.get('name')}) for i in g.get('items',[])] if isinstance(opts,list) else None) for g in (opts if isinstance(opts,list) else [])]; random.shuffle(pool)
-        return render_template('quiz.html', card=card, options=opts, pool_items=pool, finished=False, box=box)
-    return render_template('quiz.html', card=card, options=opts, finished=False, box=box)
-
 @app.route('/submit/<int:card_id>', methods=['POST'])
 @login_required
 def submit(card_id):
     try:
+        # 1. Zeiterfassung (Fehlertolerant)
         if request.form.get('start_time'): 
-            d=datetime.datetime.utcnow().timestamp()-float(request.form.get('start_time'))
-            if 0<d<600: current_user.total_learning_time+=int(d); db.session.commit()
+            try:
+                d = datetime.datetime.utcnow().timestamp()-float(request.form.get('start_time'))
+                if 0<d<600: current_user.total_learning_time+=int(d); db.session.commit()
+            except: pass
+
+        card = Card.query.get_or_404(card_id)
         
-        card = Card.query.get_or_404(card_id); p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first(); box = p.box if p else 0
-        
+        # 2. Optionen sicher laden
+        card_opts = []
+        if card.options:
+            try: card_opts = json.loads(card.options)
+            except: card_opts = []
+
+        # 3. Typ-Spezifische Auswertung
         if card.type=='mc':
-            u=request.form.get('mc_answer'); corr=(u==card.answer); update_progress(current_user, card, corr); award_badges(current_user)
-            return render_template('quiz.html', card=card, options=json.loads(card.options), finished=False, feedback=True, user_answer=u, is_correct=corr, box=box)
+            u=request.form.get('mc_answer')
+            corr=(u==card.answer)
+            update_progress(current_user, card, corr)
+            award_badges(current_user)
+            p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
+            return render_template('quiz.html', card=card, options=card_opts, finished=False, feedback=True, user_answer=u, is_correct=corr, box=p.box if p else 0)
+        
         elif card.type=='anatomy':
-            ud=request.form.get('input_de','').lower(); ul=request.form.get('input_lat','').lower(); sd=card.answer.lower(); sl=card.answer_lat.lower(); corr=(ud==sd and ul==sl)
-            update_progress(current_user, card, corr); award_badges(current_user)
-            return render_template('quiz.html', card=card, finished=False, feedback_anatomy=True, result_de=(ud==sd), result_lat=(ul==sl), box=box)
+            ud=request.form.get('input_de','').lower()
+            ul=request.form.get('input_lat','').lower()
+            sd=card.answer.lower() if card.answer else ""
+            sl=card.answer_lat.lower() if card.answer_lat else ""
+            
+            # Wenn DB-Feld leer ist, gilt es als automatisch "richtig" (da disabled im Frontend)
+            de_ok = (ud == sd) if sd else True
+            lat_ok = (ul == sl) if sl else True
+            
+            corr = (de_ok and lat_ok)
+            update_progress(current_user, card, corr)
+            award_badges(current_user)
+            p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
+            return render_template('quiz.html', card=card, finished=False, feedback_anatomy=True, result_de=(ud==sd), result_lat=(ul==sl if sl else True), box=p.box if p else 0)
+        
         elif card.type=='anatomy_multi':
-            sols=json.loads(card.options); sub=True; res=[]
+            sols=card_opts; sub=True; res=[]
             for i in sols:
-                rid=str(i.get('id')); ud=request.form.get(f"de_{rid}",'').lower(); ul=request.form.get(f"lat_{rid}",'').lower()
-                cde=(ud==i.get('de','').lower()); clat=(ul==i.get('lat','').lower())
-                if not cde or not clat: sub=False
+                rid=str(i.get('id'))
+                ud=request.form.get(f"de_{rid}",'').lower()
+                ul=request.form.get(f"lat_{rid}",'').lower()
+                
+                correct_de = i.get('de','').lower() if i.get('de') else ""
+                correct_lat = i.get('lat','').lower() if i.get('lat') else ""
+                
+                cde = (ud == correct_de) if correct_de else True
+                clat = (ul == correct_lat) if correct_lat else True
+                
+                if (correct_de and not cde) or (correct_lat and not clat): sub=False
                 res.append({'label':rid, 'user_de':ud, 'user_lat':ul, 'correct_de':i.get('de'), 'correct_lat':i.get('lat'), 'is_de_ok':cde, 'is_lat_ok':clat})
-            update_progress(current_user, card, sub); award_badges(current_user)
-            return render_template('quiz.html', card=card, finished=False, feedback_multi=True, multi_results=res, all_correct=sub, box=box)
+            
+            update_progress(current_user, card, sub)
+            award_badges(current_user)
+            p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
+            return render_template('quiz.html', card=card, finished=False, feedback_multi=True, multi_results=res, all_correct=sub, box=p.box if p else 0)
+        
         elif card.type=='ordering':
-            co=json.loads(card.options); uo=json.loads(request.form.get('order_json')); corr=(uo==co)
-            update_progress(current_user, card, corr); award_badges(current_user)
-            return render_template('quiz.html', card=card, finished=False, feedback_ordering=True, user_order=uo, correct_order=co, is_correct=corr, box=box)
+            # Safe JSON Form Data
+            try: uo = json.loads(request.form.get('order_json', '[]'))
+            except: uo = []
+            
+            corr = (uo==card_opts)
+            update_progress(current_user, card, corr)
+            award_badges(current_user)
+            p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
+            return render_template('quiz.html', card=card, finished=False, feedback_ordering=True, user_order=uo, correct_order=card_opts, is_correct=corr, box=p.box if p else 0)
+        
         elif card.type=='assignment':
-            cs=json.loads(card.options); ud=json.loads(request.form.get('assignment_json')); all_c=True; res=[]
-            for g in cs:
+            try: ud = json.loads(request.form.get('assignment_json', '{}'))
+            except: ud = {}
+            
+            all_c=True; res=[]
+            for g in card_opts:
                 gn=g.get('name'); ci=g.get('items',[]); ui=ud.get(gn,[]); gr={'name':gn,'group_items':[],'missing':[]}
                 for i, u in enumerate(ui):
                     st={'text':u}; 
-                    if u not in ci: all_c=False; st['correct']=False; st['reason']='wrong_group'; st['actual_group']='?'
+                    if u not in ci: all_c=False; st['correct']=False; st['reason']='wrong_group'
                     elif i<len(ci) and ci[i]==u: st['correct']=True
                     else: all_c=False; st['correct']=False; st['reason']='wrong_order'
                     gr['group_items'].append(st)
                 for c in ci: 
                     if c not in ui: all_c=False; gr['missing'].append(c)
                 res.append(gr)
-            update_progress(current_user, card, all_c); award_badges(current_user)
-            return render_template('quiz.html', card=card, finished=False, feedback_assignment=True, all_correct=all_c, assignment_results=res, box=box)
-        else: # Flashcard
-            k=(request.form.get('result')=='known'); update_progress(current_user, card, k); award_badges(current_user)
-            return redirect(url_for('learn', category=card.category))
-    except Exception as e: print(e); return "Fehler", 500
+            
+            update_progress(current_user, card, all_c)
+            award_badges(current_user)
+            p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
+            return render_template('quiz.html', card=card, finished=False, feedback_assignment=True, all_correct=all_c, assignment_results=res, box=p.box if p else 0)
+        
+        else: # Flashcard (Standard)
+            k=(request.form.get('result')=='known')
+            update_progress(current_user, card, k)
+            award_badges(current_user)
+            # WICHTIGER FIX: category_path statt category
+            return redirect(url_for('learn', category_path=card.category))
 
-@app.route('/reset/<path:category_path>', methods=['POST'])
+    except Exception as e: 
+        print(f"ERROR in submit: {e}") # Log error for debugging
+        return "Fehler beim Auswerten. Bitte Administrator kontaktieren.", 500
+
+@app.route('/report/<int:card_id>', methods=['POST'])
 @login_required
-def reset_category(category_path):
-    cards = Card.query.filter(Card.category.like(f"{category_path}%")).all()
-    cids = [c.id for c in cards]
-    if cids:
-        UserProgress.query.filter(UserProgress.user_id==current_user.id, UserProgress.card_id.in_(cids)).delete(synchronize_session=False)
+def report_card(card_id):
+    reason = request.form.get('reason')
+    if reason:
+        db.session.add(CardReport(card_id=card_id, user_id=current_user.id, reason=reason))
         db.session.commit()
-    flash(f"Fortschritt für {category_path} gelöscht.", "info")
-    return redirect(url_for('index'))
-
-@app.route('/admin', methods=['GET','POST'])
-@admin_required
-def admin_dashboard():
-    if request.method=='POST' and 'tag_name' in request.form:
-        db.session.add(Tag(name=request.form['tag_name'])); db.session.commit(); return redirect(url_for('admin_dashboard'))
-    if request.method=='POST' and 'question' in request.form:
-        cat_final = request.form.get('category_path')
-        if not cat_final: cat_final = request.form.get('category_new') or request.form.get('category_select')
-        c=Card(category=cat_final, type=request.form['type'], question=request.form['question'])
-        tags_raw = request.form.get('tags_input','')
-        if tags_raw:
-            for t_name in tags_raw.split(','):
-                t_name = t_name.strip()
-                if t_name:
-                    tag = Tag.query.filter_by(name=t_name).first()
-                    if not tag: tag = Tag(name=t_name); db.session.add(tag)
-                    c.tags.append(tag)
-        if c.type=='anatomy': c.answer=request.form.get('answer_de_field'); c.answer_lat=request.form.get('answer_lat')
-        else: c.answer=request.form.get('answer','')
-        if c.type=='mc': c.options=json.dumps(request.form['options'].split(',')) if request.form['options'] else '[]'
-        elif c.type=='anatomy_multi': c.options=request.form.get('multi_json')
-        elif c.type=='ordering': c.options=request.form.get('ordering_json')
-        elif c.type=='assignment': c.options=request.form.get('assignment_json')
-        if 'image' in request.files:
-            f=request.files['image']; 
-            if f and allowed_file(f.filename): fn=secure_filename(f.filename); f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn)); c.image_url=url_for('static',filename='uploads/'+fn)
-        if 'audio' in request.files:
-            f=request.files['audio']; 
-            if f and allowed_file(f.filename): fn=secure_filename(f.filename); f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn)); c.audio_url=url_for('static',filename='uploads/'+fn)
-        db.session.add(c); db.session.commit(); flash('Gespeichert','success'); return redirect(url_for('admin_dashboard'))
-    cats = [c[0] for c in db.session.query(Card.category).distinct().all()]
-    return render_template('admin.html', cards=Card.query.all(), categories=cats, tags=Tag.query.all(), messages=DashboardMessage.query.all(), groups=Group.query.all())
-
-# WIEDERHERGESTELLTE ROUTEN FÜR IMPORT / EXPORT / MESSAGES
-
-@app.route('/admin/import', methods=['POST'])
-@admin_required
-def import_csv():
-    if 'file' not in request.files: flash('Keine Datei','danger'); return redirect(url_for('admin_dashboard'))
-    file = request.files['file']
-    if file:
-        try:
-            stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
-            csv_input = csv.reader(stream, delimiter=';')
-            for row in csv_input:
-                if len(row) < 4: continue
-                # Erwartet: Category;Type;Question;Answer;Options
-                c = Card(category=row[0], type=row[1], question=row[2], answer=row[3])
-                if len(row) > 4 and row[4]: 
-                    if c.type=='mc': c.options = json.dumps([x.strip() for x in row[4].split(',')])
-                    else: c.options = row[4] # Raw JSON für komplexe Typen
-                db.session.add(c)
-            db.session.commit(); flash('Import erfolgreich','success')
-        except Exception as e: flash(f'Import Fehler: {e}','danger')
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/messages', methods=['POST'])
-@admin_required
-def add_message(): db.session.add(DashboardMessage(content=request.form['content'])); db.session.commit(); return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/messages/delete/<int:mid>')
-@admin_required
-def delete_message(mid): DashboardMessage.query.filter_by(id=mid).delete(); db.session.commit(); return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/export')
-@admin_required
-def export_data():
-    d={'cards':[{'q':c.question,'a':c.answer,'cat':c.category} for c in Card.query.all()]}; return json.dumps(d), 200, {'Content-Type':'application/json','Content-Disposition':'attachment;filename=backup.json'}
-
-# ... Profile/Exam/Users Routen wie bekannt (Platzhalter, damit Datei nicht zu lang wird, sind aber notwendig) ...
-# (Bitte die vorherigen Implementierungen für /profile, /exam, /admin/users nutzen. Siehe vorherige Antworten.)
-# Um Fehler zu vermeiden, füge ich die wichtigsten Profil/Exam Routen wieder an:
-
-@app.route('/profile', methods=['GET', 'POST'])
-@login_required
-def profile():
-    if request.method == 'POST':
-        if 'profile_image' in request.files:
-            f = request.files['profile_image']
-            if f and allowed_file(f.filename): fn = secure_filename(f"user_{current_user.id}_{f.filename}"); f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn)); current_user.profile_image = url_for('static', filename='uploads/'+fn)
-        if 'real_name' in request.form: current_user.real_name = request.form['real_name']
-        if request.form.get('new_password'):
-            if request.form['new_password'] == request.form.get('confirm_password'): current_user.set_password(request.form['new_password']); flash('Passwort geändert', 'success')
-        db.session.commit(); flash('Profil gespeichert', 'success'); return redirect(url_for('profile'))
-    att = ExamAttempt.query.filter_by(user_id=current_user.id).order_by(ExamAttempt.timestamp.desc()).all()
-    return render_template('profile.html', attempts=att, user=current_user)
-
-@app.route('/profile/exam/<int:attempt_id>')
-@login_required
-def review_exam(attempt_id):
-    att = ExamAttempt.query.get_or_404(attempt_id)
-    if att.user_id != current_user.id and not current_user.is_admin: flash("Verboten", "danger"); return redirect(url_for('profile'))
-    res = []
-    for d in att.details:
-        res.append({'question':d.question_text, 'type':d.question_type, 'is_correct':d.is_correct})
-    return render_template('exam_result.html', score=att.score, total=att.total_questions, passed=att.passed, results=res, date=att.timestamp)
+        flash('Fehler gemeldet. Danke!', 'success')
+    return redirect(request.referrer or url_for('index'))
 
 @app.route('/learn/errors')
 @login_required
 def learn_errors():
-    sub = db.session.query(UserProgress.card_id).filter(UserProgress.user_id==current_user.id, or_(UserProgress.box==0, UserProgress.last_correct==False))
-    card = Card.query.filter(Card.id.in_(sub)).order_by(func.random()).first()
-    if not card: flash("Keine Fehler!", "success"); return redirect(url_for('index'))
+    sub_query = UserProgress.query.filter(UserProgress.user_id == current_user.id, or_(UserProgress.box == 0, UserProgress.last_correct == False)).with_entities(UserProgress.card_id)
+    card = Card.query.filter(Card.id.in_(sub_query)).order_by(func.random()).first()
+    if not card: flash("Keine Fehler gefunden!", "success"); return redirect(url_for('index'))
     return render_learn_card(card)
 
 @app.route('/admin/users')
 @admin_required
-def admin_users(): return render_template('admin_users.html', users=User.query.all())
+def admin_users():
+    return render_template('admin_users.html', users=User.query.all())
 
 @app.route('/admin/users/add', methods=['POST'])
 @admin_required
 def add_user():
-    if User.query.filter_by(username=request.form['username']).first(): flash('Existiert','danger')
+    if User.query.filter_by(username=request.form['username']).first(): flash('User existiert','danger')
     else: u=User(username=request.form['username'], is_admin='is_admin' in request.form); u.set_password(request.form['password']); db.session.add(u); db.session.commit()
     return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/edit/<int:uid>', methods=['POST'])
+@admin_required
+def edit_user(uid):
+    u = User.query.get_or_404(uid)
+    u.username = request.form.get('username')
+    u.real_name = request.form.get('real_name')
+    u.email = request.form.get('email')
+    u.is_admin = 'is_admin' in request.form
+    new_pw = request.form.get('new_password')
+    if new_pw and new_pw.strip(): u.set_password(new_pw)
+    db.session.commit(); flash('Gespeichert.', 'success'); return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/delete/<int:uid>', methods=['POST'])
 @admin_required
@@ -459,10 +455,140 @@ def delete_user(uid):
     if u and u.username!='admin': db.session.delete(u); db.session.commit()
     return redirect(url_for('admin_users'))
 
-@app.route('/admin/users/reset/<int:uid>', methods=['POST'])
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        if 'profile_image' in request.files and request.files['profile_image']:
+            f = request.files['profile_image']; fn = secure_filename(f"user_{current_user.id}_{f.filename}"); f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn)); current_user.profile_image = url_for('static', filename='uploads/'+fn)
+        if 'real_name' in request.form: current_user.real_name = request.form['real_name']
+        if 'email' in request.form: current_user.email = request.form['email']
+        if request.form.get('new_password'):
+            if request.form['new_password'] == request.form.get('confirm_password'): current_user.set_password(request.form['new_password']); flash('Passwort geändert', 'success')
+        db.session.commit(); flash('Profil gespeichert', 'success'); return redirect(url_for('profile'))
+    return render_template('profile.html', attempts=ExamAttempt.query.filter_by(user_id=current_user.id).order_by(ExamAttempt.timestamp.desc()).all(), user=current_user)
+
+@app.route('/profile/reset_all', methods=['POST'])
+@login_required
+def reset_global_progress():
+    UserProgress.query.filter_by(user_id=current_user.id).delete()
+    db.session.commit()
+    flash('Gesamter Lernfortschritt wurde zurückgesetzt!', 'warning')
+    return redirect(url_for('index'))
+
+@app.route('/reset/<path:category_path>', methods=['POST'])
+@login_required
+def reset_category(category_path):
+    cids = [c.id for c in Card.query.filter(Card.category.like(f"{category_path}%")).all()]
+    if cids: UserProgress.query.filter(UserProgress.user_id==current_user.id, UserProgress.card_id.in_(cids)).delete(synchronize_session=False); db.session.commit()
+    flash(f"Reset: {category_path}", "info"); return redirect(url_for('index'))
+
+@app.route('/admin', methods=['GET','POST'])
 @admin_required
-def reset_user_password(uid):
-    u=User.query.get(uid); u.set_password(request.form['new_password']); db.session.commit(); flash('Reset OK','success'); return redirect(url_for('admin_users'))
+def admin_dashboard():
+    if request.method=='POST':
+        if 'tag_name' in request.form:
+            db.session.add(Tag(name=request.form['tag_name'])); db.session.commit(); return redirect(url_for('admin_dashboard'))
+        if 'question' in request.form:
+            cat_final = request.form.get('category_path') or request.form.get('category_new') or request.form.get('category_select')
+            c=Card(category=cat_final, type=request.form['type'], question=request.form['question'])
+            if 'tags_input' in request.form:
+                for t in request.form.get('tags_input','').split(','):
+                    if t.strip(): tag = Tag.query.filter_by(name=t.strip()).first() or Tag(name=t.strip()); db.session.add(tag); c.tags.append(tag)
+            c.answer = request.form.get('answer_de_field') if c.type=='anatomy' else request.form.get('answer','')
+            c.answer_lat = request.form.get('answer_lat')
+            if c.type=='mc': c.options=json.dumps(request.form['options'].split(',')) if request.form['options'] else '[]'
+            elif c.type=='anatomy_multi': c.options=request.form.get('multi_json')
+            elif c.type=='ordering': c.options=request.form.get('ordering_json')
+            elif c.type=='assignment': c.options=request.form.get('assignment_json')
+            if 'image' in request.files and request.files['image']:
+                f=request.files['image']; fn=secure_filename(f.filename); f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn)); c.image_url=url_for('static',filename='uploads/'+fn)
+            db.session.add(c); db.session.commit(); flash('Gespeichert','success'); return redirect(url_for('admin_dashboard'))
+    reports = CardReport.query.filter_by(resolved=False).order_by(CardReport.created_at.desc()).all()
+    return render_template('admin.html', cards=Card.query.all(), categories=[c[0] for c in db.session.query(Card.category).distinct().all()], tags=Tag.query.all(), messages=DashboardMessage.query.all(), reports=reports)
+
+@app.route('/admin/reports/dismiss/<int:rid>', methods=['POST'])
+@admin_required
+def dismiss_report(rid):
+    r = CardReport.query.get(rid); 
+    if r: r.resolved=True; db.session.commit()
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/delete/<int:card_id>', methods=['POST'])
+@admin_required
+def delete_card(card_id):
+    c = Card.query.get_or_404(card_id); UserProgress.query.filter_by(card_id=card_id).delete(); db.session.delete(c); db.session.commit()
+    flash('Gelöscht', 'success'); return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/edit/<int:card_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_card(card_id):
+    card = Card.query.get_or_404(card_id)
+    if request.method == 'POST':
+        card.category = request.form.get('category_new'); card.question = request.form.get('question'); card.type = request.form.get('type')
+        card.answer = request.form.get('answer'); card.answer_lat = request.form.get('answer_lat')
+        new_tags = request.form.get('tags_input', '')
+        card.tags = [] 
+        for t_name in new_tags.split(','):
+            t_name = t_name.strip()
+            if t_name:
+                tag = Tag.query.filter_by(name=t_name).first()
+                if not tag: tag = Tag(name=t_name); db.session.add(tag)
+                card.tags.append(tag)
+        if 'image' in request.files:
+            f = request.files['image']
+            if f and allowed_file(f.filename):
+                fn = secure_filename(f.filename); f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn)); card.image_url = url_for('static', filename='uploads/'+fn)
+        if card.type == 'mc': card.options = request.form.get('options')
+        elif card.type == 'anatomy_multi': card.options = request.form.get('multi_json')
+        elif card.type == 'ordering': card.options = request.form.get('ordering_json')
+        elif card.type == 'assignment': card.options = request.form.get('assignment_json')
+        db.session.commit(); flash('Gespeichert', 'success'); return redirect(url_for('admin_dashboard'))
+    return render_template('edit_card.html', card=card, options_str=card.options if card.type=='mc' else '', multi_json=card.options if card.type=='anatomy_multi' else '[]', ordering_json=card.options if card.type=='ordering' else '[]', assignment_json=card.options if card.type=='assignment' else '[]')
+
+@app.route('/exam')
+@login_required
+def exam_index():
+    questions = Card.query.order_by(func.random()).limit(30).all()
+    prepared = []
+    for card in questions:
+        opts = json.loads(card.options) if card.options else []
+        if card.type == 'ordering': random.shuffle(opts)
+        elif card.type == 'assignment':
+             pool=[]; [([pool.append({'val':i}) for i in g.get('items',[])] if isinstance(opts,list) else None) for g in (opts if isinstance(opts,list) else [])]; random.shuffle(pool); card.temp_pool = pool
+        prepared.append({'card': card, 'options': opts})
+    return render_template('exam.html', questions=prepared)
+
+@app.route('/exam/submit', methods=['POST'])
+@login_required
+def exam_submit():
+    score = 0; total = 0; card_ids = request.form.getlist('card_ids')
+    attempt = ExamAttempt(user_id=current_user.id, total_questions=len(card_ids)); db.session.add(attempt); db.session.commit()
+    for cid in card_ids:
+        card = Card.query.get(int(cid)); total += 1; is_correct = False
+        if card.type == 'mc' and request.form.get(f'q_{cid}') == card.answer: is_correct = True
+        if is_correct: score += 1
+        db.session.add(ExamDetail(attempt_id=attempt.id, question_text=card.question, question_type=card.type, is_correct=is_correct))
+    attempt.score = score; attempt.passed = (score >= (total * 0.6)); db.session.commit()
+    return redirect(url_for('review_exam', attempt_id=attempt.id))
+
+@app.route('/profile/exam/<int:attempt_id>')
+@login_required
+def review_exam(attempt_id):
+    att = ExamAttempt.query.get_or_404(attempt_id)
+    if att.user_id != current_user.id and not current_user.is_admin: flash("Verboten", "danger"); return redirect(url_for('profile'))
+    res = [{'question':d.question_text, 'type':d.question_type, 'is_correct':d.is_correct} for d in att.details]
+    return render_template('exam_result.html', score=att.score, total=att.total_questions, passed=att.passed, results=res, date=att.timestamp)
+
+@app.route('/leaderboard')
+def leaderboard():
+    return render_template('leaderboard.html', by_time=User.query.order_by(User.total_learning_time.desc()).limit(10).all(), by_streak=User.query.order_by(User.streak.desc()).limit(10).all())
+
+@app.route('/search')
+def search():
+    q = request.args.get('q', '')
+    results = Card.query.filter(or_(Card.question.ilike(f'%{q}%'), Card.answer.ilike(f'%{q}%'))).all() if q else []
+    return render_template('search.html', query=q, results=results)
 
 def seed_data():
     if not User.query.filter_by(username='admin').first(): u=User(username='admin', is_admin=True); u.set_password('admin123'); db.session.add(u); db.session.commit()
