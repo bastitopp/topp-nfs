@@ -1,9 +1,9 @@
-Flask
-Flask-SQLAlchemy
-Flask-Login
-Flask-Limiter
-Flask-Mail
-Werkzeug
+flask
+flask-sqlalchemy
+flask-login
+flask-limiter
+flask-mail
+werkzeug
 email_validator
-requests
+gunicorn
 psycopg2-binary

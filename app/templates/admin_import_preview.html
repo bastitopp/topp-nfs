@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <h3 class="mb-4">Import Vorschau</h3>
+    
+    <div class="alert alert-info">
+        Bitte überprüfe die Daten. Es wurden <strong>{{ data|length }}</strong> Einträge gefunden.
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 500px;">
+                <table class="table table-striped mb-0 small">
+                    <thead class="table-dark sticky-top">
+                        <tr>
+                            <th>Kategorie</th>
+                            <th>Typ</th>
+                            <th>Frage</th>
+                            <th>Antwort</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data %}
+                        <tr>
+                            <td>{{ item.category }}</td>
+                            <td>{{ item.type }}</td>
+                            <td>{{ item.question }}</td>
+                            <td>{{ item.answer }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <form action="/admin/import/confirm" method="POST" class="d-flex gap-3">
+        <input type="hidden" name="json_data" value='{{ json_data }}'>
+        <a href="/admin" class="btn btn-secondary rounded-pill px-4">Abbrechen</a>
+        <button class="btn btn-success rounded-pill px-5 fw-bold">Importieren bestätigen</button>
+    </form>
+</div>
+{% endblock %}
