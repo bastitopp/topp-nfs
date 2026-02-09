@@ -15,7 +15,7 @@
 
 <div class="container py-3" style="max-width: 800px;">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <a href="/" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm">← Exit</a>
+        <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm">← Exit</a>
         {% if waiting_count is defined and waiting_count > 0 %}
             <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3">Noch {{ waiting_count }} in Warteschlange</span>
         {% endif %}
@@ -33,10 +33,10 @@
             <p class="text-muted">Für heute stehen keine fälligen Wiederholungen mehr an.</p>
             
             <div class="d-flex flex-column gap-3 justify-content-center align-items-center mt-4">
-                <a href="/" class="btn btn-primary btn-lg rounded-pill px-5 shadow">Zur Übersicht</a>
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg rounded-pill px-5 shadow">Zur Übersicht</a>
                 
                 {% if waiting_count is defined and waiting_count > 0 %}
-                    <a href="/learn/{{ category }}?force=true" class="btn btn-outline-secondary rounded-pill px-4">
+                    <a href="{{ url_for('learn.learn', category_path=category) }}?force=true" class="btn btn-outline-secondary rounded-pill px-4">
                         <i class="bi bi-arrow-repeat"></i> Trotzdem weiterlernen ({{ waiting_count }} warten)
                     </a>
                     <small class="text-muted" style="max-width: 400px;">
@@ -82,9 +82,9 @@
                             <button class="btn p-3 fw-bold rounded-4 {{ 'btn-success' if opt==card.answer else ('btn-danger' if opt==user_answer else 'btn-light') }}" disabled>{{ opt }}</button>
                         {% endfor %}
                     </div>
-                    <a href="/learn/{{ current_category }}" class="btn btn-primary btn-lg w-100 mt-4 rounded-pill shadow">Weiter</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-lg w-100 mt-4 rounded-pill shadow">Weiter</a>
                 {% else %}
-                    <form action="/submit/{{ card.id }}" method="POST">
+                    <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <div class="d-grid gap-3">
@@ -101,9 +101,9 @@
                         <div class="col-md-6"><label class="small text-muted">Deutsch</label><div class="p-3 rounded-3 border {{ 'bg-success bg-opacity-25 border-success' if result_de else 'bg-danger bg-opacity-25 border-danger' }}">{{ card.answer }}</div></div>
                         <div class="col-md-6"><label class="small text-muted">Latein</label><div class="p-3 rounded-3 border {{ 'bg-success bg-opacity-25 border-success' if result_lat else 'bg-danger bg-opacity-25 border-danger' }}">{{ card.answer_lat }}</div></div>
                     </div>
-                    <a href="/learn/{{ current_category }}" class="btn btn-primary w-100 mt-4 rounded-pill">Weiter</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-4 rounded-pill">Weiter</a>
                 {% else %}
-                    <form action="/submit/{{ card.id }}" method="POST">
+                    <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <div class="row g-3">
@@ -117,9 +117,9 @@
             {% elif card.type == 'anatomy_multi' %}
                 {% if feedback_multi %}
                     <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Nr.</th><th>Deine Antwort</th><th>Lösung</th></tr></thead><tbody>{% for r in multi_results %}<tr><td class="fw-bold">{{ r.label }}</td><td><div class="{{ 'text-success' if r.is_de_ok else 'text-danger' }}">DE: {{ r.user_de }}</div><div class="{{ 'text-success' if r.is_lat_ok else 'text-danger' }}">LAT: {{ r.user_lat }}</div></td><td class="text-muted small"><div>{{ r.correct_de }}</div><div>{{ r.correct_lat }}</div></td></tr>{% endfor %}</tbody></table></div>
-                    <a href="/learn/{{ current_category }}" class="btn btn-primary w-100 mt-3 rounded-pill">Weiter</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-3 rounded-pill">Weiter</a>
                 {% else %}
-                    <form action="/submit/{{ card.id }}" method="POST">
+                    <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <p class="small text-muted">Benenne die markierten Strukturen:</p>
@@ -138,9 +138,9 @@
                 {% if feedback_ordering %}
                     <div class="alert {{ 'alert-success' if is_correct else 'alert-danger' }}">{{ 'Richtig!' if is_correct else 'Leider falsch.' }}</div>
                     <ol class="list-group list-group-numbered mb-3">{% for item in correct_order %}<li class="list-group-item">{{ item }}</li>{% endfor %}</ol>
-                    <a href="/learn/{{ current_category }}" class="btn btn-primary w-100 rounded-pill">Weiter</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 rounded-pill">Weiter</a>
                 {% else %}
-                    <form action="/submit/{{ card.id }}" method="POST" id="orderForm">
+                    <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="orderForm">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <input type="hidden" name="order_json" id="orderInput">
@@ -154,9 +154,9 @@
                 {% if feedback_assignment %}
                      <div class="alert {{ 'alert-success' if all_correct else 'alert-danger' }}">{{ 'Perfekt!' if all_correct else 'Nicht ganz...' }}</div>
                      <div class="row">{% for gr in assignment_results %}<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header fw-bold">{{ gr.name }}</div><ul class="list-group list-group-flush">{% for item in gr.group_items %}<li class="list-group-item {{ 'text-success' if item.correct else 'text-danger' }}">{{ item.text }}</li>{% endfor %}{% for m in gr.missing %}<li class="list-group-item text-muted fst-italic">Fehlt: {{ m }}</li>{% endfor %}</ul></div></div>{% endfor %}</div>
-                     <a href="/learn/{{ current_category }}" class="btn btn-primary w-100 rounded-pill mt-3">Weiter</a>
+                     <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 rounded-pill mt-3">Weiter</a>
                 {% else %}
-                    <form action="/submit/{{ card.id }}" method="POST" id="assignForm">
+                    <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="assignForm">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <input type="hidden" name="assignment_json" id="assignInput">
@@ -175,7 +175,7 @@
                             <h5 class="text-primary mb-3 small fw-bold">Lösung</h5>
                             <p class="lead px-3 fw-bold">{{ card.answer }}</p>
                             <div class="mt-auto w-100 px-2 pb-2" onclick="event.stopPropagation();">
-                                <form action="/submit/{{ card.id }}" method="POST" class="d-flex flex-wrap gap-2 justify-content-center">
+                                <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" class="d-flex flex-wrap gap-2 justify-content-center">
                                     <input type="hidden" name="start_time" value="{{ start_time }}">
                                     <input type="hidden" name="origin_path" value="{{ current_category }}">
                                     
@@ -196,7 +196,7 @@
     <div class="modal fade" id="reportModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form action="/report/{{ card.id }}" method="POST">
+                <form action="{{ url_for('learn.report_card', card_id=card.id) }}" method="POST">
                     <div class="modal-header"><h5 class="modal-title">Fehler melden</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body"><textarea name="reason" class="form-control" rows="3" required placeholder="Beschreibung..."></textarea></div>
                     <div class="modal-footer"><button type="submit" class="btn btn-danger">Melden</button></div>

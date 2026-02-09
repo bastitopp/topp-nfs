@@ -17,10 +17,10 @@
                 <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 p-2 text-dark"><i class="bi bi-trophy"></i> {{ current_user.badges|length }} Badges</span>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="/learn/errors" class="btn btn-warning flex-grow-1 text-dark py-3 shadow-sm"><i class="bi bi-bandaid"></i> Meine Fehler üben</a>
+                <a href="{{ url_for('learn.learn_errors') }}" class="btn btn-warning flex-grow-1 text-dark py-3 shadow-sm"><i class="bi bi-bandaid"></i> Meine Fehler üben</a>
             </div>
         {% else %}
-            <a href="/login" class="btn btn-primary btn-lg mt-3 w-100">Jetzt anmelden</a>
+            <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg mt-3 w-100">Jetzt anmelden</a>
         {% endif %}
     </div>
     
@@ -42,7 +42,7 @@
 </div>
 
 {% if current_user.is_authenticated %}
-<form action="/learn/custom" method="POST" id="learnForm" class="mb-5">
+<form action="{{ url_for('learn.learn_custom') }}" method="POST" id="learnForm" class="mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0">Deine Themen</h5>
         <button type="submit" class="btn btn-primary rounded-pill px-4"><i class="bi bi-play-fill"></i> Lernen</button>
@@ -74,7 +74,7 @@
                         </div>
 
                         <div class="ms-3 z-2 d-flex gap-2">
-                             <a href="/learn/{{ val._path }}" class="btn btn-light btn-sm rounded-circle shadow-sm text-primary" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-play-fill fs-5"></i></a>
+                             <a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle shadow-sm text-primary" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-play-fill fs-5"></i></a>
                              <button type="submit" form="resetForm_{{ loop.index }}_{{ level }}" class="btn btn-light btn-sm rounded-circle shadow-sm text-muted" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;" title="Fortschritt zurücksetzen" onclick="return confirm('Fortschritt für {{ key }} wirklich löschen?');">
                                 <i class="bi bi-trash"></i>
                              </button>
@@ -96,7 +96,7 @@
 
 {% macro render_reset_forms(nodes, level=0) %}
     {% for key, val in nodes.items() %}
-        <form id="resetForm_{{ loop.index }}_{{ level }}" action="/reset/{{ val._path }}" method="POST" style="display:none;"></form>
+        <form id="resetForm_{{ loop.index }}_{{ level }}" action="{{ url_for('main.reset_category', category_path=val._path) }}" method="POST" style="display:none;"></form>
         {% if val._subs %}
             {{ render_reset_forms(val._subs, level + 1) }}
         {% endif %}

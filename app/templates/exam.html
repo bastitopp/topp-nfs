@@ -4,78 +4,42 @@
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4 sticky-top bg-body py-2 border-bottom">
         <h3 class="fw-bold m-0"><i class="bi bi-clipboard-check"></i> Prüfung</h3>
-        <div class="text-end">
-            <div class="fs-4 fw-bold font-monospace" id="timer">45:00</div>
-            <small class="text-muted">Verbleibende Zeit</small>
-        </div>
+        <div class="text-end"><div class="fs-4 fw-bold font-monospace" id="timer">45:00</div><small class="text-muted">Verbleibende Zeit</small></div>
     </div>
 
-    <form action="/exam/submit" method="POST" id="examForm">
+    <form action="{{ url_for('learn.exam_submit') }}" method="POST" id="examForm">
         {% for item in questions %}
-            {% set c = item.card %}
-            {% set i = loop.index %}
-            
+            {% set c = item.card %}{% set i = loop.index %}
             <div class="card shadow-sm border-0 mb-5">
-                <div class="card-header bg-white fw-bold d-flex justify-content-between">
-                    <span>Frage {{ i }}</span>
-                    <span class="badge bg-light text-dark border">{{ c.category }}</span>
-                </div>
+                <div class="card-header bg-white fw-bold d-flex justify-content-between"><span>Frage {{ i }}</span><span class="badge bg-light text-dark border">{{ c.category }}</span></div>
                 <div class="card-body">
                     <h5 class="card-title mb-4">{{ c.question }}</h5>
-                    {% if c.image_url %}
-                        <div class="mb-3"><img src="{{ c.image_url }}" class="img-fluid rounded border" style="max-height: 250px;"></div>
-                    {% endif %}
-                    
+                    {% if c.image_url %}<div class="mb-3"><img src="{{ c.image_url }}" class="img-fluid rounded border" style="max-height: 250px;"></div>{% endif %}
                     <input type="hidden" name="card_ids" value="{{ c.id }}">
-
                     {% if c.type == 'mc' %}
                         <div class="d-flex flex-column gap-2">
                             {% for opt in item.options %}
                                 <div class="form-check p-3 border rounded hover-bg-light">
                                     <input class="form-check-input" type="radio" name="q_{{ c.id }}" value="{{ opt }}" id="opt_{{c.id}}_{{loop.index}}">
-                                    <label class="form-check-label w-100 stretched-link cursor-pointer" for="opt_{{c.id}}_{{loop.index}}">
-                                        {{ opt }}
-                                    </label>
+                                    <label class="form-check-label w-100 stretched-link cursor-pointer" for="opt_{{c.id}}_{{loop.index}}">{{ opt }}</label>
                                 </div>
                             {% endfor %}
                         </div>
-                    
                     {% elif c.type == 'anatomy' %}
-                        <div class="row g-3">
-                            <div class="col-md-6"><input name="input_de_{{ c.id }}" class="form-control" placeholder="Deutsch"></div>
-                            <div class="col-md-6"><input name="input_lat_{{ c.id }}" class="form-control" placeholder="Latein"></div>
-                        </div>
-
-                    {% else %}
-                        <div class="alert alert-warning">Fragetyp {{ c.type }} im Prüfungsmodus noch nicht voll unterstützt.</div>
-                    {% endif %}
+                        <div class="row g-3"><div class="col-md-6"><input name="input_de_{{ c.id }}" class="form-control" placeholder="Deutsch"></div><div class="col-md-6"><input name="input_lat_{{ c.id }}" class="form-control" placeholder="Latein"></div></div>
+                    {% else %}<div class="alert alert-warning">Fragetyp {{ c.type }} im Prüfungsmodus noch nicht voll unterstützt.</div>{% endif %}
                 </div>
             </div>
         {% endfor %}
-
-        <div class="d-grid gap-2 mb-5">
-            <button class="btn btn-primary btn-lg rounded-pill shadow">Prüfung abgeben</button>
-        </div>
+        <div class="d-grid gap-2 mb-5"><button class="btn btn-primary btn-lg rounded-pill shadow">Prüfung abgeben</button></div>
     </form>
 </div>
-
 <script>
-    // 45 Minuten Timer
-    let timeLeft = 45 * 60;
-    const timerElem = document.getElementById('timer');
-    
+    let timeLeft = 45 * 60; const timerElem = document.getElementById('timer');
     const interval = setInterval(() => {
-        const m = Math.floor(timeLeft / 60);
-        const s = timeLeft % 60;
-        timerElem.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
-        
-        if (timeLeft <= 300) timerElem.classList.add('text-danger'); // Rot ab 5 min
-        
-        if (timeLeft <= 0) {
-            clearInterval(interval);
-            alert('Zeit abgelaufen! Prüfung wird abgegeben.');
-            document.getElementById('examForm').submit();
-        }
+        const m = Math.floor(timeLeft / 60); const s = timeLeft % 60; timerElem.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+        if (timeLeft <= 300) timerElem.classList.add('text-danger');
+        if (timeLeft <= 0) { clearInterval(interval); alert('Zeit abgelaufen! Prüfung wird abgegeben.'); document.getElementById('examForm').submit(); }
         timeLeft--;
     }, 1000);
 </script>

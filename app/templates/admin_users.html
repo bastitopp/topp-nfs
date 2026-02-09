@@ -1,107 +1,81 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold"><i class="bi bi-people-fill text-primary"></i> Benutzerverwaltung</h2>
-        <a href="/admin" class="btn btn-light rounded-pill px-4">Zurück</a>
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold"><i class="bi bi-people-fill text-primary"></i> Benutzerverwaltung</h2>
+    <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Zurück</a>
+</div>
 
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-header bg-white py-3"><h5 class="mb-0 fw-bold">Neuen Benutzer anlegen</h5></div>
-        <div class="card-body bg-light">
-            <form action="/admin/users/add" method="POST" class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label class="small fw-bold">Benutzername</label>
-                    <input type="text" name="username" class="form-control" required>
-                </div>
-                <div class="col-md-4">
-                    <label class="small fw-bold">Passwort</label>
-                    <input type="password" name="password" class="form-control" required>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" name="is_admin" id="adminCheck">
-                        <label class="form-check-label small" for="adminCheck">Admin?</label>
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-success bg-opacity-10 text-success fw-bold">Neuen User anlegen</div>
+            <div class="card-body">
+                <form action="{{ url_for('admin.add_user') }}" method="POST">
+                    <div class="mb-3"><label class="small fw-bold">Username</label><input name="username" class="form-control" required></div>
+                    <div class="mb-3"><label class="small fw-bold">Passwort</label><input name="password" type="password" class="form-control" required></div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_admin" id="isAdminCheck">
+                        <label class="form-check-label" for="isAdminCheck">Ist Administrator?</label>
                     </div>
-                </div>
-                <div class="col-md-2"><button class="btn btn-success w-100 rounded-pill">Anlegen</button></div>
-            </form>
+                    <button class="btn btn-success w-100 rounded-pill">Anlegen</button>
+                </form>
+            </div>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light"><tr><th>Name / Email</th><th>Rolle</th><th>Statistik</th><th>Aktion</th></tr></thead>
-                <tbody>
-                    {% for user in users %}
-                    <tr>
-                        <td>
-                            <div class="fw-bold">{{ user.username }}</div>
-                            <small class="text-muted">{{ user.real_name or '' }}</small>
-                            {% if user.email %}<br><small class="text-primary">{{ user.email }}</small>{% endif %}
-                        </td>
-                        <td><span class="badge {{ 'bg-warning text-dark' if user.is_admin else 'bg-light text-dark border' }}">{{ 'Admin' if user.is_admin else 'User' }}</span></td>
-                        <td><small>{{ user.total_learning_time | format_duration }}</small></td>
-                        <td>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#editModal{{ user.id }}">
-                                    <i class="bi bi-pencil-fill"></i> Bearbeiten
-                                </button>
-                                
-                                {% if user.username != 'admin' %}
-                                <form action="/admin/users/delete/{{ user.id }}" method="POST" onsubmit="return confirm('Löschen?');">
-                                    <button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button>
-                                </form>
-                                {% endif %}
-                            </div>
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light"><tr><th>User</th><th>Info</th><th>Aktion</th></tr></thead>
+                        <tbody>
+                            {% for u in users %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">{{ u.username }}</div>
+                                    {% if u.is_admin %}<span class="badge bg-warning text-dark">Admin</span>{% endif %}
+                                </td>
+                                <td class="small text-muted">
+                                    {{ u.email or '-' }}<br>
+                                    Letzter Login: {{ u.last_active.strftime('%d.%m. %H:%M') if u.last_active else '-' }}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary rounded-circle me-1" data-bs-toggle="modal" data-bs-target="#editUser{{u.id}}"><i class="bi bi-pencil-fill"></i></button>
+                                    {% if u.username != 'admin' %}
+                                        <form action="{{ url_for('admin.delete_user', uid=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Wirklich löschen?');">
+                                            <button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
 
-                            <div class="modal fade" id="editModal{{ user.id }}" tabindex="-1">
+                            <div class="modal fade" id="editUser{{u.id}}" tabindex="-1">
                                 <div class="modal-dialog">
                                     <div class="modal-content">
-                                        <form action="/admin/users/edit/{{ user.id }}" method="POST">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title">Bearbeiten: {{ user.username }}</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="mb-3">
-                                                    <label class="form-label small">Benutzername</label>
-                                                    <input type="text" name="username" value="{{ user.username }}" class="form-control" required>
+                                        <div class="modal-header"><h5 class="modal-title">Bearbeiten: {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                        <div class="modal-body">
+                                            <form action="{{ url_for('admin.edit_user', uid=u.id) }}" method="POST">
+                                                <div class="mb-3"><label>Username</label><input name="username" value="{{ u.username }}" class="form-control"></div>
+                                                <div class="mb-3"><label>Echter Name</label><input name="real_name" value="{{ u.real_name or '' }}" class="form-control"></div>
+                                                <div class="mb-3"><label>Email</label><input name="email" value="{{ u.email or '' }}" class="form-control"></div>
+                                                <div class="mb-3"><label>Neues Passwort (leer lassen zum Beibehalten)</label><input name="new_password" type="password" class="form-control"></div>
+                                                <div class="form-check mb-3">
+                                                    <input class="form-check-input" type="checkbox" name="is_admin" {{ 'checked' if u.is_admin }} id="adminCheck{{u.id}}">
+                                                    <label class="form-check-label" for="adminCheck{{u.id}}">Admin Rechte</label>
                                                 </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label small">Echter Name</label>
-                                                    <input type="text" name="real_name" value="{{ user.real_name or '' }}" class="form-control">
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label small">E-Mail</label>
-                                                    <input type="email" name="email" value="{{ user.email or '' }}" class="form-control">
-                                                </div>
-                                                <div class="mb-3 form-check">
-                                                    <input type="checkbox" name="is_admin" class="form-check-input" id="checkAdmin{{user.id}}" {% if user.is_admin %}checked{% endif %}>
-                                                    <label class="form-check-label" for="checkAdmin{{user.id}}">Administrator-Rechte</label>
-                                                </div>
-                                                <hr>
-                                                <h6 class="text-danger">Passwort zurücksetzen</h6>
-                                                <div class="mb-3">
-                                                    <label class="form-label small">Neues Passwort (leer lassen zum Behalten)</label>
-                                                    <input type="text" name="new_password" class="form-control" placeholder="Neues Passwort...">
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                                                <button type="submit" class="btn btn-primary">Speichern</button>
-                                            </div>
-                                        </form>
+                                                <button class="btn btn-primary w-100">Speichern</button>
+                                            </form>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
