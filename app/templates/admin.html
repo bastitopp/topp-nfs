@@ -43,16 +43,60 @@
             </div>
         </div>
         
-        <div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Kat</th><th>Typ</th><th>Frage</th><th class="text-end"></th></tr></thead><tbody>
-        {% for c in standard_cards %}
-        <tr>
-            <td><span class="badge bg-secondary bg-opacity-10 text-secondary border">{{ c.category }}</span></td>
-            <td><small class="text-muted">{{ c.type }}</small></td>
-            <td class="text-truncate" style="max-width: 250px;">{{ c.question }}</td>
-            <td class="text-end"><a href="{{ url_for('admin.edit_card', card_id=c.id) }}" class="btn btn-sm btn-outline-primary rounded-circle"><i class="bi bi-pencil-fill"></i></a> <form action="{{ url_for('admin.delete_card', card_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button></form></td>
-        </tr>
+        <form action="{{ url_for('admin.bulk_delete') }}" method="POST" id="bulkDeleteForm">
+            
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="fw-bold text-muted">Fragen nach Kategorie</h5>
+                <button class="btn btn-danger btn-sm rounded-pill" onclick="return confirm('Ausgewählte Fragen wirklich löschen?')">
+                    <i class="bi bi-trash"></i> Markierte löschen
+                </button>
+            </div>
+
+            <div class="accordion" id="categoryAccordion">
+                {% for category in sorted_categories %}
+                {% set safe_cat_id = loop.index %}
+                <div class="accordion-item border-0 mb-2 shadow-sm rounded overflow-hidden">
+                    <h2 class="accordion-header position-relative" id="heading{{ safe_cat_id }}">
+                        <button class="accordion-button collapsed bg-white fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ safe_cat_id }}">
+                            {{ category }} <span class="badge bg-secondary ms-2">{{ grouped_cards[category]|length }}</span>
+                        </button>
+                        
+                        <button type="submit" form="delCatForm_{{ safe_cat_id }}" class="btn btn-sm btn-outline-danger border-0 position-absolute end-0 top-50 translate-middle-y me-5" style="z-index: 5;" onclick="event.stopPropagation(); return confirm('ACHTUNG: Kategorie {{ category }} und ALLE {{ grouped_cards[category]|length }} Fragen darin unwiderruflich löschen?');" title="Ganze Kategorie löschen">
+                            <i class="bi bi-folder-x"></i>
+                        </button>
+                    </h2>
+                    <div id="collapse{{ safe_cat_id }}" class="accordion-collapse collapse" data-bs-parent="#categoryAccordion">
+                        <div class="accordion-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light"><tr><th style="width: 40px;"><input type="checkbox" class="form-check-input" onclick="toggleGroup(this, 'group_{{ safe_cat_id }}')"></th><th>Typ</th><th>Frage</th><th class="text-end"></th></tr></thead>
+                                    <tbody>
+                                        {% for c in grouped_cards[category] %}
+                                        <tr>
+                                            <td><input type="checkbox" name="selected_ids" value="{{ c.id }}" class="form-check-input group_{{ safe_cat_id }}"></td>
+                                            <td><small class="text-muted">{{ c.type }}</small></td>
+                                            <td class="text-truncate" style="max-width: 350px;">{{ c.question }}</td>
+                                            <td class="text-end">
+                                                <a href="{{ url_for('admin.edit_card', card_id=c.id) }}" class="btn btn-sm btn-outline-primary rounded-circle"><i class="bi bi-pencil-fill"></i></a>
+                                                <button type="submit" formaction="{{ url_for('admin.delete_card', card_id=c.id) }}" class="btn btn-sm btn-outline-danger rounded-circle" onclick="return confirm('Löschen?');"><i class="bi bi-trash-fill"></i></button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </form>
+        {% for category in sorted_categories %}
+        <form action="{{ url_for('admin.delete_category') }}" method="POST" id="delCatForm_{{ loop.index }}" style="display:none;">
+            <input type="hidden" name="category_name" value="{{ category }}">
+        </form>
         {% endfor %}
-        </tbody></table></div></div></div>
+
     </div>
 
     <div class="tab-pane fade" id="meds">
@@ -156,7 +200,9 @@ function prepareMultiJson() {
         document.getElementById('multi_json_input').value = JSON.stringify(rows);
     }
 }
-function toggleAll(source) { document.querySelectorAll('.row-check').forEach(c => c.checked = source.checked); }
+function toggleGroup(source, groupClass) { 
+    document.querySelectorAll('.' + groupClass).forEach(c => c.checked = source.checked); 
+}
 document.addEventListener('DOMContentLoaded', updateFormFields);
 </script>
 {% endblock %}

@@ -6,39 +6,59 @@
     
     <div class="alert alert-info">
         Bitte überprüfe die Daten. Es wurden <strong>{{ data|length }}</strong> Einträge gefunden.
+        <br>
+        <small>Duplikate wurden markiert. Du kannst entscheiden, ob sie überschrieben oder übersprungen werden sollen.</small>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body p-0">
-            <div class="table-responsive" style="max-height: 500px;">
-                <table class="table table-striped mb-0 small">
-                    <thead class="table-dark sticky-top">
-                        <tr>
-                            <th>Kategorie</th>
-                            <th>Typ</th>
-                            <th>Frage</th>
-                            <th>Antwort</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in data %}
-                        <tr>
-                            <td>{{ item.category }}</td>
-                            <td>{{ item.type }}</td>
-                            <td>{{ item.question }}</td>
-                            <td>{{ item.answer }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <form action="/admin/import/confirm" method="POST">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 500px;">
+                    <table class="table table-striped mb-0 small align-middle">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th style="min-width: 150px;">Aktion</th>
+                                <th>Kategorie</th>
+                                <th>Typ</th>
+                                <th>Frage</th>
+                                <th>Antwort</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in data %}
+                            <tr class="{{ 'table-warning' if item.is_duplicate else '' }}">
+                                <td>
+                                    {% if item.is_duplicate %}
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge bg-warning text-dark align-self-start">Duplikat (ID: {{ item.existing_id }})</span>
+                                            <select name="action_{{ loop.index0 }}" class="form-select form-select-sm border-warning">
+                                                <option value="skip" selected>Überspringen</option>
+                                                <option value="overwrite">Überschreiben</option>
+                                                <option value="new">Als Neu anlegen</option>
+                                            </select>
+                                        </div>
+                                    {% else %}
+                                        <span class="badge bg-success">Neu</span>
+                                        <input type="hidden" name="action_{{ loop.index0 }}" value="new">
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.category }}</td>
+                                <td>{{ item.type }}</td>
+                                <td>{{ item.question }}</td>
+                                <td>{{ item.answer }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
 
-    <form action="/admin/import/confirm" method="POST" class="d-flex gap-3">
-        <input type="hidden" name="json_data" value='{{ json_data }}'>
-        <a href="/admin" class="btn btn-secondary rounded-pill px-4">Abbrechen</a>
-        <button class="btn btn-success rounded-pill px-5 fw-bold">Importieren bestätigen</button>
+        <div class="d-flex gap-3">
+            <input type="hidden" name="json_data" value='{{ json_data }}'>
+            <a href="/admin" class="btn btn-secondary rounded-pill px-4">Abbrechen</a>
+            <button class="btn btn-success rounded-pill px-5 fw-bold">Importieren bestätigen</button>
+        </div>
     </form>
 </div>
 {% endblock %}

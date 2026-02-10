@@ -24,95 +24,117 @@ def allowed_file(fn): return '.' in fn and fn.rsplit('.', 1)[1].lower() in {'png
 @bp.route('/admin', methods=['GET','POST'])
 @admin_required
 def admin_dashboard():
-    # POST Logik für STANDARD Fragen (bleibt hier, die anderen haben eigene Routen)
+    # POST Logik für STANDARD Fragen
     if request.method == 'POST':
         if 'tag_name' in request.form:
             db.session.add(Tag(name=request.form['tag_name'])); db.session.commit(); return redirect(url_for('admin.admin_dashboard'))
         
-        # Standard Create Logic (verkürzt für Übersicht, hier deinen Standard-Code nutzen)
+        # Standard Create Logic
         if 'question' in request.form:
             cat = request.form.get('category_path') or request.form.get('category_new') or request.form.get('category_select')
             c = Card(category=cat, type=request.form['type'], question=request.form['question'])
-            # ... (Restliche Standard-Speicher-Logik hier wie gehabt) ...
+            
             c.answer = request.form.get('answer','')
             if c.type=='mc':
                 opts = [x.strip() for x in request.form.get('options','').split(',')]
                 if c.answer and c.answer not in opts: opts.append(c.answer)
                 c.options = json.dumps(opts)
+            elif c.type == 'anatomy_multi': c.options = request.form.get('multi_json')
+            elif c.type == 'ordering': c.options = request.form.get('ordering_json')
+            elif c.type == 'assignment': c.options = request.form.get('assignment_json')
+            elif c.type == 'calculation': c.options = request.form.get('calc_json')
+            
             db.session.add(c); db.session.commit(); flash('Gespeichert', 'success'); return redirect(url_for('admin.admin_dashboard'))
 
     # DATEN LADEN & TRENNEN
     all_cards = Card.query.all()
     
-    # Wir filtern die Listen für die verschiedenen Tabs
     med_cards = [c for c in all_cards if c.type == 'calculation']
     case_cards = [c for c in all_cards if c.type == 'case_study']
-    standard_cards = [c for c in all_cards if c.type not in ['calculation', 'case_study']]
+    
+    # Gruppierung der Standard-Karten nach Kategorie
+    standard_cards_raw = [c for c in all_cards if c.type not in ['calculation', 'case_study']]
+    grouped_cards = {}
+    for c in standard_cards_raw:
+        if c.category not in grouped_cards:
+            grouped_cards[c.category] = []
+        grouped_cards[c.category].append(c)
+    
+    # Kategorien alphabetisch sortieren
+    sorted_categories = sorted(grouped_cards.keys())
     
     reports = CardReport.query.filter_by(resolved=False).order_by(CardReport.created_at.desc()).all()
-    categories = [c[0] for c in db.session.query(Card.category).distinct().all()]
+    categories_list = [c[0] for c in db.session.query(Card.category).distinct().all()]
     
     return render_template('admin.html', 
-                           standard_cards=standard_cards, 
+                           grouped_cards=grouped_cards,
+                           sorted_categories=sorted_categories,
                            med_cards=med_cards, 
                            case_cards=case_cards,
-                           categories=categories, 
+                           categories=categories_list, 
                            tags=Tag.query.all(), 
                            messages=DashboardMessage.query.all(), 
                            reports=reports)
 
-# --- NEU: SPEZIAL ROUTE FÜR MEDIKAMENTE ---
+@bp.route('/admin/category/delete', methods=['POST'])
+@admin_required
+def delete_category():
+    cat_name = request.form.get('category_name')
+    if not cat_name:
+        flash('Keine Kategorie angegeben.', 'warning')
+        return redirect(url_for('admin.admin_dashboard'))
+    
+    cards = Card.query.filter_by(category=cat_name).all()
+    count = len(cards)
+    
+    if count == 0:
+        flash('Kategorie nicht gefunden oder leer.', 'warning')
+    else:
+        for c in cards:
+            UserProgress.query.filter_by(card_id=c.id).delete()
+            db.session.delete(c)
+        db.session.commit()
+        flash(f'Kategorie "{cat_name}" und {count} Fragen gelöscht.', 'success')
+        
+    return redirect(url_for('admin.admin_dashboard'))
+
 @bp.route('/admin/add_med', methods=['POST'])
 @admin_required
 def add_med():
     cat = request.form.get('category')
-    drug = request.form.get('drug_name') # z.B. "Esketamin"
+    drug = request.form.get('drug_name')
     
-    # JSON Config bauen
     config = {
         "var": "weight",
         "min": int(request.form.get('weight_min')),
         "max": int(request.form.get('weight_max')),
         "step": int(request.form.get('weight_step')),
-        "unit": request.form.get('unit') # z.B. "mg"
+        "unit": request.form.get('unit')
     }
     
-    # Frage generieren
     question = f"{drug} Gabe: Patient wiegt {{weight}} kg."
-    
     c = Card(category=cat, type='calculation', question=question)
     c.options = json.dumps(config)
-    c.answer = request.form.get('dosage_range') # z.B. "0.125-0.25"
+    c.answer = request.form.get('dosage_range')
     
     db.session.add(c); db.session.commit()
     flash(f'Medikament {drug} angelegt.', 'success')
     return redirect(url_for('admin.admin_dashboard'))
 
-# --- NEU: SPEZIAL ROUTE FÜR FALLBEISPIELE ---
 @bp.route('/admin/add_case', methods=['POST'])
 @admin_required
 def add_case():
     cat = request.form.get('category')
     title = request.form.get('title')
     intro = request.form.get('intro')
-    solution = request.form.get('solution') # Der versteckte Teil
-    
-    # Markdown Spoiler bauen
-    # Wir speichern alles im "Question" Feld, oder teilen es auf.
-    # Besser: Intro ist Frage, Lösung ist Antwort (die wird im Quiz als Spoiler angezeigt)
+    solution = request.form.get('solution')
     
     c = Card(category=cat, type='case_study', question=f"**{title}**\n\n{intro}")
-    
-    # Wir nutzen HTML <details> im Markdown für die Lösung
-    c.answer = f"""
-### Lösung & Maßnahmen
-{solution}
-"""
+    c.answer = f"### Lösung & Maßnahmen\n{solution}"
     db.session.add(c); db.session.commit()
     flash('Fallbeispiel angelegt.', 'success')
     return redirect(url_for('admin.admin_dashboard'))
 
-# ... (Hier folgen die restlichen Routen: users, delete, export, etc. - unverändert lassen)
 @bp.route('/admin/users')
 @admin_required
 def admin_users(): return render_template('admin_users.html', users=User.query.all())
@@ -168,17 +190,13 @@ def delete_card(card_id):
 @admin_required
 def edit_card(card_id):
     card = Card.query.get_or_404(card_id)
-    
     options_str = ''
     if card.type == 'mc' and card.options:
         try:
             opts_list = json.loads(card.options)
-            if isinstance(opts_list, list):
-                options_str = ", ".join(opts_list)
-            else:
-                options_str = str(card.options)
-        except:
-            options_str = card.options
+            if isinstance(opts_list, list): options_str = ", ".join(opts_list)
+            else: options_str = str(card.options)
+        except: options_str = card.options
 
     if request.method == 'POST':
         card.category = request.form.get('category_new'); card.question = request.form.get('question'); card.type = request.form.get('type')
@@ -200,12 +218,11 @@ def edit_card(card_id):
                 opts = [x.strip() for x in opts_raw.split(',')]
                 if card.answer and card.answer not in opts: opts.append(card.answer)
                 card.options = json.dumps(opts)
-            else:
-                card.options = '[]'
+            else: card.options = '[]'
         elif card.type == 'anatomy_multi': card.options = request.form.get('multi_json')
         elif card.type == 'ordering': card.options = request.form.get('ordering_json')
         elif card.type == 'assignment': card.options = request.form.get('assignment_json')
-        elif card.type == 'calculation': card.options = request.form.get('calc_json') # Falls man manuell editiert
+        elif card.type == 'calculation': card.options = request.form.get('calc_json')
         
         db.session.commit(); flash('Gespeichert', 'success'); return redirect(url_for('admin.admin_dashboard'))
     return render_template('edit_card.html', card=card, options_str=options_str, multi_json=card.options if card.type=='anatomy_multi' else '[]', ordering_json=card.options if card.type=='ordering' else '[]', assignment_json=card.options if card.type=='assignment' else '[]')
@@ -224,6 +241,16 @@ def import_preview():
             if len(row) < 4: continue
             item = {'category': row[0], 'type': row[1], 'question': row[2], 'answer': row[3]}
             if len(row) > 4: item['options'] = row[4]
+            
+            # --- NEU: DUBLETTEN PRÜFUNG ---
+            existing = Card.query.filter_by(question=item['question']).first()
+            if existing:
+                item['is_duplicate'] = True
+                item['existing_id'] = existing.id
+            else:
+                item['is_duplicate'] = False
+            # ------------------------------
+            
             preview_data.append(item)
             
         return render_template('admin_import_preview.html', data=preview_data, json_data=json.dumps(preview_data))
@@ -234,8 +261,40 @@ def import_preview():
 def import_confirm():
     try:
         data = json.loads(request.form.get('json_data'))
-        count = 0
-        for item in data:
+        count_new = 0
+        count_overwritten = 0
+        count_skipped = 0
+        
+        for i, item in enumerate(data):
+            # Wir holen uns die Aktion für dieses Item (index i) aus dem Formular
+            action = request.form.get(f'action_{i}', 'new')
+            
+            # 1. Fall: Überspringen
+            if item.get('is_duplicate') and action == 'skip':
+                count_skipped += 1
+                continue
+                
+            # 2. Fall: Überschreiben
+            if item.get('is_duplicate') and action == 'overwrite':
+                c = Card.query.get(item.get('existing_id'))
+                if c:
+                    # Werte aktualisieren
+                    c.category = item['category']
+                    c.type = item['type']
+                    c.answer = item['answer']
+                    # Optionen aktualisieren (gleiche Logik wie bei neu)
+                    if 'options' in item and item['options']:
+                        if item['type'] == 'mc':
+                            opts = [x.strip() for x in item['options'].split(',')]
+                            if c.answer and c.answer not in opts: opts.append(c.answer)
+                            c.options = json.dumps(opts)
+                        else:
+                            c.options = item['options']
+                    
+                    count_overwritten += 1
+                    continue
+            
+            # 3. Fall: Neu anlegen (Standard)
             c = Card(category=item['category'], type=item['type'], question=item['question'], answer=item['answer'])
             if 'options' in item and item['options']:
                 if item['type'] == 'mc':
@@ -245,9 +304,10 @@ def import_confirm():
                 else:
                     c.options = item['options']
             db.session.add(c)
-            count += 1
+            count_new += 1
+            
         db.session.commit()
-        flash(f'{count} Fragen erfolgreich importiert!', 'success')
+        flash(f'Import abgeschlossen: {count_new} neu, {count_overwritten} überschrieben, {count_skipped} übersprungen.', 'success')
     except Exception as e: flash(f'Import Fehler: {e}', 'danger')
     return redirect(url_for('admin.admin_dashboard'))
 
