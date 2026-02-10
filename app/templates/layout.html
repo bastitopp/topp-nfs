@@ -16,46 +16,40 @@
     
     <style>
         :root { --border-radius-lg: 16px; --border-radius-sm: 8px; --shadow-soft: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); --primary-gradient: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); }
-        body { font-family: 'Inter', sans-serif; background-color: var(--bs-tertiary-bg); padding-bottom: 80px; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bs-tertiary-bg); padding-bottom: 85px; }
         .card { border: none; border-radius: var(--border-radius-lg); box-shadow: var(--shadow-soft); transition: transform 0.2s ease; overflow: hidden; }
-        .btn { border-radius: var(--border-radius-sm); padding: 0.6rem 1.2rem; font-weight: 600; }
-        .btn-primary { background: var(--primary-gradient); border: none; }
         
         .navbar-top { height: 70px; backdrop-filter: blur(10px); background-color: rgba(var(--bs-body-bg-rgb), 0.9) !important; z-index: 1060; }
-        .navbar-brand img { 
-            height: 65px; 
-            margin-top: -5px; 
-            margin-bottom: -5px;
-            transition: all 0.2s;
-        }
+        .navbar-brand img { height: 65px; margin-top: -5px; transition: all 0.2s; }
 
-        /* Logik für zwei Logos */
         .logo-dark-mode { display: none; }
         [data-bs-theme="dark"] .logo-light-mode { display: none; }
         [data-bs-theme="dark"] .logo-dark-mode { display: block; }
 
-        .mobile-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 70px; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); display: flex; justify-content: space-around; align-items: center; z-index: 1050; box-shadow: 0 -5px 20px rgba(0,0,0,0.05); }
-        .mobile-nav-item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: var(--bs-secondary-color); font-size: 0.75rem; transition: color 0.2s; }
-        .mobile-nav-item i { font-size: 1.5rem; margin-bottom: 2px; }
-        .mobile-nav-item.active { color: var(--bs-primary); }
-        .nav-profile-img { width: 30px; height: 30px; object-fit: cover; border-radius: 50%; border: 2px solid var(--bs-border-color); }
-        
-        #mobileSearchCollapse {
-            position: absolute;
-            top: 70px;
-            left: 0;
-            right: 0;
-            background: var(--bs-body-bg);
-            padding: 10px 20px;
-            border-bottom: 1px solid var(--bs-border-color);
-            z-index: 1055;
+        /* Level-Badge Styling */
+        .profile-wrapper { position: relative; display: flex; align-items: center; justify-content: center; height: 34px; width: 34px; }
+        .nav-profile-img { width: 34px; height: 34px; object-fit: cover; border-radius: 50%; border: 2px solid var(--bs-border-color); }
+        .badge-lvl { 
+            position: absolute; bottom: -2px; right: -4px; 
+            background: #ffc107; color: #000; 
+            font-size: 0.6rem; font-weight: 800; 
+            padding: 1px 4px; border-radius: 4px; 
+            border: 1px solid var(--bs-body-bg);
+            line-height: 1;
+            z-index: 2;
         }
 
+        /* Mobile Nav */
+        .mobile-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 75px; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); display: flex; justify-content: space-around; align-items: center; z-index: 1050; box-shadow: 0 -5px 20px rgba(0,0,0,0.05); }
+        .mobile-nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: var(--bs-secondary-color); font-size: 0.72rem; transition: color 0.2s; flex: 1; height: 100%; }
+        .mobile-nav-item i { font-size: 1.4rem; height: 34px; display: flex; align-items: center; margin-bottom: 2px; }
+        .mobile-nav-item span { line-height: 1; display: block; text-align: center; }
+        .mobile-nav-item.active { color: var(--bs-primary); }
+
+        #mobileSearchCollapse { position: absolute; top: 70px; left: 0; right: 0; background: var(--bs-body-bg); padding: 10px 20px; border-bottom: 1px solid var(--bs-border-color); z-index: 1055; }
+
         @media (max-width: 576px) {
-            .container {
-                padding-left: 20px !important;
-                padding-right: 20px !important;
-            }
+            .container { padding-left: 15px !important; padding-right: 15px !important; }
             .navbar-brand img { height: 55px; }
         }
     </style>
@@ -64,29 +58,31 @@
     <nav class="navbar navbar-expand-lg navbar-top sticky-top border-bottom">
         <div class="container">
             <a class="navbar-brand fw-bold" href="{{ url_for('main.index') }}">
-                <img src="{{ url_for('static', filename='images/logo.svg') }}" class="logo-light-mode" alt="topp-nfs">
-                <img src="{{ url_for('static', filename='images/logo-white.svg') }}" class="logo-dark-mode" alt="topp-nfs">
+                <img src="{{ url_for('static', filename='images/logo.svg') }}" class="logo-light-mode" alt="Logo">
+                <img src="{{ url_for('static', filename='images/logo-white.svg') }}" class="logo-dark-mode" alt="Logo">
             </a>
             
-            <form class="d-none d-md-flex ms-4" action="{{ url_for('main.search') }}" method="GET">
-                <input class="form-control form-control-sm rounded-pill border-0 bg-light" type="search" name="q" placeholder="Frage suchen...">
-            </form>
-
             <div class="d-none d-lg-block ms-auto">
                 <ul class="navbar-nav align-items-center d-flex flex-row gap-3">
                     {% if current_user.is_authenticated %}
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('learn.exam_index') }}">Prüfung</a></li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('main.leaderboard') }}">Rangliste</a></li>
+                        
+                        {# Admin Button Desktop #}
                         {% if current_user.is_admin %}
-                             <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('admin.admin_dashboard') }}">Admin</a></li>
+                        <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('admin.admin_dashboard') }}"><i class="bi bi-gear-fill"></i> Admin</a></li>
                         {% endif %}
+
                         <li class="nav-item ms-2">
-                            <a class="nav-link p-0" href="{{ url_for('main.profile') }}" title="Mein Profil">
-                                {% if current_user.profile_image %}
-                                    <img src="{{ current_user.profile_image }}" class="nav-profile-img shadow-sm">
-                                {% else %}
-                                    <div class="bg-secondary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;"><i class="bi bi-person-fill text-muted"></i></div>
-                                {% endif %}
+                            <a class="nav-link p-0" href="{{ url_for('main.profile') }}">
+                                <div class="profile-wrapper">
+                                    {% if current_user.profile_image %}
+                                        <img src="{{ current_user.profile_image }}" class="nav-profile-img shadow-sm">
+                                    {% else %}
+                                        <div class="bg-secondary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;"><i class="bi bi-person-fill text-muted"></i></div>
+                                    {% endif %}
+                                    <span class="badge-lvl">{{ current_user.get_level() }}</span>
+                                </div>
                             </a>
                         </li>
                         <li class="nav-item"><a class="btn btn-sm btn-outline-danger" href="{{ url_for('auth.logout') }}">Logout</a></li>
@@ -98,18 +94,16 @@
             </div>
 
             <div class="d-lg-none ms-auto d-flex align-items-center gap-3">
-                <button class="btn btn-link text-secondary p-0" type="button" data-bs-toggle="collapse" data-bs-target="#mobileSearchCollapse">
-                    <i class="bi bi-search fs-5"></i>
-                </button>
+                <button class="btn btn-link text-secondary p-0" type="button" data-bs-toggle="collapse" data-bs-target="#mobileSearchCollapse"><i class="bi bi-search fs-5"></i></button>
                 <button class="btn btn-link nav-link p-1" onclick="toggleTheme()"><i class="bi bi-moon-stars-fill"></i></button>
             </div>
         </div>
     </nav>
 
     <div class="collapse d-lg-none" id="mobileSearchCollapse">
-        <form action="{{ url_for('main.search') }}" method="GET">
+        <form action="{{ url_for('main.search') }}" method="GET" class="p-2">
             <div class="input-group">
-                <input class="form-control rounded-pill border-0 bg-light" type="search" name="q" placeholder="Frage suchen..." autofocus>
+                <input class="form-control rounded-pill border-0 bg-light" type="search" name="q" placeholder="Frage suchen...">
                 <button class="btn btn-primary rounded-pill ms-2" type="submit">Suchen</button>
             </div>
         </form>
@@ -117,68 +111,67 @@
 
     <main class="container flex-grow-1 mt-4">
         {% with m=get_flashed_messages(with_categories=true) %}{% if m %}{% for c,t in m %}
-            <div class="alert alert-{{c}} shadow-sm border-0 rounded-3 d-flex align-items-center gap-2"><i class="bi bi-info-circle-fill"></i> {{t}}</div>
+            <div class="alert alert-{{c}} shadow-sm border-0 rounded-3 mb-3">{{t}}</div>
         {% endfor %}{% endif %}{% endwith %}
         {% block content %}{% endblock %}
     </main>
 
+    {% if current_user.is_authenticated %}
     <div class="mobile-nav d-lg-none">
-        <a href="{{ url_for('main.index') }}" class="mobile-nav-item {{ 'active' if request.path == '/' }}"><i class="bi bi-house-door{{ '-fill' if request.path == '/' }}"></i> Start</a>
-        <a href="{{ url_for('learn.exam_index') }}" class="mobile-nav-item {{ 'active' if '/exam' in request.path }}"><i class="bi bi-clipboard-check{{ '-fill' if '/exam' in request.path }}"></i> Prüfung</a>
-        <a href="{{ url_for('main.leaderboard') }}" class="mobile-nav-item {{ 'active' if '/leaderboard' in request.path }}"><i class="bi bi-trophy{{ '-fill' if '/leaderboard' in request.path }}"></i> Rang</a>
-        {% if current_user.is_authenticated and current_user.is_admin %}
-        <a href="{{ url_for('admin.admin_dashboard') }}" class="mobile-nav-item {{ 'active' if '/admin' in request.path }}"><i class="bi bi-gear{{ '-fill' if '/admin' in request.path }}"></i> Admin</a>
+        <a href="{{ url_for('main.index') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.index') }}">
+            <i class="bi bi-house-door{{ '-fill' if request.path == url_for('main.index') }}"></i>
+            <span>Start</span>
+        </a>
+        <a href="{{ url_for('learn.exam_index') }}" class="mobile-nav-item {{ 'active' if '/exam' in request.path }}">
+            <i class="bi bi-clipboard-check{{ '-fill' if '/exam' in request.path }}"></i>
+            <span>Prüfung</span>
+        </a>
+        <a href="{{ url_for('main.leaderboard') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.leaderboard') }}">
+            <i class="bi bi-trophy{{ '-fill' if request.path == url_for('main.leaderboard') }}"></i>
+            <span>Rang</span>
+        </a>
+        
+        {# Admin Button Mobile #}
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="mobile-nav-item {{ 'active' if '/admin' in request.path }}">
+            <i class="bi bi-gear{{ '-fill' if '/admin' in request.path }}"></i>
+            <span>Admin</span>
+        </a>
         {% endif %}
-        <a href="{{ url_for('main.profile') }}" class="mobile-nav-item {{ 'active' if '/profile' in request.path }}">
-            {% if current_user.is_authenticated and current_user.profile_image %}<img src="{{ current_user.profile_image }}" class="mobile-profile-img shadow-sm" style="width:24px; height:24px; border-radius:50%"> Profil
-            {% else %}<i class="bi bi-person{{ '-fill' if '/profile' in request.path }}"></i> Profil{% endif %}
+
+        <a href="{{ url_for('main.profile') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.profile') }}">
+            <div class="profile-wrapper" style="margin-bottom: 2px;">
+                {% if current_user.profile_image %}
+                    <img src="{{ current_user.profile_image }}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--bs-border-color);">
+                {% else %}
+                    <i class="bi bi-person{{ '-fill' if request.path == url_for('main.profile') }}" style="font-size: 1.5rem;"></i>
+                {% endif %}
+                <span class="badge-lvl" style="font-size: 0.5rem; bottom: 0px; right: -2px;">{{ current_user.get_level() }}</span>
+            </div>
+            <span>Profil</span>
         </a>
     </div>
-
-    <footer class="d-none d-lg-block bg-body-tertiary py-3 mt-5 text-center text-muted"><small>&copy; 2025 Topp-NFS</small></footer>
+    {% endif %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        /**
-         * Theme-Management: Berücksichtigt Systemeinstellungen und Benutzerauswahl
-         */
         function getPreferredTheme() {
             const stored = localStorage.getItem('t');
             if (stored) return stored;
             return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         }
-
         function setTheme(theme) {
             document.documentElement.setAttribute('data-bs-theme', theme);
             const icon = document.getElementById('themeIcon');
-            if (icon) {
-                icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
-            }
+            if (icon) { icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill'; }
         }
-
         function toggleTheme() {
             const current = document.documentElement.getAttribute('data-bs-theme');
             const next = current === 'light' ? 'dark' : 'light';
             localStorage.setItem('t', next);
             setTheme(next);
         }
-
-        // Initialisierung beim Laden
-        const initialTheme = getPreferredTheme();
-        setTheme(initialTheme);
-
-        // Automatische Anpassung, wenn sich die Systemeinstellungen ändern (falls kein manuelles Theme gesetzt wurde)
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-            if (!localStorage.getItem('t')) {
-                setTheme(e.matches ? 'dark' : 'light');
-            }
-        });
-
-        if ('serviceWorker' in navigator) { 
-            window.addEventListener('load', () => { 
-                navigator.serviceWorker.register('/static/sw.js').catch(err => console.log('SW Fail', err)); 
-            }); 
-        }
+        setTheme(getPreferredTheme());
     </script>
 </body>
 </html>
