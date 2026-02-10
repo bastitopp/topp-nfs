@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="220" viewBox="0 0 980 220" role="img" aria-label="Topp-NFS Headerlogo Darkmode">
+  <defs>
+    <style>
+      .wordmark { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; font-weight: 800; letter-spacing: -0.5px; }
+      .sub { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; font-weight: 600; opacity: 0.85; }
+    </style>
+  </defs>
+
+  <!-- Layout -->
+  <g transform="translate(40,0)">
+    
+    <!-- Icon (light version for dark background) -->
+    <g transform="translate(0,30)">
+      <rect x="0" y="0" width="160" height="160" rx="36" fill="#E8F3F8"/>
+
+      <!-- Cross -->
+      <g transform="translate(80,78)">
+        <rect x="-14" y="-48" width="28" height="96" rx="6" fill="#0B2A3A"/>
+        <rect x="-48" y="-14" width="96" height="28" rx="6" fill="#0B2A3A"/>
+      </g>
+
+      <!-- ECG -->
+      <path d="M18 110 H52
+               L62 92
+               L74 126
+               L88 78
+               L104 118
+               L114 106
+               H142"
+            fill="none"
+            stroke="#FF3B30"
+            stroke-width="6"
+            stroke-linecap="round"
+            stroke-linejoin="round"/>
+    </g>
+
+    <!-- Text -->
+    <g transform="translate(200,0)">
+      <text class="wordmark" x="0" y="105" font-size="72" fill="#E8F3F8">Topp-</text>
+      <text class="wordmark" x="210" y="105" font-size="72" fill="#FF3B30">NFS</text>
+
+      <text class="sub" x="0" y="150" font-size="26" fill="#C9DCE6">
+        Lernplattform für Notfallsanitäter
+      </text>
+    </g>
+  </g>
+</svg>
