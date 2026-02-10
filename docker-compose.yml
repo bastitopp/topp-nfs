@@ -5,31 +5,36 @@ services:
     restart: always
     ports:
       - "5000:5000"
+    env_file:
+      - .env
     environment:
-      # Hier werden die Zugangsdaten für die Datenbank definiert
-      - DATABASE_URL=postgresql://nfs_user:geheim123@db:5432/nfs_db
-      - SECRET_KEY=dein_sehr_geheimer_produktions_key_hier_aendern
-      # Optional: Mail Server Konfiguration
-      # - MAIL_SERVER=smtp.example.com
-      # - MAIL_USERNAME=user@example.com
-      # - MAIL_PASSWORD=pw
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - PYTHONPATH=/service
     depends_on:
       - db
     volumes:
-      # Damit Bilder-Uploads erhalten bleiben, auch wenn der Container neu gebaut wird
-      - ./app/static/uploads:/service/app/static/uploads
+      - ./app_data/uploads:/service/app/static/uploads
+    # Führt erst Init DB aus, dann startet es die App
+    command: >
+      sh -c "python -m app.init_db && 
+             gunicorn -w 4 -b 0.0.0.0:5000 app:app"
+    networks:
+      - nfs-network
 
   db:
     image: postgres:15-alpine
     container_name: topp-nfs-db
     restart: always
-    environment:
-      POSTGRES_USER: nfs_user
-      POSTGRES_PASSWORD: geheim123
-      POSTGRES_DB: nfs_db
+    env_file:
+      - .env
     volumes:
-      # Hier werden die Datenbank-Dateien dauerhaft gespeichert
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nfs-network
 
 volumes:
   postgres_data:
+
+networks:
+  nfs-network:
+    driver: bridge

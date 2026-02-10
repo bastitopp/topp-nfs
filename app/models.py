@@ -15,7 +15,9 @@ user_badges = db.Table('user_badges',
     db.Column('earned_at', db.DateTime, default=datetime.utcnow)
 )
 
-class Group(db.Model):
+# ÄNDERUNG: Group -> UserGroup
+class UserGroup(db.Model):
+    __tablename__ = 'user_group'  # WICHTIG: Expliziter Name, um Konflikte zu vermeiden
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     users = db.relationship('User', backref='group', lazy=True)
@@ -59,11 +61,21 @@ class User(UserMixin, db.Model):
     total_learning_time = db.Column(db.Integer, default=0)
     last_active = db.Column(db.DateTime, default=datetime.utcnow)
     streak = db.Column(db.Integer, default=0)
+    xp = db.Column(db.Integer, default=0)
+    
     badges = db.relationship('Badge', secondary=user_badges, lazy='subquery', backref=db.backref('users', lazy=True))
-    group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=True)
+    
+    # ÄNDERUNG: ForeignKey auf user_group.id angepasst
+    group_id = db.Column(db.Integer, db.ForeignKey('user_group.id'), nullable=True)
     
     def set_password(self, pw): self.password_hash = generate_password_hash(pw)
     def check_password(self, pw): return check_password_hash(self.password_hash, pw)
+    
+    def get_level(self): return int(self.xp / 500) + 1
+    def get_level_progress(self):
+        current_level_xp = (self.get_level() - 1) * 500
+        xp_in_level = self.xp - current_level_xp
+        return int((xp_in_level / 500) * 100)
 
 class Card(db.Model):
     id = db.Column(db.Integer, primary_key=True)

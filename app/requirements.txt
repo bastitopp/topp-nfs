@@ -7,3 +7,5 @@ werkzeug
 email_validator
 gunicorn
 psycopg2-binary
+itsdangerous
+markdown

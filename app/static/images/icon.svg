@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Topp-NFS Icon">
+  <!-- Background -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="#0B2A3A"/>
+
+  <!-- Cross -->
+  <g transform="translate(256,250)">
+    <rect x="-40" y="-132" width="80" height="264" rx="18" fill="#E8F3F8"/>
+    <rect x="-132" y="-40" width="264" height="80" rx="18" fill="#E8F3F8"/>
+  </g>
+
+  <!-- ECG line -->
+  <path d="M88 310 H178
+           L208 270
+           L236 352
+           L270 222
+           L306 334
+           L332 306
+           H424"
+        fill="none" stroke="#FF3B30" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -11,13 +11,33 @@
     .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-shadow: var(--shadow-soft); background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); }
     .flip-card-back { transform: rotateY(180deg); background: var(--bs-tertiary-bg); border-color: var(--bs-primary); }
     input:disabled { background-color: #e9ecef !important; opacity: 1; color: #6c757d; font-style: italic; }
+    
+    /* Markdown & Details */
+    .markdown-content p { margin-bottom: 0.5rem; }
+    .markdown-content ul { text-align: left; padding-left: 1.5rem; }
+    .markdown-content li { margin-bottom: 0.25rem; }
+    details { border: 1px solid #dee2e6; border-radius: 8px; padding: 10px; margin-bottom: 10px; background: #f8f9fa; }
+    summary { font-weight: bold; cursor: pointer; color: #0d6efd; outline: none; }
+    details[open] { background: #fff; }
+    details[open] summary { border-bottom: 1px solid #dee2e6; margin-bottom: 10px; padding-bottom: 5px; color: #212529; }
 </style>
 
 <div class="container py-3" style="max-width: 800px;">
+    
+    {% if not finished and current_user.is_authenticated %}
+    <div class="d-flex align-items-center mb-3 bg-white p-2 rounded-pill shadow-sm border">
+        <div class="badge bg-primary rounded-pill me-2">Lvl {{ current_user.get_level() }}</div>
+        <div class="progress flex-grow-1" style="height: 8px;">
+            <div class="progress-bar bg-warning" style="width: {{ current_user.get_level_progress() }}%"></div>
+        </div>
+        <div class="ms-2 small text-muted">{{ current_user.xp }} XP</div>
+    </div>
+    {% endif %}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm">← Exit</a>
         {% if waiting_count is defined and waiting_count > 0 %}
-            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3">Noch {{ waiting_count }} in Warteschlange</span>
+            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3">Noch {{ waiting_count }}</span>
         {% endif %}
         {% if not finished %}
         <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal">
@@ -31,17 +51,12 @@
             <h1 class="display-1 mb-4">🎉</h1>
             <h3>Stark gemacht!</h3>
             <p class="text-muted">Für heute stehen keine fälligen Wiederholungen mehr an.</p>
-            
             <div class="d-flex flex-column gap-3 justify-content-center align-items-center mt-4">
                 <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg rounded-pill px-5 shadow">Zur Übersicht</a>
-                
                 {% if waiting_count is defined and waiting_count > 0 %}
                     <a href="{{ url_for('learn.learn', category_path=category) }}?force=true" class="btn btn-outline-secondary rounded-pill px-4">
                         <i class="bi bi-arrow-repeat"></i> Trotzdem weiterlernen ({{ waiting_count }} warten)
                     </a>
-                    <small class="text-muted" style="max-width: 400px;">
-                        Hinweis: Das Lernen nicht fälliger Karten ist weniger effektiv für das Langzeitgedächtnis.
-                    </small>
                 {% endif %}
             </div>
         </div>
@@ -50,36 +65,49 @@
         
         <div class="card p-4 shadow mb-4">
             
-            {% if feedback %}
+            {% if feedback or feedback_calc %}
                 {% if is_correct %}
                     <div class="alert alert-success d-flex align-items-center gap-3 shadow-sm mb-4">
                         <i class="bi bi-check-circle-fill fs-3"></i>
-                        <div>
-                            <h5 class="alert-heading fw-bold mb-0">Richtig!</h5>
-                            <small>Starke Leistung.</small>
-                        </div>
+                        <div><h5 class="alert-heading fw-bold mb-0">Richtig!</h5><small>Starke Leistung.</small></div>
                     </div>
                 {% else %}
                     <div class="alert alert-danger d-flex align-items-center gap-3 shadow-sm mb-4">
                         <i class="bi bi-x-circle-fill fs-3"></i>
                         <div>
                             <h5 class="alert-heading fw-bold mb-0">Falsch</h5>
-                            <small>Richtige Antwort: <strong>{{ card.answer }}</strong></small>
+                            {% if feedback_calc %}
+                                <small>{{ result_text }} (Du: {{ user_val }})</small>
+                            {% else %}
+                                <small>Richtige Antwort: <strong>{{ card.answer }}</strong></small>
+                            {% endif %}
                         </div>
                     </div>
                 {% endif %}
             {% endif %}
 
-            <h4 class="fw-bold text-center mb-4">{{ card.question }}</h4>
+            <div class="fw-bold text-center mb-4 fs-4 markdown-content">
+                {% if card.type == 'calculation' and calc_data %}
+                    {{ calc_data.question | markdown }}
+                {% else %}
+                    {{ card.question | markdown }}
+                {% endif %}
+            </div>
+            
             {% if card.image_url %}
-                <div class="text-center mb-3"><img src="{{ card.image_url }}" class="img-fluid rounded-4 border" style="max-height:300px"></div>
+                <div class="text-center mb-3">
+                    <img src="{{ card.image_url }}" class="img-fluid rounded-4 border cursor-zoom" style="max-height:300px" data-bs-toggle="modal" data-bs-target="#imgModal">
+                </div>
+                <div class="modal fade" id="imgModal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content bg-dark"><div class="modal-header border-0"><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body d-flex align-items-center justify-content-center"><img src="{{ card.image_url }}" class="img-fluid" style="max-height: 90vh;"></div></div></div></div>
             {% endif %}
 
             {% if card.type == 'mc' %}
                 {% if feedback %}
                     <div class="d-grid gap-3">
                         {% for opt in options %}
-                            <button class="btn p-3 fw-bold rounded-4 {{ 'btn-success' if opt==card.answer else ('btn-danger' if opt==user_answer else 'btn-light') }}" disabled>{{ opt }}</button>
+                            <div class="btn p-3 fw-bold rounded-4 markdown-content {{ 'btn-success' if opt==card.answer else ('btn-danger' if opt==user_answer else 'btn-light') }}" style="pointer-events: none;">
+                                {{ opt | markdown }}
+                            </div>
                         {% endfor %}
                     </div>
                     <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-lg w-100 mt-4 rounded-pill shadow">Weiter</a>
@@ -89,9 +117,30 @@
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <div class="d-grid gap-3">
                             {% for opt in options %}
-                                <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary p-3 fw-bold rounded-4 text-start border-2">{{ opt }}</button>
+                                <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary p-3 fw-bold rounded-4 text-start border-2 markdown-content">{{ opt | markdown }}</button>
                             {% endfor %}
                         </div>
+                    </form>
+                {% endif %}
+
+            {% elif card.type == 'calculation' %}
+                {% if feedback_calc %}
+                    <div class="text-center py-3">
+                        <h1 class="display-6 fw-bold {{ 'text-success' if is_correct else 'text-danger' }}">{{ user_val }}</h1>
+                        <p class="text-muted">Ziel: {{ result_text }}</p>
+                    </div>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-4 rounded-pill">Weiter</a>
+                {% else %}
+                    <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
+                        <input type="hidden" name="start_time" value="{{ start_time }}">
+                        <input type="hidden" name="origin_path" value="{{ current_category }}">
+                        <input type="hidden" name="calc_var" value="{{ calc_data.val }}">
+                        
+                        <div class="input-group input-group-lg mb-3">
+                            <input type="number" step="any" name="calc_input" class="form-control text-center fw-bold" placeholder="Dein Ergebnis" required autofocus>
+                            {% if calc_data.unit %}<span class="input-group-text">{{ calc_data.unit }}</span>{% endif %}
+                        </div>
+                        <button class="btn btn-primary w-100 rounded-pill btn-lg">Bestätigen</button>
                     </form>
                 {% endif %}
 
@@ -124,11 +173,7 @@
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <p class="small text-muted">Benenne die markierten Strukturen:</p>
                         {% for item in options %}
-                        <div class="row g-2 mb-2 align-items-center">
-                            <div class="col-1 fw-bold text-center bg-light rounded">{{ item.id }}</div>
-                            <div class="col"><input name="de_{{ item.id }}" class="form-control" placeholder="Deutsch" {% if not item.de %}disabled{% endif %}></div>
-                            <div class="col"><input name="lat_{{ item.id }}" class="form-control" placeholder="Latein" {% if not item.lat %}disabled{% endif %}></div>
-                        </div>
+                        <div class="row g-2 mb-2 align-items-center"><div class="col-1 fw-bold text-center bg-light rounded">{{ item.id }}</div><div class="col"><input name="de_{{ item.id }}" class="form-control" placeholder="Deutsch" {% if not item.de %}disabled{% endif %}></div><div class="col"><input name="lat_{{ item.id }}" class="form-control" placeholder="Latein" {% if not item.lat %}disabled{% endif %}></div></div>
                         {% endfor %}
                         <button class="btn btn-primary w-100 mt-3 rounded-pill">Prüfen</button>
                     </form>
@@ -170,15 +215,17 @@
             {% else %}
                 <div class="flip-card mx-auto mb-4" id="myCard" onclick="document.getElementById('myCard').classList.toggle('flipped')">
                     <div class="flip-card-inner">
-                        <div class="flip-card-front"><span class="badge bg-light text-muted mb-3 rounded-pill">Tippen</span><h3 class="px-3 fw-bold">{{ card.question }}</h3></div>
+                        <div class="flip-card-front">
+                            <span class="badge bg-light text-muted mb-3 rounded-pill">Tippen</span>
+                            <div class="px-3 fw-bold fs-4 markdown-content">{{ card.question | markdown }}</div>
+                        </div>
                         <div class="flip-card-back">
                             <h5 class="text-primary mb-3 small fw-bold">Lösung</h5>
-                            <p class="lead px-3 fw-bold">{{ card.answer }}</p>
+                            <div class="lead px-3 fw-bold markdown-content">{{ card.answer | markdown }}</div>
                             <div class="mt-auto w-100 px-2 pb-2" onclick="event.stopPropagation();">
                                 <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" class="d-flex flex-wrap gap-2 justify-content-center">
                                     <input type="hidden" name="start_time" value="{{ start_time }}">
                                     <input type="hidden" name="origin_path" value="{{ current_category }}">
-                                    
                                     <button type="submit" name="result" value="0" class="btn btn-danger flex-grow-1">Nochmal<br><small class="fw-light">0 Min</small></button>
                                     <button type="submit" name="result" value="3" class="btn btn-warning text-white flex-grow-1">Schwer<br><small class="fw-light">1 Tag</small></button>
                                     <button type="submit" name="result" value="4" class="btn btn-success flex-grow-1">Gut<br><small class="fw-light">3 Tage</small></button>
