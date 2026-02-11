@@ -2,24 +2,24 @@
 
 {% block content %}
 <div class="container py-4">
-    <h3 class="mb-4">Import Vorschau</h3>
+    <h3 class="mb-4 fw-bold"><i class="bi bi-file-earmark-spreadsheet"></i> Import Vorschau</h3>
     
-    <div class="alert alert-info">
-        Bitte überprüfe die Daten. Es wurden <strong>{{ data|length }}</strong> Einträge gefunden.
-        <br>
-        <small>Duplikate wurden markiert. (Hinweis: Aktuell werden alle validen Einträge importiert).</small>
+    <div class="alert alert-info shadow-sm border-0">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        Bitte überprüfe die Daten vor dem Import. Es wurden <strong>{{ data|length }}</strong> Einträge gefunden.
     </div>
 
-    <form action="{{ url_for('admin.import_commit') }}" method="POST">
+    <form action="{{ url_for('admin.import_confirm') }}" method="POST">
+        <input type="hidden" name="json_data" value="{{ json_data }}">
+
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body p-0">
-                <div class="table-responsive" style="max-height: 500px;">
-                    <table class="table table-striped mb-0 small align-middle">
-                        <thead class="table-dark sticky-top">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
                             <tr>
-                                <th style="min-width: 150px;">Status</th>
-                                <th>Kategorie</th>
-                                <th>Typ</th>
+                                <th style="width: 280px;">Aktion</th>
+                                <th>Typ / Kategorie</th>
                                 <th>Frage</th>
                                 <th>Antwort</th>
                             </tr>
@@ -29,18 +29,32 @@
                             <tr class="{{ 'table-warning' if item.is_duplicate else '' }}">
                                 <td>
                                     {% if item.is_duplicate %}
-                                        <div class="d-flex flex-column gap-1">
-                                            <span class="badge bg-warning text-dark align-self-start">Duplikat</span>
-                                            <small class="text-muted">ID: {{ item.existing_id }}</small>
+                                        <div class="d-flex flex-column gap-2">
+                                            <span class="badge bg-warning text-dark align-self-start"><i class="bi bi-exclamation-triangle"></i> Duplikat</span>
+                                            
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <input type="radio" class="btn-check" name="action_{{ loop.index0 }}" id="act_skip_{{ loop.index0 }}" value="skip" checked>
+                                                <label class="btn btn-outline-secondary" for="act_skip_{{ loop.index0 }}">Skip</label>
+
+                                                <input type="radio" class="btn-check" name="action_{{ loop.index0 }}" id="act_over_{{ loop.index0 }}" value="overwrite">
+                                                <label class="btn btn-outline-warning text-dark" for="act_over_{{ loop.index0 }}">Update</label>
+
+                                                <input type="radio" class="btn-check" name="action_{{ loop.index0 }}" id="act_new_{{ loop.index0 }}" value="new">
+                                                <label class="btn btn-outline-success" for="act_new_{{ loop.index0 }}">Neu</label>
+                                            </div>
+                                            <small class="text-muted" style="font-size: 0.7rem;">ID: {{ item.existing_id }}</small>
                                         </div>
                                     {% else %}
-                                        <span class="badge bg-success">Neu</span>
+                                        <span class="badge bg-success"><i class="bi bi-plus-circle"></i> Neu anlegen</span>
+                                        <input type="hidden" name="action_{{ loop.index0 }}" value="new">
                                     {% endif %}
                                 </td>
-                                <td>{{ item.category }}</td>
-                                <td>{{ item.type }}</td>
-                                <td>{{ item.question }}</td>
-                                <td>{{ item.answer }}</td>
+                                <td>
+                                    <span class="badge bg-secondary mb-1">{{ item.type }}</span>
+                                    <div class="small text-muted text-truncate" style="max-width: 150px;">{{ item.category }}</div>
+                                </td>
+                                <td class="text-truncate" style="max-width: 300px;" title="{{ item.question }}">{{ item.question }}</td>
+                                <td class="text-truncate" style="max-width: 200px;" title="{{ item.answer }}">{{ item.answer }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -49,11 +63,11 @@
             </div>
         </div>
 
-        <div class="d-flex gap-3">
-            <input type="hidden" name="import_data" value="{{ data|tojson|forceescape }}">
-            
-            <a href="{{ url_for('admin.index') }}" class="btn btn-secondary rounded-pill px-4">Abbrechen</a>
-            <button class="btn btn-success rounded-pill px-5 fw-bold">Importieren bestätigen</button>
+        <div class="d-flex justify-content-between align-items-center">
+            <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill px-4">Abbrechen</a>
+            <button type="submit" class="btn btn-success rounded-pill px-5 fw-bold shadow-sm">
+                <i class="bi bi-check-lg"></i> Import durchführen
+            </button>
         </div>
     </form>
 </div>

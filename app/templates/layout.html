@@ -16,7 +16,10 @@
     
     <style>
         :root { --border-radius-lg: 16px; --border-radius-sm: 8px; --shadow-soft: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); --primary-gradient: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); }
-        body { font-family: 'Inter', sans-serif; background-color: var(--bs-tertiary-bg); padding-bottom: 85px; }
+        
+        /* Padding Bottom sorgt dafür, dass Inhalt nicht von Mobile Nav oder Desktop Footer verdeckt wird */
+        body { font-family: 'Inter', sans-serif; background-color: var(--bs-tertiary-bg); padding-bottom: 90px; }
+        
         .card { border: none; border-radius: var(--border-radius-lg); box-shadow: var(--shadow-soft); transition: transform 0.2s ease; overflow: hidden; }
         
         /* Dark Mode Fixes */
@@ -51,6 +54,18 @@
         .mobile-nav-item.active { color: var(--bs-primary); }
 
         #mobileSearchCollapse { position: absolute; top: 70px; left: 0; right: 0; background: var(--bs-body-bg); padding: 10px 20px; border-bottom: 1px solid var(--bs-border-color); z-index: 1055; }
+
+        /* NEU: Desktop Fixed Footer */
+        @media (min-width: 992px) {
+            .footer-desktop-fixed {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                z-index: 1030;
+                box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+            }
+        }
 
         @media (max-width: 576px) {
             .container { padding-left: 15px !important; padding-right: 15px !important; }
@@ -133,6 +148,21 @@
         {% endfor %}{% endif %}{% endwith %}
         {% block content %}{% endblock %}
     </main>
+
+    <footer class="footer mt-auto py-4 bg-white border-top text-center footer-desktop-fixed">
+        <div class="container">
+            <div class="row justify-content-center align-items-center gap-3">
+                <div class="col-12 col-md-auto">
+                    <span class="text-muted small fw-bold">&copy; 2026 Topp-NFS Training</span>
+                </div>
+                <div class="col-12 col-md-auto">
+                    <a href="https://www.paypal.com/paypalme/bastiantopp" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill px-4 shadow-sm fw-bold">
+                        <i class="bi bi-paypal me-1"></i> Projekt unterstützen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
 
     {% if current_user.is_authenticated %}
     <div class="mobile-nav d-lg-none">

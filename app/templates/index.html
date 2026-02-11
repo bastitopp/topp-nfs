@@ -13,11 +13,27 @@
         
         {% if current_user.is_authenticated %}
             <div class="d-flex gap-2 mb-4">
-                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 p-2"><i class="bi bi-fire"></i> {{ current_user.streak }} Tage</span>
+                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 p-2"><i class="bi bi-fire"></i> {{ current_user.streak }} Tage Streak</span>
                 <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 p-2 text-dark"><i class="bi bi-trophy"></i> {{ current_user.badges|length }} Badges</span>
             </div>
+            
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="p-3 border rounded bg-white shadow-sm h-100">
+                        <div class="text-muted small fw-bold">Wiederholung fällig</div>
+                        <div class="display-4 fw-bold {{ 'text-danger' if global_stats.due > 0 else 'text-success' }}">{{ global_stats.due }}</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 border rounded bg-white shadow-sm h-100">
+                        <div class="text-muted small fw-bold">Neu / Unbekannt</div>
+                        <div class="display-4 fw-bold text-primary">{{ global_stats.new }}</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ url_for('learn.learn_errors') }}" class="btn btn-warning flex-grow-1 text-dark py-3 shadow-sm"><i class="bi bi-bandaid"></i> Meine Fehler üben</a>
+                <a href="{{ url_for('learn.learn_errors') }}" class="btn btn-warning flex-grow-1 text-dark py-3 shadow-sm fw-bold"><i class="bi bi-bandaid"></i> Fehler üben</a>
             </div>
         {% else %}
             <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg mt-3 w-100">Jetzt anmelden</a>
@@ -27,13 +43,16 @@
     {% if current_user.is_authenticated %}
     <div class="col-md-5 mt-4 mt-md-0">
         <div class="card shadow-sm border-0">
-            <div class="card-body position-relative d-flex align-items-center justify-content-center p-2">
-                <div style="width: 140px; height: 140px;">
+            <div class="card-body position-relative d-flex align-items-center justify-content-center p-4">
+                <div style="width: 160px; height: 160px;">
                     <canvas id="progressChart"></canvas>
                 </div>
-                <div class="ms-3">
+                <div class="ms-4">
                     <h2 class="fw-bold mb-0">{{ global_stats.learned }} <small class="text-muted fs-6">/ {{ global_stats.total }}</small></h2>
                     <small class="text-muted">Fragen gelernt</small>
+                    <hr>
+                    <div class="small text-success"><i class="bi bi-check-circle-fill"></i> {{ global_stats.learned }} Sicher</div>
+                    <div class="small text-danger"><i class="bi bi-clock-history"></i> {{ global_stats.due }} Fällig</div>
                 </div>
             </div>
         </div>
@@ -45,7 +64,7 @@
 <form action="{{ url_for('learn.learn_custom') }}" method="POST" id="learnForm" class="mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0">Deine Themen</h5>
-        <button type="submit" class="btn btn-primary rounded-pill px-4"><i class="bi bi-play-fill"></i> Lernen</button>
+        <button type="submit" class="btn btn-primary rounded-pill px-4 shadow-sm"><i class="bi bi-play-fill"></i> Lernen Starten</button>
     </div>
     
     <div class="list-group">
@@ -111,16 +130,16 @@
             new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Gelernt', 'Offen'],
+                    labels: ['Sicher', 'Fällig', 'Neu'],
                     datasets: [{
-                        data: [{{ global_stats.learned }}, {{ global_stats.total - global_stats.learned }}],
-                        backgroundColor: ['#0d6efd', '#e9ecef'],
+                        data: [{{ global_stats.learned }}, {{ global_stats.due }}, {{ global_stats.new }}],
+                        backgroundColor: ['#198754', '#dc3545', '#e9ecef'],
                         borderWidth: 0
                     }]
                 },
                 options: {
                     cutout: '70%',
-                    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                    plugins: { legend: { display: false }, tooltip: { enabled: true } }
                 }
             });
         }

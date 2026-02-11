@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import or_
 from ..extensions import db
 from ..models import Card, UserProgress, DashboardMessage, ExamAttempt, User
-from ..utils import check_gamification, build_category_tree
+from ..utils import check_gamification, build_category_tree, get_learning_stats
 
 bp = Blueprint('main', __name__)
 
@@ -13,49 +13,40 @@ bp = Blueprint('main', __name__)
 def index():
     if not current_user.is_authenticated:
         return redirect(url_for('auth.login'))
+    
     check_gamification(current_user)
-    global_stats = {'total': 0, 'learned': 0}
-    if current_user.is_authenticated:
-        global_stats['total'] = Card.query.count()
-        global_stats['learned'] = UserProgress.query.join(Card).filter(UserProgress.user_id==current_user.id, UserProgress.box>0).count()
+    
+    # NEU: Detaillierte Statistiken aus utils.py
+    global_stats = get_learning_stats(current_user)
+    
     all_cards = Card.query.all()
     u = current_user if current_user.is_authenticated else type('obj', (object,), {'id':0, 'is_authenticated':False})
     tree = build_category_tree(all_cards, u)
     msgs = DashboardMessage.query.filter_by(active=True).order_by(DashboardMessage.created_at.desc()).all()
+    
     return render_template('index.html', tree=tree, messages=msgs, global_stats=global_stats)
 
 @bp.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
     if request.method == 'POST':
-        # 1. Profilbild Upload Handling
         if 'profile_image' in request.files and request.files['profile_image']:
             f = request.files['profile_image']
             if f.filename != '' and '.' in f.filename and f.filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg'}:
-                # ABSOLUTER PFAD FIX: 
-                # Wir bauen den Pfad ausgehend vom Root-Verzeichnis der App
                 target_dir = os.path.join(current_app.root_path, 'static', 'uploads')
-                
-                # Sicherstellen, dass der Ordner wirklich existiert
-                if not os.path.exists(target_dir):
-                    os.makedirs(target_dir, exist_ok=True)
-                
+                if not os.path.exists(target_dir): os.makedirs(target_dir, exist_ok=True)
                 fn = secure_filename(f"user_{current_user.id}_{f.filename}")
                 destination_path = os.path.join(target_dir, fn)
-                
                 try:
                     f.save(destination_path)
-                    # Den Pfad für den Browser speichern (relativ zu static)
                     current_user.profile_image = url_for('static', filename='uploads/' + fn)
                 except Exception as e:
                     flash(f'Fehler beim Speichern: {str(e)}', 'danger')
                     return redirect(url_for('main.profile'))
         
-        # 2. Andere Profildaten
         if 'real_name' in request.form: current_user.real_name = request.form['real_name']
         if 'email' in request.form: current_user.email = request.form['email']
         
-        # 3. Passwort Änderung
         if request.form.get('new_password'):
             if request.form['new_password'] == request.form.get('confirm_password'):
                 current_user.set_password(request.form['new_password'])

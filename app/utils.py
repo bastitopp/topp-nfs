@@ -15,7 +15,6 @@ def check_gamification(user):
         user.last_active = datetime.utcnow(); db.session.commit()
 
 def add_xp(user, amount):
-    # XP hinzufügen und prüfen, ob Level-Up
     old_level = user.get_level()
     user.xp += amount
     db.session.commit()
@@ -40,38 +39,76 @@ def get_next_card(user, paths, force=False):
     conditions = [Card.category.like(f"{p}%") for p in paths]
     filter_cond = or_(*conditions)
     query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id, filter_cond)
-    if not force: due = query.filter(UserProgress.next_review <= now).order_by(func.random()).first()
-    else: due = query.order_by(func.random()).first()
-    if due: return due.card, due
+    
+    # Prio 1: Überfällige Karten
+    if not force: 
+        due = query.filter(UserProgress.next_review <= now).order_by(func.random()).first()
+        if due: return due.card, due
+
+    # Prio 2: Neue Karten (noch nie gelernt)
     sub = db.session.query(UserProgress.card_id).filter(UserProgress.user_id==user.id)
     new = Card.query.filter(filter_cond, ~Card.id.in_(sub)).order_by(func.random()).first()
+    
+    # Fallback für "Lernen erzwingen": Einfach irgendeine Karte nehmen
+    if not new and force:
+        return query.order_by(func.random()).first().card, None
+        
     return new, None
 
 def update_progress(user, card, quality):
-    # XP Vergabe: 10 XP für Richtig, 2 XP für Falsch (Trostpreis)
     if isinstance(quality, bool): 
         quality = 4 if quality else 0
         add_xp(user, 10 if quality >= 3 else 2)
     else:
-        # Bei Flashcards: 3-5 gibt mehr XP
         xp_map = {0: 1, 3: 5, 4: 10, 5: 15}
         add_xp(user, xp_map.get(quality, 0))
 
     p = UserProgress.query.filter_by(user_id=user.id, card_id=card.id).first()
     if not p: p = UserProgress(user_id=user.id, card_id=card.id, box=0, easiness_factor=2.5, interval=0); db.session.add(p)
     p.last_correct = (quality >= 3)
+    
     if quality >= 3:
         if p.box == 0: p.interval = 1
         elif p.box == 1: p.interval = 6
         else: p.interval = int(p.interval * p.easiness_factor)
+        
+        # --- ALGORITHMUS VERFEINERUNG: FUZZING ---
+        # Verhindert "Clumping" (Kartenklumpen am selben Tag)
+        if p.interval > 3:
+            fuzz = random.uniform(0.9, 1.1) # +/- 10% Variation
+            p.interval = int(p.interval * fuzz)
+            if p.interval < 3: p.interval = 3
+            
         p.box += 1
     else:
         p.box = 0; p.interval = 0
+
+    # Easiness Factor Anpassung (SM-2 Standard)
     p.easiness_factor = p.easiness_factor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
     if p.easiness_factor < 1.3: p.easiness_factor = 1.3
-    if p.interval == 0: delta = timedelta(minutes=3)
+    
+    # Nächstes Datum setzen
+    if p.interval == 0: delta = timedelta(minutes=5) # 5 Min Cooldown bei Fehler
     else: delta = timedelta(days=p.interval)
-    p.next_review = datetime.utcnow() + delta; db.session.commit()
+    
+    p.next_review = datetime.utcnow() + delta
+    db.session.commit()
+
+def get_learning_stats(user):
+    """Berechnet detaillierte Lernstatistiken für das Dashboard"""
+    if not user.is_authenticated: return {'total':0, 'learned':0, 'due':0, 'new':0}
+    
+    total = Card.query.count()
+    # Gelernt = Mindestens einmal Box > 0
+    learned = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.box>0).count()
+    # Fällig = Review Datum in Vergangenheit
+    due = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review <= datetime.utcnow()).count()
+    # Neu = Total - Einträge in Progress
+    progress_count = UserProgress.query.filter_by(user_id=user.id).count()
+    new = total - progress_count
+    if new < 0: new = 0
+    
+    return {'total': total, 'learned': learned, 'due': due, 'new': new}
 
 def build_category_tree(cards, user):
     tree = {}
@@ -97,24 +134,13 @@ def get_mc_options(card):
     random.shuffle(opts)
     return opts
 
-# --- RECHNER LOGIK ---
 def prepare_calculation_card(card):
-    # Optionen: {"var": "weight", "min": 50, "max": 120, "step": 5}
-    # Frage: "Patient {weight} kg..."
     try: config = json.loads(card.options)
     except: config = {}
-    
     var_name = config.get('var', 'x')
-    min_val = config.get('min', 1)
-    max_val = config.get('max', 100)
-    step = config.get('step', 1)
-    
-    # Zufallswert generieren
+    min_val = config.get('min', 1); max_val = config.get('max', 100); step = config.get('step', 1)
     val = random.randrange(min_val, max_val + 1, step)
-    
-    # Platzhalter in Frage ersetzen
     question_text = card.question.replace(f"{{{var_name}}}", str(val))
-    
     return {'val': val, 'question': question_text, 'unit': config.get('unit', '')}
 
 def render_learn_card(card, user, context_path):
@@ -125,7 +151,6 @@ def render_learn_card(card, user, context_path):
     if card.type == 'mc': opts = get_mc_options(card)
     elif card.type == 'ordering': random.shuffle(opts)
     elif card.type == 'calculation':
-        # Spezialfall: Dynamische Berechnung
         calc_data = prepare_calculation_card(card)
         return render_template('quiz.html', card=card, finished=False, box=box, current_category=context_path, calc_data=calc_data)
     elif card.type == 'assignment':
