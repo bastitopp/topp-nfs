@@ -1,46 +1,155 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 sticky-top bg-body py-2 border-bottom">
-        <h3 class="fw-bold m-0"><i class="bi bi-clipboard-check"></i> Prüfung</h3>
-        <div class="text-end"><div class="fs-4 fw-bold font-monospace" id="timer">45:00</div><small class="text-muted">Verbleibende Zeit</small></div>
-    </div>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
-    <form action="{{ url_for('learn.exam_submit') }}" method="POST" id="examForm">
-        {% for item in questions %}
-            {% set c = item.card %}{% set i = loop.index %}
-            <div class="card shadow-sm border-0 mb-5">
-                <div class="card-header bg-white fw-bold d-flex justify-content-between"><span>Frage {{ i }}</span><span class="badge bg-light text-dark border">{{ c.category }}</span></div>
-                <div class="card-body">
-                    <h5 class="card-title mb-4">{{ c.question }}</h5>
-                    {% if c.image_url %}<div class="mb-3"><img src="{{ c.image_url }}" class="img-fluid rounded border" style="max-height: 250px;"></div>{% endif %}
-                    <input type="hidden" name="card_ids" value="{{ c.id }}">
-                    {% if c.type == 'mc' %}
-                        <div class="d-flex flex-column gap-2">
-                            {% for opt in item.options %}
-                                <div class="form-check p-3 border rounded hover-bg-light">
-                                    <input class="form-check-input" type="radio" name="q_{{ c.id }}" value="{{ opt }}" id="opt_{{c.id}}_{{loop.index}}">
-                                    <label class="form-check-label w-100 stretched-link cursor-pointer" for="opt_{{c.id}}_{{loop.index}}">{{ opt }}</label>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% elif c.type == 'anatomy' %}
-                        <div class="row g-3"><div class="col-md-6"><input name="input_de_{{ c.id }}" class="form-control" placeholder="Deutsch"></div><div class="col-md-6"><input name="input_lat_{{ c.id }}" class="form-control" placeholder="Latein"></div></div>
-                    {% else %}<div class="alert alert-warning">Fragetyp {{ c.type }} im Prüfungsmodus noch nicht voll unterstützt.</div>{% endif %}
-                </div>
-            </div>
+<div class="container py-4" style="max-width: 800px;">
+    <h3 class="fw-bold mb-4">Prüfungsmodus</h3>
+
+    <form method="POST" id="examForm" onsubmit="prepareExamSubmission()">
+        {% for entry in questions %}
+            <input type="hidden" name="card_ids" value="{{ entry.card.id }}">
         {% endfor %}
-        <div class="d-grid gap-2 mb-5"><button class="btn btn-primary btn-lg rounded-pill shadow">Prüfung abgeben</button></div>
+
+        {% for entry in questions %}
+        {% set card = entry.card %}
+        {% set opts = entry.options %}
+        
+        <div class="card mb-4 p-4 shadow-sm border-0">
+            <h5 class="fw-bold mb-3">{{ card.question }}</h5>
+
+            {% if card.type == 'mc' %}
+                <div class="d-flex flex-column gap-2">
+                    {% for opt in opts %}
+                    <div class="form-check p-3 border rounded bg-light">
+                        <input class="form-check-input" type="radio" name="q_{{ card.id }}" id="opt_{{ card.id }}_{{ loop.index }}" value="{{ opt }}" required>
+                        <label class="form-check-label w-100" for="opt_{{ card.id }}_{{ loop.index }}" style="cursor: pointer;">
+                            {{ opt }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            {% elif card.type == 'calculation' %}
+                <label class="form-label">Dein Ergebnis:</label>
+                <div class="input-group">
+                    <input type="number" step="any" name="q_{{ card.id }}" class="form-control form-control-lg" required>
+                    {% if entry.calc_data and entry.calc_data.unit %}
+                        <span class="input-group-text">{{ entry.calc_data.unit }}</span>
+                    {% endif %}
+                </div>
+            
+            {% elif card.type == 'anatomy' %}
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="small text-muted">Deutsch</label>
+                        <input type="text" name="q_{{ card.id }}_de" class="form-control" placeholder="Begriff...">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small text-muted">Latein</label>
+                        <input type="text" name="q_{{ card.id }}_lat" class="form-control" placeholder="Begriff...">
+                    </div>
+                </div>
+
+            {% elif card.type == 'anatomy_multi' %}
+                <p class="small text-muted">Benenne die markierten Strukturen:</p>
+                {% set parts = card.options | from_json %}
+                {% for part in parts %}
+                <div class="row g-2 mb-2 align-items-center">
+                    <div class="col-1 fw-bold text-center bg-secondary bg-opacity-10 rounded">{{ part.id }}</div>
+                    <div class="col"><input type="text" name="q_{{ card.id }}_{{ part.id }}_de" class="form-control form-control-sm" placeholder="Deutsch"></div>
+                    <div class="col"><input type="text" name="q_{{ card.id }}_{{ part.id }}_lat" class="form-control form-control-sm" placeholder="Latein"></div>
+                </div>
+                {% endfor %}
+
+            {% elif card.type == 'ordering' %}
+                <input type="hidden" name="q_{{ card.id }}" id="input_q_{{ card.id }}">
+                <div class="small text-muted mb-2">Ziehe die Elemente in die richtige Reihenfolge:</div>
+                <ul class="list-group sortable-list" id="sort_{{ card.id }}">
+                    {% for item in opts %}
+                    <li class="list-group-item cursor-grab bg-light my-1 border rounded">{{ item }}</li>
+                    {% endfor %}
+                </ul>
+
+            {% elif card.type == 'assignment' %}
+                <input type="hidden" name="q_{{ card.id }}" id="input_q_{{ card.id }}">
+                
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">Begriffe (ziehen):</div>
+                    <div id="pool_{{ card.id }}" class="d-flex flex-wrap gap-2 p-2 bg-light rounded border border-dashed min-vh-10">
+                        {% for item in entry.pool %}
+                        <div class="badge bg-white text-dark border p-2 cursor-grab fs-6" style="user-select:none">{{ item.val }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="row g-3">
+                    {% set groups = card.options | from_json %}
+                    {% for gr in groups %}
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header fw-bold small bg-secondary text-white">{{ gr.name }}</div>
+                            <div class="card-body p-2 dropzone-{{ card.id }}" data-group="{{ gr.name }}" style="min-height:100px; background:#f8f9fa;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            {% else %}
+                <div class="alert alert-warning small">
+                    <i class="bi bi-exclamation-circle"></i> Typ "{{ card.type }}" wird in der automatischen Prüfung nicht unterstützt (z.B. Fallbeispiel).
+                </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <button class="btn btn-primary btn-lg w-100 rounded-pill shadow mb-5">Prüfung abgeben</button>
     </form>
 </div>
+
 <script>
-    let timeLeft = 45 * 60; const timerElem = document.getElementById('timer');
-    const interval = setInterval(() => {
-        const m = Math.floor(timeLeft / 60); const s = timeLeft % 60; timerElem.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
-        if (timeLeft <= 300) timerElem.classList.add('text-danger');
-        if (timeLeft <= 0) { clearInterval(interval); alert('Zeit abgelaufen! Prüfung wird abgegeben.'); document.getElementById('examForm').submit(); }
-        timeLeft--;
-    }, 1000);
+    // Initialisiere SortableJS für alle Listen
+    document.addEventListener("DOMContentLoaded", function() {
+        // Sortieren
+        document.querySelectorAll('.sortable-list').forEach(el => {
+            new Sortable(el, { animation: 150 });
+        });
+
+        // Zuordnung
+        {% for entry in questions %}
+            {% if entry.card.type == 'assignment' %}
+                new Sortable(document.getElementById('pool_{{ entry.card.id }}'), { group: 'assign_{{ entry.card.id }}', animation: 150 });
+                document.querySelectorAll('.dropzone-{{ entry.card.id }}').forEach(el => {
+                    new Sortable(el, { group: 'assign_{{ entry.card.id }}', animation: 150 });
+                });
+            {% endif %}
+        {% endfor %}
+    });
+
+    // Daten sammeln vor dem Senden
+    function prepareExamSubmission() {
+        // 1. Sortier-Aufgaben sammeln
+        document.querySelectorAll('.sortable-list').forEach(list => {
+            const cardId = list.id.split('_')[1];
+            const items = [];
+            list.querySelectorAll('li').forEach(li => items.push(li.innerText));
+            document.getElementById('input_q_' + cardId).value = JSON.stringify(items);
+        });
+
+        // 2. Zuordnungs-Aufgaben sammeln
+        // Wir suchen alle hidden inputs für assignment (erkennbar an input_q_ID wo auch pool_ID existiert)
+        {% for entry in questions %}
+            {% if entry.card.type == 'assignment' %}
+                const res{{ entry.card.id }} = {};
+                document.querySelectorAll('.dropzone-{{ entry.card.id }}').forEach(dz => {
+                    const gName = dz.getAttribute('data-group');
+                    const items = [];
+                    dz.querySelectorAll('div').forEach(d => items.push(d.innerText));
+                    res{{ entry.card.id }}[gName] = items;
+                });
+                document.getElementById('input_q_{{ entry.card.id }}').value = JSON.stringify(res{{ entry.card.id }});
+            {% endif %}
+        {% endfor %}
+    }
 </script>
 {% endblock %}

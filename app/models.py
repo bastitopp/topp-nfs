@@ -15,9 +15,8 @@ user_badges = db.Table('user_badges',
     db.Column('earned_at', db.DateTime, default=datetime.utcnow)
 )
 
-# ÄNDERUNG: Group -> UserGroup
 class UserGroup(db.Model):
-    __tablename__ = 'user_group'  # WICHTIG: Expliziter Name, um Konflikte zu vermeiden
+    __tablename__ = 'user_group'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     users = db.relationship('User', backref='group', lazy=True)
@@ -64,8 +63,6 @@ class User(UserMixin, db.Model):
     xp = db.Column(db.Integer, default=0)
     
     badges = db.relationship('Badge', secondary=user_badges, lazy='subquery', backref=db.backref('users', lazy=True))
-    
-    # ÄNDERUNG: ForeignKey auf user_group.id angepasst
     group_id = db.Column(db.Integer, db.ForeignKey('user_group.id'), nullable=True)
     
     def set_password(self, pw): self.password_hash = generate_password_hash(pw)
@@ -82,7 +79,12 @@ class Card(db.Model):
     category = db.Column(db.String(200), nullable=False)
     type = db.Column(db.String(20))     
     question = db.Column(db.Text, nullable=False)
-    answer = db.Column(db.Text, nullable=False) 
+    answer = db.Column(db.Text, nullable=False)
+    
+    # --- NEU: ERKLÄRUNG ---
+    explanation = db.Column(db.Text, nullable=True)
+    # ----------------------
+    
     answer_lat = db.Column(db.Text, nullable=True) 
     options = db.Column(db.Text, nullable=True) 
     image_url = db.Column(db.String(200), nullable=True)

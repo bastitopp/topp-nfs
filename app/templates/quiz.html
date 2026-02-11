@@ -2,17 +2,30 @@
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
 <style>
     .cursor-grab { cursor: grab; }
     .flip-card { background-color: transparent; width: 100%; height: 450px; perspective: 1000px; }
     .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
     .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
-    .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-shadow: var(--shadow-soft); background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); }
-    .flip-card-back { transform: rotateY(180deg); background: var(--bs-tertiary-bg); border-color: var(--bs-primary); }
+    
+    .flip-card-front, .flip-card-back { 
+        position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 24px; 
+        display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; 
+        box-shadow: var(--shadow-soft); background: var(--bs-body-bg); border: 1px solid var(--bs-border-color);
+        color: var(--bs-body-color); 
+    }
+    
+    .flip-card-back { 
+        transform: rotateY(180deg); 
+        background: var(--bs-tertiary-bg); 
+        border-color: var(--bs-primary);
+        color: var(--bs-body-color); 
+    }
+
     input:disabled { background-color: #e9ecef !important; opacity: 1; color: #6c757d; font-style: italic; }
     
-    /* Markdown & Details */
     .markdown-content p { margin-bottom: 0.5rem; }
     .markdown-content ul { text-align: left; padding-left: 1.5rem; }
     .markdown-content li { margin-bottom: 0.25rem; }
@@ -20,6 +33,13 @@
     summary { font-weight: bold; cursor: pointer; color: #0d6efd; outline: none; }
     details[open] { background: #fff; }
     details[open] summary { border-bottom: 1px solid #dee2e6; margin-bottom: 10px; padding-bottom: 5px; color: #212529; }
+    
+    .shortcut-badge { 
+        display: inline-block; width: 20px; height: 20px; 
+        background: rgba(0,0,0,0.1); color: inherit;
+        border-radius: 4px; text-align: center; line-height: 20px;
+        font-size: 0.7em; margin-right: 10px; font-family: monospace;
+    }
 </style>
 
 <div class="container py-3" style="max-width: 800px;">
@@ -40,7 +60,7 @@
             <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3">Noch {{ waiting_count }}</span>
         {% endif %}
         {% if not finished %}
-        <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal">
+        <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal" tabindex="-1">
             <i class="bi bi-flag-fill"></i>
         </button>
         {% endif %}
@@ -60,6 +80,9 @@
                 {% endif %}
             </div>
         </div>
+        <script>
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        </script>
     {% else %}
         {% set start_time = now.timestamp() %}
         
@@ -110,14 +133,29 @@
                             </div>
                         {% endfor %}
                     </div>
-                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-lg w-100 mt-4 rounded-pill shadow">Weiter</a>
+                    
+                    <div class="mt-4 alert alert-info shadow-sm border-0">
+                        <h6 class="fw-bold mb-2"><i class="bi bi-info-circle-fill"></i> Lösung:</h6>
+                        <div class="markdown-content mb-2">{{ card.answer | markdown }}</div>
+                        
+                        {% if card.explanation %}
+                        <hr>
+                        <h6 class="fw-bold mb-2 small text-muted">Erklärung:</h6>
+                        <div class="markdown-content">{{ card.explanation | markdown }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-lg w-100 mt-4 rounded-pill shadow">Weiter <small class="text-white-50 ms-2">[Enter]</small></a>
                 {% else %}
                     <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <div class="d-grid gap-3">
                             {% for opt in options %}
-                                <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary p-3 fw-bold rounded-4 text-start border-2 markdown-content">{{ opt | markdown }}</button>
+                                <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary p-3 fw-bold rounded-4 text-start border-2 markdown-content position-relative">
+                                    <span class="shortcut-badge d-none d-md-inline-block">{{ loop.index }}</span>
+                                    {{ opt | markdown }}
+                                </button>
                             {% endfor %}
                         </div>
                     </form>
@@ -129,7 +167,7 @@
                         <h1 class="display-6 fw-bold {{ 'text-success' if is_correct else 'text-danger' }}">{{ user_val }}</h1>
                         <p class="text-muted">Ziel: {{ result_text }}</p>
                     </div>
-                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-4 rounded-pill">Weiter</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-4 rounded-pill">Weiter <small class="text-white-50 ms-2">[Enter]</small></a>
                 {% else %}
                     <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
@@ -150,7 +188,7 @@
                         <div class="col-md-6"><label class="small text-muted">Deutsch</label><div class="p-3 rounded-3 border {{ 'bg-success bg-opacity-25 border-success' if result_de else 'bg-danger bg-opacity-25 border-danger' }}">{{ card.answer }}</div></div>
                         <div class="col-md-6"><label class="small text-muted">Latein</label><div class="p-3 rounded-3 border {{ 'bg-success bg-opacity-25 border-success' if result_lat else 'bg-danger bg-opacity-25 border-danger' }}">{{ card.answer_lat }}</div></div>
                     </div>
-                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-4 rounded-pill">Weiter</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-4 rounded-pill">Weiter <small class="text-white-50 ms-2">[Enter]</small></a>
                 {% else %}
                     <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
@@ -166,7 +204,7 @@
             {% elif card.type == 'anatomy_multi' %}
                 {% if feedback_multi %}
                     <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Nr.</th><th>Deine Antwort</th><th>Lösung</th></tr></thead><tbody>{% for r in multi_results %}<tr><td class="fw-bold">{{ r.label }}</td><td><div class="{{ 'text-success' if r.is_de_ok else 'text-danger' }}">DE: {{ r.user_de }}</div><div class="{{ 'text-success' if r.is_lat_ok else 'text-danger' }}">LAT: {{ r.user_lat }}</div></td><td class="text-muted small"><div>{{ r.correct_de }}</div><div>{{ r.correct_lat }}</div></td></tr>{% endfor %}</tbody></table></div>
-                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-3 rounded-pill">Weiter</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 mt-3 rounded-pill">Weiter <small class="text-white-50 ms-2">[Enter]</small></a>
                 {% else %}
                     <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
@@ -183,7 +221,7 @@
                 {% if feedback_ordering %}
                     <div class="alert {{ 'alert-success' if is_correct else 'alert-danger' }}">{{ 'Richtig!' if is_correct else 'Leider falsch.' }}</div>
                     <ol class="list-group list-group-numbered mb-3">{% for item in correct_order %}<li class="list-group-item">{{ item }}</li>{% endfor %}</ol>
-                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 rounded-pill">Weiter</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 rounded-pill">Weiter <small class="text-white-50 ms-2">[Enter]</small></a>
                 {% else %}
                     <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="orderForm">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
@@ -192,14 +230,22 @@
                         <ul id="sortList" class="list-group mb-4">{% for item in options %}<li class="list-group-item cursor-grab bg-light my-1 border rounded">{{ item }}</li>{% endfor %}</ul>
                         <button type="button" onclick="submitOrder()" class="btn btn-primary w-100 rounded-pill">Prüfen</button>
                     </form>
-                    <script>new Sortable(document.getElementById('sortList'), { animation: 150 }); function submitOrder() { const items = []; document.querySelectorAll('#sortList li').forEach(li => items.push(li.innerText)); document.getElementById('orderInput').value = JSON.stringify(items); document.getElementById('orderForm').submit(); }</script>
+                    <script>
+                        new Sortable(document.getElementById('sortList'), { animation: 150 });
+                        function submitOrder() { 
+                            const items = []; 
+                            document.querySelectorAll('#sortList li').forEach(li => items.push(li.innerText)); 
+                            document.getElementById('orderInput').value = JSON.stringify(items); 
+                            document.getElementById('orderForm').requestSubmit(); 
+                        }
+                    </script>
                 {% endif %}
 
             {% elif card.type == 'assignment' %}
                 {% if feedback_assignment %}
                      <div class="alert {{ 'alert-success' if all_correct else 'alert-danger' }}">{{ 'Perfekt!' if all_correct else 'Nicht ganz...' }}</div>
                      <div class="row">{% for gr in assignment_results %}<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header fw-bold">{{ gr.name }}</div><ul class="list-group list-group-flush">{% for item in gr.group_items %}<li class="list-group-item {{ 'text-success' if item.correct else 'text-danger' }}">{{ item.text }}</li>{% endfor %}{% for m in gr.missing %}<li class="list-group-item text-muted fst-italic">Fehlt: {{ m }}</li>{% endfor %}</ul></div></div>{% endfor %}</div>
-                     <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 rounded-pill mt-3">Weiter</a>
+                     <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary w-100 rounded-pill mt-3">Weiter <small class="text-white-50 ms-2">[Enter]</small></a>
                 {% else %}
                     <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="assignForm">
                         <input type="hidden" name="start_time" value="{{ start_time }}">
@@ -209,27 +255,48 @@
                         <div class="row g-3">{% for gr in options %}<div class="col-md-6"><div class="card h-100"><div class="card-header fw-bold bg-secondary text-white">{{ gr.name }}</div><div class="card-body p-2 dropzone" data-group="{{ gr.name }}" style="min-height:100px; background:#f8f9fa;"></div></div></div>{% endfor %}</div>
                         <button type="button" onclick="submitAssign()" class="btn btn-primary w-100 rounded-pill mt-4">Prüfen</button>
                     </form>
-                    <script>new Sortable(document.getElementById('pool'), { group: 'shared', animation: 150 }); document.querySelectorAll('.dropzone').forEach(el => { new Sortable(el, { group: 'shared', animation: 150 }); }); function submitAssign() { const res = {}; document.querySelectorAll('.dropzone').forEach(dz => { const gName = dz.getAttribute('data-group'); const items = []; dz.querySelectorAll('div').forEach(d => items.push(d.innerText)); res[gName] = items; }); document.getElementById('assignInput').value = JSON.stringify(res); document.getElementById('assignForm').submit(); }</script>
+                    <script>
+                        new Sortable(document.getElementById('pool'), { group: 'shared', animation: 150 }); 
+                        document.querySelectorAll('.dropzone').forEach(el => { new Sortable(el, { group: 'shared', animation: 150 }); }); 
+                        function submitAssign() { 
+                            const res = {}; 
+                            document.querySelectorAll('.dropzone').forEach(dz => { 
+                                const gName = dz.getAttribute('data-group'); 
+                                const items = []; 
+                                dz.querySelectorAll('div').forEach(d => items.push(d.innerText)); 
+                                res[gName] = items; 
+                            }); 
+                            document.getElementById('assignInput').value = JSON.stringify(res); 
+                            document.getElementById('assignForm').requestSubmit(); 
+                        }
+                    </script>
                 {% endif %}
 
             {% else %}
                 <div class="flip-card mx-auto mb-4" id="myCard" onclick="document.getElementById('myCard').classList.toggle('flipped')">
                     <div class="flip-card-inner">
                         <div class="flip-card-front">
-                            <span class="badge bg-light text-muted mb-3 rounded-pill">Tippen</span>
+                            <span class="badge bg-light text-muted mb-3 rounded-pill">Tippen oder [Space]</span>
                             <div class="px-3 fw-bold fs-4 markdown-content">{{ card.question | markdown }}</div>
                         </div>
                         <div class="flip-card-back">
                             <h5 class="text-primary mb-3 small fw-bold">Lösung</h5>
                             <div class="lead px-3 fw-bold markdown-content">{{ card.answer | markdown }}</div>
+                            
+                            {% if card.explanation %}
+                            <hr class="w-75 mx-auto border-secondary">
+                            <div class="small text-muted mb-3">Erklärung:</div>
+                            <div class="markdown-content px-3 small">{{ card.explanation | markdown }}</div>
+                            {% endif %}
+                            
                             <div class="mt-auto w-100 px-2 pb-2" onclick="event.stopPropagation();">
                                 <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" class="d-flex flex-wrap gap-2 justify-content-center">
                                     <input type="hidden" name="start_time" value="{{ start_time }}">
                                     <input type="hidden" name="origin_path" value="{{ current_category }}">
-                                    <button type="submit" name="result" value="0" class="btn btn-danger flex-grow-1">Nochmal<br><small class="fw-light">0 Min</small></button>
-                                    <button type="submit" name="result" value="3" class="btn btn-warning text-white flex-grow-1">Schwer<br><small class="fw-light">1 Tag</small></button>
-                                    <button type="submit" name="result" value="4" class="btn btn-success flex-grow-1">Gut<br><small class="fw-light">3 Tage</small></button>
-                                    <button type="submit" name="result" value="5" class="btn btn-primary flex-grow-1">Einfach<br><small class="fw-light">5 Tage</small></button>
+                                    <button type="submit" name="result" value="0" class="btn btn-danger flex-grow-1">Nochmal<br><small class="fw-light">[1]</small></button>
+                                    <button type="submit" name="result" value="3" class="btn btn-warning text-white flex-grow-1">Schwer<br><small class="fw-light">[2]</small></button>
+                                    <button type="submit" name="result" value="4" class="btn btn-success flex-grow-1">Gut<br><small class="fw-light">[3]</small></button>
+                                    <button type="submit" name="result" value="5" class="btn btn-primary flex-grow-1">Einfach<br><small class="fw-light">[4]</small></button>
                                 </form>
                             </div>
                         </div>
@@ -237,20 +304,63 @@
                 </div>
             {% endif %}
         </div>
-    {% endif %}
-
-    {% if not finished %}
-    <div class="modal fade" id="reportModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form action="{{ url_for('learn.report_card', card_id=card.id) }}" method="POST">
-                    <div class="modal-header"><h5 class="modal-title">Fehler melden</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                    <div class="modal-body"><textarea name="reason" class="form-control" rows="3" required placeholder="Beschreibung..."></textarea></div>
-                    <div class="modal-footer"><button type="submit" class="btn btn-danger">Melden</button></div>
-                </form>
+        
+        <div class="modal fade" id="reportModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="{{ url_for('learn.report_card', card_id=card.id) }}" method="POST">
+                        <div class="modal-header"><h5 class="modal-title">Fehler melden</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body"><textarea name="reason" class="form-control" rows="3" required placeholder="Beschreibung..."></textarea></div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-danger">Melden</button></div>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
+
     {% endif %}
+
 </div>
+
+<script>
+document.addEventListener('keydown', function(event) {
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+    const key = event.key;
+
+    const mcButtons = document.querySelectorAll('button[name="mc_answer"]');
+    if (mcButtons.length > 0) {
+        const num = parseInt(key);
+        if (!isNaN(num) && num > 0 && num <= mcButtons.length) {
+            event.preventDefault();
+            mcButtons[num - 1].click();
+            return;
+        }
+    }
+
+    const card = document.getElementById('myCard');
+    if (card) {
+        if (key === ' ') {
+            event.preventDefault();
+            card.classList.toggle('flipped');
+        }
+
+        if (card.classList.contains('flipped')) {
+            const buttons = document.querySelectorAll('button[name="result"]');
+            if (key === '1' && buttons[0]) buttons[0].click();
+            if (key === '2' && buttons[1]) buttons[1].click();
+            if (key === '3' && buttons[2]) buttons[2].click();
+            if (key === '4' && buttons[3]) buttons[3].click();
+        }
+    }
+
+    if (key === 'Enter') {
+        const nextBtn = document.querySelector('a.btn-primary[href*="learn"]'); 
+        if (nextBtn) {
+            event.preventDefault();
+            nextBtn.click();
+        }
+    }
+});
+</script>
+
 {% endblock %}

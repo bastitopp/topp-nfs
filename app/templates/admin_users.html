@@ -1,81 +1,102 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold"><i class="bi bi-people-fill text-primary"></i> Benutzerverwaltung</h2>
-    <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Zurück</a>
-</div>
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold"><i class="bi bi-people-fill text-primary"></i> Benutzerverwaltung</h2>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Zurück</a>
+    </div>
 
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-success bg-opacity-10 text-success fw-bold">Neuen User anlegen</div>
-            <div class="card-body">
-                <form action="{{ url_for('admin.add_user') }}" method="POST">
-                    <div class="mb-3"><label class="small fw-bold">Username</label><input name="username" class="form-control" required></div>
-                    <div class="mb-3"><label class="small fw-bold">Passwort</label><input name="password" type="password" class="form-control" required></div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" name="is_admin" id="isAdminCheck">
-                        <label class="form-check-label" for="isAdminCheck">Ist Administrator?</label>
-                    </div>
-                    <button class="btn btn-success w-100 rounded-pill">Anlegen</button>
-                </form>
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3">
+            <button class="btn btn-primary rounded-pill w-100 fw-bold" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="bi bi-person-plus-fill"></i> Neuen Benutzer anlegen
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>User</th>
+                            <th>Rolle</th>
+                            <th>XP</th>
+                            <th class="text-end">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ u.username }}</div>
+                                <div class="small text-muted">{{ u.email or '-' }}</div>
+                            </td>
+                            <td>
+                                {% if u.is_admin %}<span class="badge bg-warning text-dark">Admin</span>{% else %}<span class="badge bg-secondary">User</span>{% endif %}
+                            </td>
+                            <td>{{ u.xp }}</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary rounded-circle me-1" data-bs-toggle="modal" data-bs-target="#editUser{{ u.id }}"><i class="bi bi-pencil-fill"></i></button>
+                                {% if u.username != 'admin' %}
+                                <form action="{{ url_for('admin.delete_user', uid=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Wirklich löschen?');">
+                                    <button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        
+                        <div class="modal fade" id="editUser{{ u.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <form action="{{ url_for('admin.edit_user', uid=u.id) }}" method="POST">
+                                        <div class="modal-header"><h5 class="modal-title">Bearbeiten: {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                        <div class="modal-body">
+                                            <div class="mb-3"><label class="form-label">Username</label><input name="username" class="form-control" value="{{ u.username }}" required></div>
+                                            <div class="mb-3"><label class="form-label">E-Mail</label><input name="email" class="form-control" value="{{ u.email }}"></div>
+                                            <div class="mb-3"><label class="form-label">Name</label><input name="real_name" class="form-control" value="{{ u.real_name }}"></div>
+                                            <div class="mb-3"><label class="form-label">Neues Passwort (leer lassen für keins)</label><input name="new_password" class="form-control" placeholder="***"></div>
+                                            <div class="form-check"><input type="checkbox" class="form-check-input" name="is_admin" id="adm{{u.id}}" {% if u.is_admin %}checked{% endif %}><label class="form-check-label" for="adm{{u.id}}">Administrator</label></div>
+                                        </div>
+                                        <div class="modal-footer"><button class="btn btn-primary">Speichern</button></div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="col-md-8">
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>User</th><th>Info</th><th>Aktion</th></tr></thead>
-                        <tbody>
-                            {% for u in users %}
-                            <tr>
-                                <td>
-                                    <div class="fw-bold">{{ u.username }}</div>
-                                    {% if u.is_admin %}<span class="badge bg-warning text-dark">Admin</span>{% endif %}
-                                </td>
-                                <td class="small text-muted">
-                                    {{ u.email or '-' }}<br>
-                                    Letzter Login: {{ u.last_active.strftime('%d.%m. %H:%M') if u.last_active else '-' }}
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary rounded-circle me-1" data-bs-toggle="modal" data-bs-target="#editUser{{u.id}}"><i class="bi bi-pencil-fill"></i></button>
-                                    {% if u.username != 'admin' %}
-                                        <form action="{{ url_for('admin.delete_user', uid=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Wirklich löschen?');">
-                                            <button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button>
-                                        </form>
-                                    {% endif %}
-                                </td>
-                            </tr>
-
-                            <div class="modal fade" id="editUser{{u.id}}" tabindex="-1">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header"><h5 class="modal-title">Bearbeiten: {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                                        <div class="modal-body">
-                                            <form action="{{ url_for('admin.edit_user', uid=u.id) }}" method="POST">
-                                                <div class="mb-3"><label>Username</label><input name="username" value="{{ u.username }}" class="form-control"></div>
-                                                <div class="mb-3"><label>Echter Name</label><input name="real_name" value="{{ u.real_name or '' }}" class="form-control"></div>
-                                                <div class="mb-3"><label>Email</label><input name="email" value="{{ u.email or '' }}" class="form-control"></div>
-                                                <div class="mb-3"><label>Neues Passwort (leer lassen zum Beibehalten)</label><input name="new_password" type="password" class="form-control"></div>
-                                                <div class="form-check mb-3">
-                                                    <input class="form-check-input" type="checkbox" name="is_admin" {{ 'checked' if u.is_admin }} id="adminCheck{{u.id}}">
-                                                    <label class="form-check-label" for="adminCheck{{u.id}}">Admin Rechte</label>
-                                                </div>
-                                                <button class="btn btn-primary w-100">Speichern</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.add_user') }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">Neuen Benutzer anlegen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-            </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Passwort</label>
+                        <input type="text" name="password" class="form-control" required>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="is_admin" id="newAdmin">
+                        <label class="form-check-label" for="newAdmin">Administrator Rechte</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Anlegen</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

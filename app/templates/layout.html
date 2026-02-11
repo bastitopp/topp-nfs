@@ -19,6 +19,12 @@
         body { font-family: 'Inter', sans-serif; background-color: var(--bs-tertiary-bg); padding-bottom: 85px; }
         .card { border: none; border-radius: var(--border-radius-lg); box-shadow: var(--shadow-soft); transition: transform 0.2s ease; overflow: hidden; }
         
+        /* Dark Mode Fixes */
+        [data-bs-theme="dark"] .bg-white {
+            background-color: var(--bs-secondary-bg) !important;
+            color: var(--bs-body-color) !important;
+        }
+
         .navbar-top { height: 70px; backdrop-filter: blur(10px); background-color: rgba(var(--bs-body-bg-rgb), 0.9) !important; z-index: 1060; }
         .navbar-brand img { height: 65px; margin-top: -5px; transition: all 0.2s; }
 
@@ -26,7 +32,6 @@
         [data-bs-theme="dark"] .logo-light-mode { display: none; }
         [data-bs-theme="dark"] .logo-dark-mode { display: block; }
 
-        /* Level-Badge Styling */
         .profile-wrapper { position: relative; display: flex; align-items: center; justify-content: center; height: 34px; width: 34px; }
         .nav-profile-img { width: 34px; height: 34px; object-fit: cover; border-radius: 50%; border: 2px solid var(--bs-border-color); }
         .badge-lvl { 
@@ -39,7 +44,6 @@
             z-index: 2;
         }
 
-        /* Mobile Nav */
         .mobile-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 75px; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); display: flex; justify-content: space-around; align-items: center; z-index: 1050; box-shadow: 0 -5px 20px rgba(0,0,0,0.05); }
         .mobile-nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: var(--bs-secondary-color); font-size: 0.72rem; transition: color 0.2s; flex: 1; height: 100%; }
         .mobile-nav-item i { font-size: 1.4rem; height: 34px; display: flex; align-items: center; margin-bottom: 2px; }
@@ -63,34 +67,42 @@
             </a>
             
             <div class="d-none d-lg-block ms-auto">
-                <ul class="navbar-nav align-items-center d-flex flex-row gap-3">
-                    {% if current_user.is_authenticated %}
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('learn.exam_index') }}">Prüfung</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('main.leaderboard') }}">Rangliste</a></li>
-                        
-                        {# Admin Button Desktop #}
-                        {% if current_user.is_admin %}
-                        <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('admin.admin_dashboard') }}"><i class="bi bi-gear-fill"></i> Admin</a></li>
-                        {% endif %}
+                <div class="d-flex align-items-center gap-3">
+                    <form action="{{ url_for('main.search') }}" method="GET" class="me-3">
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0 rounded-start-pill"><i class="bi bi-search"></i></span>
+                            <input class="form-control rounded-end-pill border-0 bg-light" type="search" name="q" placeholder="Frage suchen..." style="width: 200px;">
+                        </div>
+                    </form>
 
-                        <li class="nav-item ms-2">
-                            <a class="nav-link p-0" href="{{ url_for('main.profile') }}">
-                                <div class="profile-wrapper">
-                                    {% if current_user.profile_image %}
-                                        <img src="{{ current_user.profile_image }}" class="nav-profile-img shadow-sm">
-                                    {% else %}
-                                        <div class="bg-secondary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;"><i class="bi bi-person-fill text-muted"></i></div>
-                                    {% endif %}
-                                    <span class="badge-lvl">{{ current_user.get_level() }}</span>
-                                </div>
-                            </a>
-                        </li>
-                        <li class="nav-item"><a class="btn btn-sm btn-outline-danger" href="{{ url_for('auth.logout') }}">Logout</a></li>
-                    {% else %}
-                        <li class="nav-item"><a class="btn btn-sm btn-primary" href="{{ url_for('auth.login') }}">Login</a></li>
-                    {% endif %}
-                    <li class="nav-item"><button class="btn nav-link" onclick="toggleTheme()"><i class="bi bi-moon-stars-fill" id="themeIcon"></i></button></li>
-                </ul>
+                    <ul class="navbar-nav align-items-center d-flex flex-row gap-3">
+                        {% if current_user.is_authenticated %}
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('learn.exam_index') }}">Prüfung</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('main.leaderboard') }}">Rangliste</a></li>
+                            
+                            {% if current_user.is_admin %}
+                            <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('admin.admin_dashboard') }}"><i class="bi bi-gear-fill"></i> Admin</a></li>
+                            {% endif %}
+
+                            <li class="nav-item ms-2">
+                                <a class="nav-link p-0" href="{{ url_for('main.profile') }}">
+                                    <div class="profile-wrapper">
+                                        {% if current_user.profile_image %}
+                                            <img src="{{ current_user.profile_image }}" class="nav-profile-img shadow-sm">
+                                        {% else %}
+                                            <div class="bg-secondary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;"><i class="bi bi-person-fill text-muted"></i></div>
+                                        {% endif %}
+                                        <span class="badge-lvl">{{ current_user.get_level() }}</span>
+                                    </div>
+                                </a>
+                            </li>
+                            <li class="nav-item"><a class="btn btn-sm btn-outline-danger" href="{{ url_for('auth.logout') }}">Logout</a></li>
+                        {% else %}
+                            <li class="nav-item"><a class="btn btn-sm btn-primary" href="{{ url_for('auth.login') }}">Login</a></li>
+                        {% endif %}
+                        <li class="nav-item"><button class="btn nav-link" onclick="toggleTheme()"><i class="bi bi-moon-stars-fill" id="themeIcon"></i></button></li>
+                    </ul>
+                </div>
             </div>
 
             <div class="d-lg-none ms-auto d-flex align-items-center gap-3">
@@ -131,7 +143,6 @@
             <span>Rang</span>
         </a>
         
-        {# Admin Button Mobile #}
         {% if current_user.is_admin %}
         <a href="{{ url_for('admin.admin_dashboard') }}" class="mobile-nav-item {{ 'active' if '/admin' in request.path }}">
             <i class="bi bi-gear{{ '-fill' if '/admin' in request.path }}"></i>
@@ -146,7 +157,7 @@
                 {% else %}
                     <i class="bi bi-person{{ '-fill' if request.path == url_for('main.profile') }}" style="font-size: 1.5rem;"></i>
                 {% endif %}
-                <span class="badge-lvl" style="font-size: 0.5rem; bottom: 0px; right: -2px;">{{ current_user.get_level() }}</span>
+                <span class="badge-lvl">{{ current_user.get_level() }}</span>
             </div>
             <span>Profil</span>
         </a>
@@ -172,6 +183,34 @@
             setTheme(next);
         }
         setTheme(getPreferredTheme());
+
+        document.addEventListener("DOMContentLoaded", function(){
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+
+        document.addEventListener('submit', function(e) {
+            var form = e.target;
+            if (!form.checkValidity()) return;
+            var btn = e.submitter;
+            if (btn && (btn.tagName === 'BUTTON' || btn.tagName === 'INPUT') && !btn.classList.contains('no-loader')) {
+                if (btn.querySelector('.spinner-border')) return;
+                btn.classList.add('disabled');
+                var spinner = document.createElement('span');
+                spinner.className = 'spinner-border spinner-border-sm';
+                spinner.setAttribute('role', 'status');
+                spinner.setAttribute('aria-hidden', 'true');
+                if (btn.innerText.trim() === '') {
+                    if (btn.tagName === 'INPUT') { btn.value = '...'; } 
+                    else { btn.innerHTML = ''; btn.appendChild(spinner); }
+                } else {
+                    if (btn.tagName === 'INPUT') { btn.value = 'Laden...'; } 
+                    else { spinner.classList.add('me-2'); btn.insertBefore(spinner, btn.firstChild); }
+                }
+            }
+        });
     </script>
 </body>
 </html>
