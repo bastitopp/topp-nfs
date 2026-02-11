@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow border-0">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                            <i class="bi bi-clipboard-check display-4"></i>
+                        </div>
+                        <h2 class="fw-bold">Prüfungsmodus</h2>
+                        <p class="text-muted">Simuliere eine echte Prüfungssituation. Die Fragen werden zufällig aus allen Bereichen gewählt.</p>
+                    </div>
+
+                    <form action="{{ url_for('learn.exam_start') }}" method="POST">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold d-flex justify-content-between">
+                                <span>Anzahl der Fragen</span>
+                                <span class="badge bg-secondary">{{ max_questions }} Verfügbar</span>
+                            </label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="range" class="form-range flex-grow-1" min="5" max="{{ max_questions if max_questions < 100 else 100 }}" value="30" id="qRange" name="question_count" oninput="updateVal(this.value)">
+                                <span class="h4 fw-bold text-primary mb-0" style="width: 50px; text-align: center;" id="qVal">30</span>
+                            </div>
+                            <div class="form-text mt-2">
+                                <i class="bi bi-clock"></i> Geschätzte Dauer: <span id="timeEst">~45</span> Min.
+                            </div>
+                        </div>
+
+                        <div class="alert alert-light border small">
+                            <strong><i class="bi bi-info-circle"></i> Zeitansatz:</strong>
+                            <ul class="mb-0 ps-3 mt-1">
+                                <li>Multiple Choice: 45 Sek.</li>
+                                <li>Komplexe Fragen: 2 Min.</li>
+                            </ul>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold mt-2">
+                            Prüfung starten
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateVal(val) {
+        document.getElementById('qVal').innerText = val;
+        // Grobe Schätzung für die Vorschau (Mittelwert ca. 1.5 Min pro Frage um nicht zu komplex zu werden in JS)
+        // MC (0.75) vs Andere (2.0). Mix ist unbekannt. Gehen wir von 50/50 aus ~ 1.3 Min
+        let est = Math.round(val * 1.3);
+        document.getElementById('timeEst').innerText = "~" + est;
+    }
+    document.addEventListener('DOMContentLoaded', () => updateVal(document.getElementById('qRange').value));
+</script>
+{% endblock %}

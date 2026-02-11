@@ -28,8 +28,8 @@
             {% endif %}
 
             <div class="mt-4">
-                <a href="/profile" class="btn btn-outline-secondary">Zum Profil</a>
-                <a href="/exam" class="btn btn-primary">Neue Prüfung</a>
+                <a href="{{ url_for('main.profile') }}" class="btn btn-outline-secondary">Zum Profil</a>
+                <a href="{{ url_for('learn.exam_index') }}" class="btn btn-primary">Neue Prüfung</a>
             </div>
         </div>
     </div>
@@ -39,12 +39,12 @@
     {% for res in results %}
     <div class="card mb-3 border-{{ 'success' if res.is_correct else 'danger' }}">
         <div class="card-header d-flex justify-content-between align-items-center {{ 'bg-success text-white' if res.is_correct else 'bg-danger text-white' }}">
-            <span>Frage {{ loop.index }}: {{ res.question }}</span>
-            <span>{{ 'Richtig' if res.is_correct else 'Falsch' }}</span>
+            <span class="fw-bold text-truncate" style="max-width: 80%;">Frage {{ loop.index }}: {{ res.question }}</span>
+            <span class="badge bg-white text-{{ 'success' if res.is_correct else 'danger' }}">{{ 'Richtig' if res.is_correct else 'Falsch' }}</span>
         </div>
         <div class="card-body bg-light">
             
-            {% if res.type == 'mc' %}
+            {% if res.type == 'mc' or res.type == 'calculation' %}
                 <div class="row">
                     <div class="col-md-6"><strong>Deine Antwort:</strong> {{ res.user_data }}</div>
                     <div class="col-md-6 text-success"><strong>Lösung:</strong> {{ res.correct_data }}</div>
@@ -53,7 +53,7 @@
             {% elif res.type == 'anatomy' %}
                 <div class="row">
                     <div class="col-md-6">
-                        <strong>Dein:</strong> {{ res.user_data.de }} / {{ res.user_data.lat }}
+                        <strong>Dein:</strong> {{ res.user_data.de if res.user_data else '-' }} / {{ res.user_data.lat if res.user_data else '-' }}
                     </div>
                     <div class="col-md-6 text-success">
                         <strong>Lösung:</strong> {{ res.correct_data.de }} / {{ res.correct_data.lat }}
@@ -64,18 +64,22 @@
                 <table class="table table-sm">
                     <thead><tr><th>ID</th><th>Dein (DE/LAT)</th><th>Lösung (DE/LAT)</th></tr></thead>
                     <tbody>
+                        {% if res.correct_data %}
                         {% for item in res.correct_data %}
                             {% set ns = namespace(u_item=None) %}
-                            {% for u in res.user_data %}
-                                {% if u.id == item.id %}{% set ns.u_item = u %}{% endif %}
-                            {% endfor %}
+                            {% if res.user_data %}
+                                {% for u in res.user_data %}
+                                    {% if u.id == item.id %}{% set ns.u_item = u %}{% endif %}
+                                {% endfor %}
+                            {% endif %}
                             
-                            <tr class="{{ 'table-danger' if (ns.u_item.de != item.de or ns.u_item.lat != item.lat) else 'table-success' }}">
+                            <tr class="{{ 'table-danger' if (not ns.u_item or ns.u_item.de != item.de or ns.u_item.lat != item.lat) else 'table-success' }}">
                                 <td>{{ item.id }}</td>
-                                <td>{{ ns.u_item.de }} / {{ ns.u_item.lat }}</td>
+                                <td>{{ ns.u_item.de if ns.u_item else '-' }} / {{ ns.u_item.lat if ns.u_item else '-' }}</td>
                                 <td>{{ item.de }} / {{ item.lat }}</td>
                             </tr>
                         {% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
 
@@ -84,20 +88,26 @@
                     <div class="col-md-6">
                         <h6 class="text-muted">Deine Reihenfolge:</h6>
                         <ol class="list-group list-group-numbered">
-                            {% for item in res.user_data %}
-                                {% set is_pos_correct = (loop.index0 < res.correct_data|length) and (item == res.correct_data[loop.index0]) %}
-                                <li class="list-group-item {{ 'list-group-item-success' if is_pos_correct else 'list-group-item-danger' }}">
-                                    {{ item }}
-                                </li>
-                            {% endfor %}
+                            {% if res.user_data %}
+                                {% for item in res.user_data %}
+                                    {% set is_pos_correct = (res.correct_data and loop.index0 < res.correct_data|length) and (item == res.correct_data[loop.index0]) %}
+                                    <li class="list-group-item {{ 'list-group-item-success' if is_pos_correct else 'list-group-item-danger' }}">
+                                        {{ item }}
+                                    </li>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">- Keine Antwort -</span>
+                            {% endif %}
                         </ol>
                     </div>
                     <div class="col-md-6">
                         <h6 class="text-success">Korrekte Reihenfolge:</h6>
                         <ol class="list-group list-group-numbered">
-                            {% for item in res.correct_data %}
-                                <li class="list-group-item">{{ item }}</li>
-                            {% endfor %}
+                            {% if res.correct_data %}
+                                {% for item in res.correct_data %}
+                                    <li class="list-group-item">{{ item }}</li>
+                                {% endfor %}
+                            {% endif %}
                         </ol>
                     </div>
                 </div>
@@ -106,39 +116,47 @@
                 <div class="row">
                     <div class="col-md-6 border-end">
                         <h6 class="text-muted text-center">Deine Zuordnung</h6>
-                        {% for grp_name, items in res.user_data.items() %}
-                            <div class="card mb-2">
-                                <div class="card-header py-1 small fw-bold">{{ grp_name }}</div>
-                                <ul class="list-group list-group-flush small">
-                                    {% for item in items %}
-                                        {% set is_item_here_correct = false %}
-                                        {% for c_grp in res.correct_data %}
-                                            {% if c_grp.name == grp_name and item in c_grp.get('items', []) %}
-                                                {% set is_item_here_correct = true %}
+                        {% if res.user_data %}
+                            {% for grp_name, items in res.user_data.items() %}
+                                <div class="card mb-2">
+                                    <div class="card-header py-1 small fw-bold">{{ grp_name }}</div>
+                                    <ul class="list-group list-group-flush small">
+                                        {% for item in items %}
+                                            {% set is_item_here_correct = false %}
+                                            {% if res.correct_data %}
+                                                {% for c_grp in res.correct_data %}
+                                                    {% if c_grp.name == grp_name and item in c_grp.get('items', []) %}
+                                                        {% set is_item_here_correct = true %}
+                                                    {% endif %}
+                                                {% endfor %}
                                             {% endif %}
+                                            
+                                            <li class="list-group-item {{ 'text-danger fw-bold' if not is_item_here_correct else 'text-success' }}">
+                                                {{ item }} {{ '❌' if not is_item_here_correct else '✓' }}
+                                            </li>
                                         {% endfor %}
-                                        
-                                        <li class="list-group-item {{ 'text-danger fw-bold' if not is_item_here_correct else 'text-success' }}">
-                                            {{ item }} {{ '❌' if not is_item_here_correct else '✓' }}
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-center text-muted small">Keine Zuordnung getroffen.</p>
+                        {% endif %}
                     </div>
 
                     <div class="col-md-6">
                         <h6 class="text-success text-center">Korrekte Lösung</h6>
-                        {% for grp in res.correct_data %}
-                            <div class="card mb-2 border-success">
-                                <div class="card-header py-1 small fw-bold bg-success text-white">{{ grp.name }}</div>
-                                <ul class="list-group list-group-flush small">
-                                    {% for item in grp.get('items', []) %}
-                                        <li class="list-group-item">{{ item }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        {% endfor %}
+                        {% if res.correct_data %}
+                            {% for grp in res.correct_data %}
+                                <div class="card mb-2 border-success">
+                                    <div class="card-header py-1 small fw-bold bg-success text-white">{{ grp.name }}</div>
+                                    <ul class="list-group list-group-flush small">
+                                        {% for item in grp.get('items', []) %}
+                                            <li class="list-group-item">{{ item }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
                     </div>
                 </div>
 
@@ -146,6 +164,8 @@
 
         </div>
     </div>
+    {% else %}
+    <div class="alert alert-info">Keine Details verfügbar.</div>
     {% endfor %}
 </div>
 {% endblock %}

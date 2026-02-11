@@ -81,7 +81,7 @@
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('main.leaderboard') }}">Rangliste</a></li>
                             
                             {% if current_user.is_admin %}
-                            <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('admin.admin_dashboard') }}"><i class="bi bi-gear-fill"></i> Admin</a></li>
+                            <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('admin.index') }}"><i class="bi bi-gear-fill"></i> Admin</a></li>
                             {% endif %}
 
                             <li class="nav-item ms-2">
@@ -144,7 +144,7 @@
         </a>
         
         {% if current_user.is_admin %}
-        <a href="{{ url_for('admin.admin_dashboard') }}" class="mobile-nav-item {{ 'active' if '/admin' in request.path }}">
+        <a href="{{ url_for('admin.index') }}" class="mobile-nav-item {{ 'active' if '/admin' in request.path }}">
             <i class="bi bi-gear{{ '-fill' if '/admin' in request.path }}"></i>
             <span>Admin</span>
         </a>

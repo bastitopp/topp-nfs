@@ -80,11 +80,7 @@ class Card(db.Model):
     type = db.Column(db.String(20))     
     question = db.Column(db.Text, nullable=False)
     answer = db.Column(db.Text, nullable=False)
-    
-    # --- NEU: ERKLÄRUNG ---
     explanation = db.Column(db.Text, nullable=True)
-    # ----------------------
-    
     answer_lat = db.Column(db.Text, nullable=True) 
     options = db.Column(db.Text, nullable=True) 
     image_url = db.Column(db.String(200), nullable=True)
@@ -118,3 +114,6 @@ class ExamDetail(db.Model):
     question_text = db.Column(db.Text)
     question_type = db.Column(db.String(20))
     is_correct = db.Column(db.Boolean, default=False)
+    # --- NEUE FELDER ---
+    user_solution = db.Column(db.Text, nullable=True)
+    correct_solution = db.Column(db.Text, nullable=True)

@@ -3,153 +3,228 @@
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
-<div class="container py-4" style="max-width: 800px;">
-    <h3 class="fw-bold mb-4">Prüfungsmodus</h3>
+<div class="sticky-top bg-white border-bottom shadow-sm py-2 mb-4" style="top: 70px; z-index: 1040;">
+    <div class="container d-flex justify-content-between align-items-center" style="max-width: 800px;">
+        <h5 class="m-0 fw-bold text-secondary"><i class="bi bi-stopwatch"></i> Prüfung</h5>
+        <div class="d-flex align-items-center gap-3">
+            <div class="fs-4 fw-bold font-monospace" id="timerDisplay">--:--</div>
+            <button class="btn btn-sm btn-outline-primary d-none d-sm-block" onclick="document.getElementById('examForm').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}))">Abgeben</button>
+        </div>
+    </div>
+</div>
 
-    <form method="POST" id="examForm" onsubmit="prepareExamSubmission()">
+<div class="container py-2" style="max-width: 800px;">
+    
+    <form method="POST" action="{{ url_for('learn.exam_submit') }}" id="examForm">
         {% for entry in questions %}
             <input type="hidden" name="card_ids" value="{{ entry.card.id }}">
-        {% endfor %}
-
-        {% for entry in questions %}
-        {% set card = entry.card %}
-        {% set opts = entry.options %}
         
-        <div class="card mb-4 p-4 shadow-sm border-0">
-            <h5 class="fw-bold mb-3">{{ card.question }}</h5>
-
-            {% if card.type == 'mc' %}
-                <div class="d-flex flex-column gap-2">
-                    {% for opt in opts %}
-                    <div class="form-check p-3 border rounded bg-light">
-                        <input class="form-check-input" type="radio" name="q_{{ card.id }}" id="opt_{{ card.id }}_{{ loop.index }}" value="{{ opt }}" required>
-                        <label class="form-check-label w-100" for="opt_{{ card.id }}_{{ loop.index }}" style="cursor: pointer;">
-                            {{ opt }}
-                        </label>
-                    </div>
-                    {% endfor %}
-                </div>
-
-            {% elif card.type == 'calculation' %}
-                <label class="form-label">Dein Ergebnis:</label>
-                <div class="input-group">
-                    <input type="number" step="any" name="q_{{ card.id }}" class="form-control form-control-lg" required>
-                    {% if entry.calc_data and entry.calc_data.unit %}
-                        <span class="input-group-text">{{ entry.calc_data.unit }}</span>
-                    {% endif %}
-                </div>
+            {% set card = entry.card %}
+            {% set opts = entry.options %}
             
-            {% elif card.type == 'anatomy' %}
-                <div class="row g-2">
-                    <div class="col-md-6">
-                        <label class="small text-muted">Deutsch</label>
-                        <input type="text" name="q_{{ card.id }}_de" class="form-control" placeholder="Begriff...">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="small text-muted">Latein</label>
-                        <input type="text" name="q_{{ card.id }}_lat" class="form-control" placeholder="Begriff...">
-                    </div>
+            <div class="card mb-4 p-4 shadow-sm border-0">
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="badge bg-light text-secondary border">Frage {{ loop.index }}</span>
+                    <span class="badge bg-light text-secondary border">{{ card.type|upper }}</span>
                 </div>
-
-            {% elif card.type == 'anatomy_multi' %}
-                <p class="small text-muted">Benenne die markierten Strukturen:</p>
-                {% set parts = card.options | from_json %}
-                {% for part in parts %}
-                <div class="row g-2 mb-2 align-items-center">
-                    <div class="col-1 fw-bold text-center bg-secondary bg-opacity-10 rounded">{{ part.id }}</div>
-                    <div class="col"><input type="text" name="q_{{ card.id }}_{{ part.id }}_de" class="form-control form-control-sm" placeholder="Deutsch"></div>
-                    <div class="col"><input type="text" name="q_{{ card.id }}_{{ part.id }}_lat" class="form-control form-control-sm" placeholder="Latein"></div>
-                </div>
-                {% endfor %}
-
-            {% elif card.type == 'ordering' %}
-                <input type="hidden" name="q_{{ card.id }}" id="input_q_{{ card.id }}">
-                <div class="small text-muted mb-2">Ziehe die Elemente in die richtige Reihenfolge:</div>
-                <ul class="list-group sortable-list" id="sort_{{ card.id }}">
-                    {% for item in opts %}
-                    <li class="list-group-item cursor-grab bg-light my-1 border rounded">{{ item }}</li>
-                    {% endfor %}
-                </ul>
-
-            {% elif card.type == 'assignment' %}
-                <input type="hidden" name="q_{{ card.id }}" id="input_q_{{ card.id }}">
                 
-                <div class="mb-3">
-                    <div class="small text-muted mb-1">Begriffe (ziehen):</div>
-                    <div id="pool_{{ card.id }}" class="d-flex flex-wrap gap-2 p-2 bg-light rounded border border-dashed min-vh-10">
-                        {% for item in entry.pool %}
-                        <div class="badge bg-white text-dark border p-2 cursor-grab fs-6" style="user-select:none">{{ item.val }}</div>
+                <h5 class="fw-bold mb-3">{{ card.question }}</h5>
+
+                {% if card.type == 'mc' %}
+                    <div class="d-flex flex-column gap-2">
+                        {% for opt in opts %}
+                        <div class="form-check p-3 border rounded bg-light hover-shadow">
+                            <input class="form-check-input" type="radio" name="q_{{ card.id }}" id="opt_{{ card.id }}_{{ loop.index }}" value="{{ opt }}">
+                            <label class="form-check-label w-100 stretched-link" for="opt_{{ card.id }}_{{ loop.index }}" style="cursor: pointer;">
+                                {{ opt }}
+                            </label>
+                        </div>
                         {% endfor %}
                     </div>
-                </div>
+
+                {% elif card.type == 'calculation' %}
+                    <label class="form-label">Dein Ergebnis:</label>
+                    <div class="input-group">
+                        <input type="text" name="q_{{ card.id }}" class="form-control form-control-lg" placeholder="12.5" autocomplete="off">
+                        {% if entry.calc_data and entry.calc_data.unit %}
+                            <span class="input-group-text">{{ entry.calc_data.unit }}</span>
+                        {% endif %}
+                    </div>
                 
-                <div class="row g-3">
-                    {% set groups = card.options | from_json %}
-                    {% for gr in groups %}
-                    <div class="col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header fw-bold small bg-secondary text-white">{{ gr.name }}</div>
-                            <div class="card-body p-2 dropzone-{{ card.id }}" data-group="{{ gr.name }}" style="min-height:100px; background:#f8f9fa;"></div>
+                {% elif card.type == 'anatomy' %}
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="small text-muted">Deutsch</label>
+                            <input type="text" name="q_{{ card.id }}_de" class="form-control" autocomplete="off">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small text-muted">Latein</label>
+                            <input type="text" name="q_{{ card.id }}_lat" class="form-control" autocomplete="off">
                         </div>
                     </div>
-                    {% endfor %}
-                </div>
 
-            {% else %}
-                <div class="alert alert-warning small">
-                    <i class="bi bi-exclamation-circle"></i> Typ "{{ card.type }}" wird in der automatischen Prüfung nicht unterstützt (z.B. Fallbeispiel).
-                </div>
-            {% endif %}
-        </div>
+                {% elif card.type == 'anatomy_multi' %}
+                    <p class="small text-muted">Benenne die markierten Strukturen:</p>
+                    {% set parts = card.options | from_json %}
+                    {% for part in parts %}
+                    <div class="row g-2 mb-2 align-items-center">
+                        <div class="col-1 fw-bold text-center bg-secondary bg-opacity-10 rounded py-1">{{ part.id }}</div>
+                        <div class="col"><input type="text" name="q_{{ card.id }}_{{ part.id }}_de" class="form-control form-control-sm" placeholder="Deutsch" autocomplete="off"></div>
+                        <div class="col"><input type="text" name="q_{{ card.id }}_{{ part.id }}_lat" class="form-control form-control-sm" placeholder="Latein" autocomplete="off"></div>
+                    </div>
+                    {% endfor %}
+
+                {% elif card.type == 'ordering' %}
+                    <input type="hidden" name="q_{{ card.id }}" id="input_q_{{ card.id }}" class="order-input">
+                    <div class="small text-muted mb-2">Ziehe die Elemente in die richtige Reihenfolge:</div>
+                    <ul class="list-group sortable-list" id="sort_{{ card.id }}" data-target="input_q_{{ card.id }}">
+                        {% for item in opts %}
+                        <li class="list-group-item cursor-grab bg-light my-1 border rounded d-flex align-items-center">
+                            <i class="bi bi-grip-vertical text-muted me-2"></i> {{ item }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                {% elif card.type == 'assignment' %}
+                    <input type="hidden" name="q_{{ card.id }}" id="input_q_{{ card.id }}" class="assign-input">
+                    
+                    <div class="mb-3">
+                        <div class="small text-muted mb-1">Begriffe (ziehen):</div>
+                        <div id="pool_{{ card.id }}" class="d-flex flex-wrap gap-2 p-2 bg-light rounded border border-dashed">
+                            {% for item in entry.pool %}
+                            <div class="badge bg-white text-dark border p-2 cursor-grab fs-6 shadow-sm" style="user-select:none">{{ item.val }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3">
+                        {% set groups = card.options | from_json %}
+                        {% for gr in groups %}
+                        <div class="col-md-6">
+                            <div class="card h-100 bg-light border">
+                                <div class="card-header fw-bold small text-center">{{ gr.name }}</div>
+                                <div class="card-body p-2 dropzone-{{ card.id }}" data-group="{{ gr.name }}" style="min-height:100px;"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                {% else %}
+                    <div class="alert alert-warning small">
+                        Typ "{{ card.type }}" nicht unterstützt.
+                    </div>
+                {% endif %}
+            </div>
         {% endfor %}
 
-        <button class="btn btn-primary btn-lg w-100 rounded-pill shadow mb-5">Prüfung abgeben</button>
+        <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill shadow mb-5 py-3 fw-bold">
+            <i class="bi bi-check-circle-fill me-2"></i> Prüfung verbindlich abgeben
+        </button>
     </form>
 </div>
 
 <script>
-    // Initialisiere SortableJS für alle Listen
-    document.addEventListener("DOMContentLoaded", function() {
-        // Sortieren
-        document.querySelectorAll('.sortable-list').forEach(el => {
-            new Sortable(el, { animation: 150 });
+    // --- TIMER LOGIC ---
+    let timeMinutes = {{ estimated_time|default(30) }};
+    let timeSeconds = timeMinutes * 60;
+    const display = document.getElementById('timerDisplay');
+    
+    // Timer Intervall
+    const timerInterval = setInterval(() => {
+        if (timeSeconds <= 0) {
+            clearInterval(timerInterval);
+            display.classList.add('text-danger');
+            display.innerText = "00:00";
+            alert("Die Zeit ist abgelaufen! Deine Prüfung wird nun automatisch abgegeben.");
+            submitExam();
+        } else {
+            timeSeconds--;
+            
+            // Formatierung
+            let m = Math.floor(timeSeconds / 60);
+            let s = timeSeconds % 60;
+            
+            // Warnung bei wenig Zeit (letzte 2 Minuten)
+            if (timeSeconds < 120) display.classList.add('text-danger', 'blink');
+            
+            display.innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+        }
+    }, 1000);
+
+    // --- FORM SUBMISSION ---
+    const form = document.getElementById('examForm');
+    
+    // Funktion zum Sammeln der Daten (Sortable & Assignment)
+    function collectData() {
+        // Ordering
+        document.querySelectorAll('.sortable-list').forEach(list => {
+            const targetId = list.getAttribute('data-target');
+            const items = [];
+            list.querySelectorAll('li').forEach(li => items.push(li.innerText.trim()));
+            document.getElementById(targetId).value = JSON.stringify(items);
         });
 
-        // Zuordnung
-        {% for entry in questions %}
-            {% if entry.card.type == 'assignment' %}
-                new Sortable(document.getElementById('pool_{{ entry.card.id }}'), { group: 'assign_{{ entry.card.id }}', animation: 150 });
-                document.querySelectorAll('.dropzone-{{ entry.card.id }}').forEach(el => {
-                    new Sortable(el, { group: 'assign_{{ entry.card.id }}', animation: 150 });
-                });
-            {% endif %}
-        {% endfor %}
+        // Assignment
+        const assignInputs = document.querySelectorAll('.assign-input');
+        assignInputs.forEach(input => {
+            const cardId = input.id.split('_')[2]; // input_q_ID
+            const result = {};
+            
+            // Finde alle Dropzones für diese Karte
+            document.querySelectorAll(`.dropzone-${cardId}`).forEach(dz => {
+                const groupName = dz.getAttribute('data-group');
+                const items = [];
+                dz.querySelectorAll('.badge').forEach(b => items.push(b.innerText.trim()));
+                result[groupName] = items;
+            });
+            input.value = JSON.stringify(result);
+        });
+    }
+
+    function submitExam() {
+        collectData();
+        form.submit();
+    }
+
+    // Event Listener für manuelles Submit
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        // Kurze Bestätigung bei manuellem Klick (optional, hier weggelassen für Fluss)
+        if(confirm("Möchtest du die Prüfung wirklich abgeben?")) {
+            submitExam();
+        }
     });
 
-    // Daten sammeln vor dem Senden
-    function prepareExamSubmission() {
-        // 1. Sortier-Aufgaben sammeln
-        document.querySelectorAll('.sortable-list').forEach(list => {
-            const cardId = list.id.split('_')[1];
-            const items = [];
-            list.querySelectorAll('li').forEach(li => items.push(li.innerText));
-            document.getElementById('input_q_' + cardId).value = JSON.stringify(items);
+    // --- SORTABLE INIT ---
+    document.addEventListener("DOMContentLoaded", function() {
+        // Simple Lists (Ordering)
+        document.querySelectorAll('.sortable-list').forEach(el => {
+            new Sortable(el, { animation: 150, ghostClass: 'bg-info' });
         });
 
-        // 2. Zuordnungs-Aufgaben sammeln
-        // Wir suchen alle hidden inputs für assignment (erkennbar an input_q_ID wo auch pool_ID existiert)
-        {% for entry in questions %}
-            {% if entry.card.type == 'assignment' %}
-                const res{{ entry.card.id }} = {};
-                document.querySelectorAll('.dropzone-{{ entry.card.id }}').forEach(dz => {
-                    const gName = dz.getAttribute('data-group');
-                    const items = [];
-                    dz.querySelectorAll('div').forEach(d => items.push(d.innerText));
-                    res{{ entry.card.id }}[gName] = items;
-                });
-                document.getElementById('input_q_{{ entry.card.id }}').value = JSON.stringify(res{{ entry.card.id }});
-            {% endif %}
-        {% endfor %}
-    }
+        // Assignment Groups
+        // Wir iterieren über die Hidden Inputs, um die IDs zu finden
+        document.querySelectorAll('.assign-input').forEach(inp => {
+            const cid = inp.id.split('_')[2];
+            const groupName = `shared-${cid}`;
+            
+            // Pool
+            const poolEl = document.getElementById(`pool_${cid}`);
+            if(poolEl) new Sortable(poolEl, { group: groupName, animation: 150 });
+            
+            // Dropzones
+            document.querySelectorAll(`.dropzone-${cid}`).forEach(dz => {
+                new Sortable(dz, { group: groupName, animation: 150 });
+            });
+        });
+    });
 </script>
+
+<style>
+    .cursor-grab { cursor: grab; }
+    .cursor-grab:active { cursor: grabbing; }
+    .blink { animation: blinker 1s linear infinite; }
+    @keyframes blinker { 50% { opacity: 0; } }
+    .hover-shadow:hover { box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
+</style>
 {% endblock %}
