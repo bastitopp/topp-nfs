@@ -5,7 +5,7 @@ from ..extensions import db, mail, limiter
 from ..models import User
 from itsdangerous import URLSafeTimedSerializer
 from flask import current_app
-import traceback # Zum Anzeigen des vollen Fehlers
+import traceback
 
 bp = Blueprint('auth', __name__)
 
@@ -18,7 +18,10 @@ def login():
     if request.method=='POST':
         u = User.query.filter_by(username=request.form['username']).first()
         if u and u.check_password(request.form['password']): 
-            login_user(u)
+            # Checkbox 'remember' auslesen
+            remember = True if request.form.get('remember') else False
+            login_user(u, remember=remember)
+            
             # Aktualisiere last_active für Gamification
             from datetime import datetime
             u.last_active = datetime.utcnow()
@@ -29,7 +32,10 @@ def login():
 
 @bp.route('/logout')
 @login_required
-def logout(): logout_user(); return redirect(url_for('main.index'))
+def logout(): 
+    logout_user()
+    flash('Du wurdest ausgeloggt.', 'info')
+    return redirect(url_for('auth.login'))
 
 @bp.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
@@ -50,10 +56,9 @@ def forgot_password():
                 flash('Link gesendet. Bitte Postfach prüfen.', 'info')
             except Exception as e:
                 print(f"--- MAIL FEHLER: {e} ---")
-                traceback.print_exc() # Zeigt Details im Docker Log
+                traceback.print_exc()
                 flash(f'Fehler beim Senden: {str(e)}', 'danger')
         else:
-            # Sicherheits-Best-Practice: Nicht verraten, ob Email existiert
             flash('Wenn die E-Mail existiert, wurde ein Link gesendet.', 'info')
             
         return redirect(url_for('auth.login'))
