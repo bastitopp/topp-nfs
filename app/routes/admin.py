@@ -341,8 +341,26 @@ def import_confirm():
             else:
                 c = Card(question=item['question'])
                 db.session.add(c)
+            
             c.category, c.type, c.answer, c.explanation = item['category'], item['type'], item['answer'], item.get('explanation', '')
-            c.options = item.get('options')
+            
+            # --- UPDATE: FIX FÜR MC-OPTIONEN IMPORT ---
+            # Wenn es MC ist und Optionen vorhanden sind, müssen diese als JSON-Liste gespeichert werden
+            if c.type == 'mc' and item.get('options'):
+                raw_opts = item.get('options')
+                try:
+                    # Prüfen, ob es bereits ein gültiger JSON-String ist
+                    json.loads(raw_opts)
+                    c.options = raw_opts
+                except:
+                    # Falls nicht (z.B. CSV Text "A, B, C"), in Liste umwandeln und als JSON speichern
+                    opts_list = [x.strip() for x in raw_opts.split(',') if x.strip()]
+                    c.options = json.dumps(opts_list)
+            else:
+                # Bei anderen Typen oder leeren Optionen einfach übernehmen
+                c.options = item.get('options')
+            # ------------------------------------------
+
         db.session.commit()
         flash('Import erfolgreich.', 'success')
     except Exception as e: flash(f'Import Fehler: {e}', 'danger')
