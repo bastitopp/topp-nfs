@@ -2,17 +2,16 @@
 
 {% block content %}
 <div class="container py-4" style="max-width: 800px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold">Frage bearbeiten</h3>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Abbrechen</a>
+    </div>
+
     <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-3">
-            <h4 class="mb-0 fw-bold"><i class="bi bi-pencil-fill text-primary"></i> Karte bearbeiten</h4>
-        </div>
         <div class="card-body bg-light">
             <form method="POST" enctype="multipart/form-data" onsubmit="prepareMultiJson()">
                 <input type="hidden" name="multi_json" id="multi_json_input">
-                <input type="hidden" name="ordering_json" id="ordering_json_input">
-                <input type="hidden" name="assignment_json" id="assignment_json_input">
-                <input type="hidden" name="calc_json" id="calc_json_input">
-
+                
                 <div class="row g-3 mb-3">
                     <div class="col-md-8">
                         <label class="fw-bold small">Kategorie</label>
@@ -21,33 +20,41 @@
                     <div class="col-md-4">
                         <label class="fw-bold small">Typ</label>
                         <select name="type" id="typeSelect" class="form-select" onchange="updateFormFields()">
-                            <option value="flashcard" {% if card.type=='flashcard' %}selected{% endif %}>Karteikarte</option>
-                            <option value="mc" {% if card.type=='mc' %}selected{% endif %}>Multiple Choice</option>
-                            <option value="anatomy" {% if card.type=='anatomy' %}selected{% endif %}>Anatomie</option>
-                            <option value="anatomy_multi" {% if card.type=='anatomy_multi' %}selected{% endif %}>Anatomie Multi</option>
-                            <option value="ordering" {% if card.type=='ordering' %}selected{% endif %}>Sortieren</option>
-                            <option value="assignment" {% if card.type=='assignment' %}selected{% endif %}>Zuordnung</option>
-                            <option value="calculation" {% if card.type=='calculation' %}selected{% endif %}>Berechnung</option>
+                            <option value="flashcard" {% if card.type == 'flashcard' %}selected{% endif %}>Karteikarte</option>
+                            <option value="mc" {% if card.type == 'mc' %}selected{% endif %}>Multiple Choice</option>
+                            <option value="anatomy" {% if card.type == 'anatomy' %}selected{% endif %}>Anatomie</option>
+                            <option value="anatomy_multi" {% if card.type == 'anatomy_multi' %}selected{% endif %}>Anatomie Multi</option>
+                            <option value="ordering" {% if card.type == 'ordering' %}selected{% endif %}>Sortieren</option>
+                            <option value="assignment" {% if card.type == 'assignment' %}selected{% endif %}>Zuordnung</option>
                         </select>
                     </div>
                 </div>
 
-                <label class="fw-bold small">Frage / Titel</label>
-                <textarea name="question" class="form-control mb-3" rows="3" required>{{ card.question }}</textarea>
-
-                <label class="fw-bold small">Erklärung (Optional)</label>
-                <textarea name="explanation" class="form-control mb-3" rows="3">{{ card.explanation or '' }}</textarea>
                 <div class="mb-3">
-                    <label class="fw-bold small">Neues Bild (Überschreibt altes)</label>
-                    <input type="file" name="image" class="form-control">
-                    {% if card.image_url %}
-                        <div class="mt-2"><small>Aktuell:</small> <img src="{{ card.image_url }}" height="50"></div>
-                    {% endif %}
+                    <label class="fw-bold small">Frage</label>
+                    <textarea name="question" class="form-control" rows="3" required>{{ card.question }}</textarea>
                 </div>
 
                 <div class="mb-3">
-                    <label class="fw-bold small">Tags (Komma)</label>
-                    <input name="tags_input" class="form-control" value="{{ card.tags|map(attribute='name')|join(', ') }}">
+                    <label class="fw-bold small">Erklärung</label>
+                    <textarea name="explanation" class="form-control" rows="3">{{ card.explanation }}</textarea>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="fw-bold small">Bild ändern</label>
+                        <input type="file" name="image" class="form-control">
+                        {% if card.image_url %}
+                            <div class="mt-2 small text-muted">Aktuell: <a href="{{ card.image_url }}" target="_blank">Bild ansehen</a></div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-bold small">Audio ändern</label>
+                        <input type="file" name="audio" class="form-control" accept="audio/*">
+                         {% if card.audio_url %}
+                            <div class="mt-2 small text-muted">Aktuell: Audio vorhanden</div>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <div id="field_standard_answer" class="mb-3">
@@ -56,24 +63,40 @@
                 </div>
 
                 <div id="field_options" class="mb-3 d-none">
-                    <label class="fw-bold small">Optionen (mit Komma trennen)</label>
-                    <input name="options" class="form-control" value="{{ options_str }}">
+                    <label class="fw-bold small">MC Optionen (Komma-getrennt)</label>
+                    <input name="options" class="form-control" value="{{ options_str if options_str else card.options }}">
+                    <div class="form-text small">Gib hier die falschen Antworten ein (durch Komma getrennt). Die richtige Antwort wird automatisch hinzugefügt.</div>
                 </div>
 
                 <div id="field_anatomy" class="row g-3 mb-3 d-none">
-                    <div class="col-md-6"><label class="fw-bold small">Deutsch</label><input name="answer_de_field" class="form-control" value="{{ card.answer }}"></div>
-                    <div class="col-md-6"><label class="fw-bold small">Latein</label><input name="answer_lat" class="form-control" value="{{ card.answer_lat }}"></div>
+                    <div class="col-md-6">
+                        <label class="fw-bold small">Deutsch</label>
+                        <input name="answer_de_field" class="form-control" value="{{ card.answer }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-bold small">Latein</label>
+                        <input name="answer_lat" class="form-control" value="{{ card.answer_lat }}">
+                    </div>
+                </div>
+
+                <div id="field_anatomy_multi" class="mb-3 d-none p-3 bg-white rounded border">
+                    <label class="fw-bold small mb-2">Strukturen</label>
+                    <table class="table table-sm table-bordered">
+                        <thead><tr><th>Nr.</th><th>Deutsch</th><th>Latein</th><th></th></tr></thead>
+                        <tbody id="multiTableBody">
+                            </tbody>
+                    </table>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="addMultiRow()">+ Zeile</button>
                 </div>
 
                 <div id="field_json" class="mb-3 d-none">
-                    <label class="fw-bold small">JSON Daten (Anatomie Multi / Sortieren / Zuordnung / Berechnung)</label>
-                    <textarea class="form-control font-monospace small" rows="5" id="json_editor"></textarea>
-                    <small class="text-muted">Achtung: Nur für fortgeschrittene Bearbeitung.</small>
+                    <label class="fw-bold small">JSON Daten</label>
+                    <textarea name="ordering_json" class="form-control font-monospace" rows="5">{{ card.options }}</textarea>
+                    <div class="form-text small">Für "Sortieren": <code>["A", "B", "C"]</code><br>Für "Zuordnung": <code>[{"name":"Gruppe1", "items":["A","B"]}]</code></div>
                 </div>
 
-                <div class="d-flex justify-content-between mt-4">
-                    <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Abbrechen</a>
-                    <button class="btn btn-primary rounded-pill px-5">Speichern</button>
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Änderungen speichern</button>
                 </div>
             </form>
         </div>
@@ -81,41 +104,87 @@
 </div>
 
 <script>
-    const type = "{{ card.type }}";
-    const multiData = `{{ multi_json|safe }}`;
-    const orderingData = `{{ ordering_json|safe }}`;
-    const assignData = `{{ assignment_json|safe }}`;
-    const calcData = `{{ calc_json if calc_json else card.options|safe }}`;
+let nextId = 1;
 
-    function updateFormFields() {
-        const t = document.getElementById('typeSelect').value;
-        ['field_standard_answer','field_options','field_anatomy','field_json'].forEach(id=>document.getElementById(id).classList.add('d-none'));
-        
-        if(t==='flashcard'||t==='mc') { 
-            document.getElementById('field_standard_answer').classList.remove('d-none'); 
-            if(t==='mc') document.getElementById('field_options').classList.remove('d-none'); 
-        }
-        else if(t==='anatomy') document.getElementById('field_anatomy').classList.remove('d-none');
-        else {
-            // JSON basierte Typen
-            document.getElementById('field_json').classList.remove('d-none');
-            const editor = document.getElementById('json_editor');
-            if(t==='anatomy_multi') editor.value = multiData;
-            else if(t==='ordering') editor.value = orderingData;
-            else if(t==='assignment') editor.value = assignData;
-            else if(t==='calculation') editor.value = calcData;
+// Daten aus dem Backend (sicher als JSON parsen)
+const cardType = "{{ card.type }}";
+let multiData = [];
+try {
+    multiData = {{ card.options | tojson | safe }};
+    if (typeof multiData === 'string') multiData = JSON.parse(multiData);
+} catch(e) { multiData = []; }
+
+function updateFormFields() {
+    const type = document.getElementById('typeSelect').value;
+    
+    // Alle ausblenden
+    ['field_standard_answer','field_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id => {
+        document.getElementById(id).classList.add('d-none');
+    });
+
+    // Je nach Typ einblenden
+    if (type === 'flashcard' || type === 'mc') {
+        document.getElementById('field_standard_answer').classList.remove('d-none');
+        if (type === 'mc') document.getElementById('field_options').classList.remove('d-none');
+    }
+    else if (type === 'anatomy') {
+        document.getElementById('field_anatomy').classList.remove('d-none');
+    }
+    else if (type === 'anatomy_multi') {
+        document.getElementById('field_anatomy_multi').classList.remove('d-none');
+        // Tabelle füllen, falls noch leer
+        if (document.getElementById('multiTableBody').children.length === 0) {
+            initMultiRows();
         }
     }
-    
-    function prepareMultiJson() {
-        const t = document.getElementById('typeSelect').value;
-        const val = document.getElementById('json_editor').value;
-        if(t==='anatomy_multi') document.getElementById('multi_json_input').value = val;
-        else if(t==='ordering') document.getElementById('ordering_json_input').value = val;
-        else if(t==='assignment') document.getElementById('assignment_json_input').value = val;
-        else if(t==='calculation') document.getElementById('calc_json_input').value = val;
+    else if (type === 'ordering' || type === 'assignment' || type === 'calculation') {
+        document.getElementById('field_json').classList.remove('d-none');
     }
+}
+
+function addMultiRow(data = null) {
+    const tbody = document.getElementById('multiTableBody');
+    const idVal = data ? data.id : nextId++;
+    const deVal = data ? data.de : '';
+    const latVal = data ? data.lat : '';
     
-    document.addEventListener('DOMContentLoaded', updateFormFields);
+    const row = `
+        <tr>
+            <td><input class="form-control form-control-sm row-id" value="${idVal}"></td>
+            <td><input class="form-control form-control-sm row-de" value="${deVal}"></td>
+            <td><input class="form-control form-control-sm row-lat" value="${latVal}"></td>
+            <td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()">X</button></td>
+        </tr>
+    `;
+    tbody.insertAdjacentHTML('beforeend', row);
+}
+
+function initMultiRows() {
+    if (Array.isArray(multiData)) {
+        multiData.forEach(item => addMultiRow(item));
+        // Update nextId
+        const maxId = multiData.reduce((max, item) => Math.max(max, parseInt(item.id) || 0), 0);
+        nextId = maxId + 1;
+    } else {
+        addMultiRow();
+    }
+}
+
+function prepareMultiJson() {
+    if (document.getElementById('typeSelect').value === 'anatomy_multi') {
+        const rows = [];
+        document.querySelectorAll('#multiTableBody tr').forEach(tr => {
+            rows.push({
+                id: tr.querySelector('.row-id').value,
+                de: tr.querySelector('.row-de').value,
+                lat: tr.querySelector('.row-lat').value
+            });
+        });
+        document.getElementById('multi_json_input').value = JSON.stringify(rows);
+    }
+}
+
+// Initial beim Laden ausführen
+document.addEventListener('DOMContentLoaded', updateFormFields);
 </script>
 {% endblock %}

@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from functools import wraps
+from sqlalchemy import or_
 from ..extensions import db
 from ..models import Card, User, Tag, DashboardMessage, CardReport, UserProgress
 
@@ -40,7 +41,6 @@ def build_admin_tree(cards):
             current = current[part]['_subs']
     return tree
 
-# Hilfsfunktion für Uploads
 def handle_upload(file_obj):
     if file_obj and allowed_file(file_obj.filename):
         fn = secure_filename(file_obj.filename)
@@ -61,16 +61,12 @@ def admin_dashboard():
         
         if 'question' in request.form:
             cat = request.form.get('category_path') or request.form.get('category_new') or request.form.get('category_select')
-            
             c = Card(category=cat, type=request.form['type'], question=request.form['question'])
             c.explanation = request.form.get('explanation', '')
             
-            # Bild Upload
             if 'image' in request.files:
                 url = handle_upload(request.files['image'])
                 if url: c.image_url = url
-            
-            # Audio Upload (NEU)
             if 'audio' in request.files:
                 url = handle_upload(request.files['audio'])
                 if url: c.audio_url = url
@@ -91,62 +87,101 @@ def admin_dashboard():
             return redirect(url_for('admin.admin_dashboard'))
 
     all_cards = Card.query.all()
-    med_cards = [c for c in all_cards if c.type == 'calculation']
-    case_cards = [c for c in all_cards if c.type == 'case_study']
     standard_cards_raw = [c for c in all_cards if c.type not in ['calculation', 'case_study']]
-    
     question_tree = build_admin_tree(standard_cards_raw)
-    categories_list = [c[0] for c in db.session.query(Card.category).distinct().all()]
-    reports = CardReport.query.filter_by(resolved=False).order_by(CardReport.created_at.desc()).all()
+    
+    reports = CardReport.query.options(db.joinedload(CardReport.card))\
+        .filter_by(resolved=False)\
+        .order_by(CardReport.created_at.desc()).all()
     
     return render_template('admin.html', 
                            question_tree=question_tree,
-                           med_cards=med_cards, 
-                           case_cards=case_cards, 
-                           categories=categories_list, 
+                           med_cards=[c for c in all_cards if c.type == 'calculation'], 
+                           case_cards=[c for c in all_cards if c.type == 'case_study'], 
+                           categories=[c[0] for c in db.session.query(Card.category).distinct().all()], 
                            tags=Tag.query.all(), 
                            messages=DashboardMessage.query.all(), 
                            reports=reports)
+
+@bp.route('/admin/bulk_delete', methods=['POST'])
+@admin_required
+def bulk_delete():
+    ids = request.form.getlist('selected_ids')
+    if not ids:
+        flash('Keine Fragen ausgewählt', 'warning')
+        return redirect(url_for('admin.admin_dashboard'))
+    count = 0
+    for cid in ids:
+        c = Card.query.get(int(cid))
+        if c:
+            UserProgress.query.filter_by(card_id=c.id).delete()
+            CardReport.query.filter_by(card_id=c.id).delete()
+            db.session.delete(c)
+            count += 1
+    db.session.commit()
+    flash(f'{count} Fragen gelöscht.', 'success')
+    return redirect(url_for('admin.admin_dashboard'))
 
 @bp.route('/admin/category/delete', methods=['POST'])
 @admin_required
 def delete_category():
     cat_name = request.form.get('category_name')
     if not cat_name: return redirect(url_for('admin.admin_dashboard'))
-    cards = Card.query.filter(Card.category.like(f"{cat_name}%")).all()
+    clean_name = cat_name.rstrip('/')
+    cards = Card.query.filter(or_(Card.category == clean_name, Card.category.like(f"{clean_name}/%"))).all()
     count = 0
     for c in cards:
         UserProgress.query.filter_by(card_id=c.id).delete()
+        CardReport.query.filter_by(card_id=c.id).delete()
         db.session.delete(c)
         count += 1
     db.session.commit()
-    flash(f'Kategorie "{cat_name}" und {count} enthaltene Fragen gelöscht.', 'success')
+    flash(f'Kategorie "{clean_name}" und {count} Fragen gelöscht.', 'success')
     return redirect(url_for('admin.admin_dashboard'))
 
-@bp.route('/admin/add_med', methods=['POST'])
+@bp.route('/admin/delete/<int:card_id>', methods=['POST'])
 @admin_required
-def add_med():
-    cat = request.form.get('category'); drug = request.form.get('drug_name')
-    config = { "var": "weight", "min": int(request.form.get('weight_min')), "max": int(request.form.get('weight_max')), "step": int(request.form.get('weight_step')), "unit": request.form.get('unit') }
-    question = f"{drug} Gabe: Patient wiegt {{weight}} kg."
-    c = Card(category=cat, type='calculation', question=question)
-    c.options = json.dumps(config)
-    c.answer = request.form.get('dosage_range')
-    db.session.add(c)
+def delete_card(card_id):
+    c = Card.query.get_or_404(card_id)
+    UserProgress.query.filter_by(card_id=card_id).delete()
+    CardReport.query.filter_by(card_id=card_id).delete()
+    db.session.delete(c)
     db.session.commit()
-    flash(f'Medikament {drug} angelegt.', 'success')
+    flash('Gelöscht', 'success')
     return redirect(url_for('admin.admin_dashboard'))
 
-@bp.route('/admin/add_case', methods=['POST'])
+@bp.route('/admin/edit/<int:card_id>', methods=['GET', 'POST'])
 @admin_required
-def add_case():
-    cat = request.form.get('category'); title = request.form.get('title'); intro = request.form.get('intro'); solution = request.form.get('solution')
-    c = Card(category=cat, type='case_study', question=f"**{title}**\n\n{intro}")
-    c.answer = f"### Lösung & Maßnahmen\n{solution}"
-    db.session.add(c)
-    db.session.commit()
-    flash('Fallbeispiel angelegt.', 'success')
+def edit_card(card_id):
+    card = Card.query.get_or_404(card_id)
+    if request.method == 'POST':
+        card.category = request.form.get('category_new') or card.category
+        card.question = request.form.get('question')
+        card.type = request.form.get('type')
+        card.answer = request.form.get('answer')
+        card.answer_lat = request.form.get('answer_lat')
+        card.explanation = request.form.get('explanation')
+        if 'image' in request.files:
+            url = handle_upload(request.files['image'])
+            if url: card.image_url = url
+        if 'audio' in request.files:
+            url = handle_upload(request.files['audio'])
+            if url: card.audio_url = url
+        db.session.commit()
+        flash('Gespeichert', 'success')
+        return redirect(url_for('admin.admin_dashboard'))
+    return render_template('edit_card.html', card=card)
+
+@bp.route('/admin/reports/dismiss/<int:rid>', methods=['POST'])
+@admin_required
+def dismiss_report(rid):
+    r = CardReport.query.get(rid)
+    if r:
+        r.resolved = True
+        db.session.commit()
     return redirect(url_for('admin.admin_dashboard'))
+
+# --- BENUTZER VERWALTUNG ---
 
 @bp.route('/admin/users')
 @admin_required
@@ -156,13 +191,17 @@ def admin_users():
 @bp.route('/admin/users/add', methods=['POST'])
 @admin_required
 def add_user():
-    if User.query.filter_by(username=request.form['username']).first():
-        flash('Existiert','danger')
+    username = request.form.get('username')
+    password = request.form.get('password')
+    is_admin = 'is_admin' in request.form
+    if User.query.filter_by(username=username).first():
+        flash('Benutzer existiert bereits!', 'danger')
     else:
-        u=User(username=request.form['username'], is_admin='is_admin' in request.form)
-        u.set_password(request.form['password'])
+        u = User(username=username, is_admin=is_admin)
+        u.set_password(password)
         db.session.add(u)
         db.session.commit()
+        flash('Benutzer angelegt.', 'success')
     return redirect(url_for('admin.admin_users'))
 
 @bp.route('/admin/users/edit/<int:uid>', methods=['POST'])
@@ -170,23 +209,50 @@ def add_user():
 def edit_user(uid):
     u = User.query.get_or_404(uid)
     u.username = request.form.get('username')
-    u.real_name = request.form.get('real_name')
     u.email = request.form.get('email')
+    u.real_name = request.form.get('real_name')
     u.is_admin = 'is_admin' in request.form
-    if request.form.get('new_password'):
-        u.set_password(request.form.get('new_password'))
+    new_pw = request.form.get('new_password')
+    if new_pw:
+        u.set_password(new_pw)
     db.session.commit()
-    flash('Gespeichert.', 'success')
+    flash('Benutzer aktualisiert.', 'success')
     return redirect(url_for('admin.admin_users'))
 
 @bp.route('/admin/users/delete/<int:uid>', methods=['POST'])
 @admin_required
 def delete_user(uid):
-    u=User.query.get(uid)
-    if u and u.username!='admin':
+    u = User.query.get_or_404(uid)
+    if u.username == 'admin':
+        flash('Der Haupt-Administrator kann nicht gelöscht werden!', 'danger')
+    else:
+        UserProgress.query.filter_by(user_id=u.id).delete()
+        CardReport.query.filter_by(user_id=u.id).delete()
         db.session.delete(u)
         db.session.commit()
+        flash('Benutzer gelöscht.', 'success')
     return redirect(url_for('admin.admin_users'))
+
+# --- WEITERE ADMIN ROUTEN ---
+
+@bp.route('/admin/add_med', methods=['POST'])
+@admin_required
+def add_med():
+    cat = request.form.get('category'); drug = request.form.get('drug_name')
+    config = { "var": "weight", "min": int(request.form.get('weight_min', 10)), "max": int(request.form.get('weight_max', 150)), "step": 1, "unit": request.form.get('unit', 'mg') }
+    c = Card(category=cat, type='calculation', question=f"{drug} Gabe: Patient wiegt {{weight}} kg.")
+    c.options = json.dumps(config)
+    c.answer = request.form.get('dosage_range', '0')
+    db.session.add(c); db.session.commit()
+    return redirect(url_for('admin.admin_dashboard'))
+
+@bp.route('/admin/add_case', methods=['POST'])
+@admin_required
+def add_case():
+    cat = request.form.get('category'); title = request.form.get('title')
+    c = Card(category=cat, type='case_study', question=f"**{title}**\n\n{request.form.get('intro')}")
+    c.answer = request.form.get('solution'); db.session.add(c); db.session.commit()
+    return redirect(url_for('admin.admin_dashboard'))
 
 @bp.route('/admin/messages', methods=['POST'])
 @admin_required
@@ -202,88 +268,16 @@ def delete_message(mid):
     db.session.commit()
     return redirect(url_for('admin.admin_dashboard'))
 
-@bp.route('/admin/reports/dismiss/<int:rid>', methods=['POST'])
+@bp.route('/admin/export')
 @admin_required
-def dismiss_report(rid):
-    r = CardReport.query.get(rid)
-    if r:
-        r.resolved=True
-        db.session.commit()
-    return redirect(url_for('admin.admin_dashboard'))
-
-@bp.route('/admin/delete/<int:card_id>', methods=['POST'])
-@admin_required
-def delete_card(card_id):
-    c = Card.query.get_or_404(card_id)
-    UserProgress.query.filter_by(card_id=card_id).delete()
-    db.session.delete(c)
-    db.session.commit()
-    flash('Gelöscht', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
-
-@bp.route('/admin/edit/<int:card_id>', methods=['GET', 'POST'])
-@admin_required
-def edit_card(card_id):
-    card = Card.query.get_or_404(card_id)
-    options_str = ''
-    if card.type == 'mc' and card.options:
-        try:
-            opts_list = json.loads(card.options)
-            if isinstance(opts_list, list): options_str = ", ".join(opts_list)
-            else: options_str = str(card.options)
-        except: options_str = card.options
-
-    if request.method == 'POST':
-        card.category = request.form.get('category_new')
-        card.question = request.form.get('question')
-        card.type = request.form.get('type')
-        card.answer = request.form.get('answer')
-        card.answer_lat = request.form.get('answer_lat')
-        card.explanation = request.form.get('explanation')
-
-        new_tags = request.form.get('tags_input', '')
-        card.tags = [] 
-        for t_name in new_tags.split(','):
-            if t_name.strip():
-                tag = Tag.query.filter_by(name=t_name.strip()).first()
-                if not tag:
-                    tag = Tag(name=t_name.strip())
-                    db.session.add(tag)
-                card.tags.append(tag)
-        
-        # Bild Upload
-        if 'image' in request.files:
-            url = handle_upload(request.files['image'])
-            if url: card.image_url = url
-            
-        # Audio Upload (NEU)
-        if 'audio' in request.files:
-            url = handle_upload(request.files['audio'])
-            if url: card.audio_url = url
-
-        if card.type == 'mc': 
-            opts_raw = request.form.get('options')
-            if opts_raw:
-                opts = [x.strip() for x in opts_raw.split(',')]
-                if card.answer and card.answer not in opts: opts.append(card.answer)
-                card.options = json.dumps(opts)
-            else: card.options = '[]'
-        elif card.type == 'anatomy_multi': card.options = request.form.get('multi_json')
-        elif card.type == 'ordering': card.options = request.form.get('ordering_json')
-        elif card.type == 'assignment': card.options = request.form.get('assignment_json')
-        elif card.type == 'calculation': card.options = request.form.get('calc_json')
-        
-        db.session.commit()
-        flash('Gespeichert', 'success')
-        return redirect(url_for('admin.admin_dashboard'))
-    return render_template('edit_card.html', card=card, options_str=options_str, multi_json=card.options if card.type=='anatomy_multi' else '[]', ordering_json=card.options if card.type=='ordering' else '[]', assignment_json=card.options if card.type=='assignment' else '[]')
+def export_data():
+    d={'cards':[{'q':c.question,'a':c.answer,'cat':c.category, 'type':c.type, 'opts':c.options, 'expl': c.explanation} for c in Card.query.all()]}
+    return Response(json.dumps(d, indent=2), mimetype='application/json', headers={'Content-Disposition':f'attachment;filename=topp-nfs-backup.json'})
 
 @bp.route('/admin/import', methods=['POST'])
 @admin_required
 def import_preview():
-    if 'file' not in request.files:
-        flash('Kein File','danger')
-        return redirect(url_for('admin.admin_dashboard'))
+    if 'file' not in request.files: return redirect(url_for('admin.admin_dashboard'))
     file = request.files['file']
     try:
         stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
@@ -291,17 +285,10 @@ def import_preview():
         preview_data = []
         for row in csv_input:
             if len(row) < 4: continue
-            item = {'category': row[0], 'type': row[1], 'question': row[2], 'answer': row[3]}
-            if len(row) > 4: item['options'] = row[4]
-            if len(row) > 5: item['explanation'] = row[5]
-            else: item['explanation'] = ''
-            
+            item = {'category': row[0], 'type': row[1], 'question': row[2], 'answer': row[3], 'options': row[4] if len(row) > 4 else '', 'explanation': row[5] if len(row) > 5 else ''}
             existing = Card.query.filter_by(question=item['question']).first()
-            if existing:
-                item['is_duplicate'] = True
-                item['existing_id'] = existing.id
-            else:
-                item['is_duplicate'] = False
+            item['is_duplicate'] = True if existing else False
+            if existing: item['existing_id'] = existing.id
             preview_data.append(item)
         return render_template('admin_import_preview.html', data=preview_data, json_data=json.dumps(preview_data))
     except Exception as e:
@@ -313,65 +300,17 @@ def import_preview():
 def import_confirm():
     try:
         data = json.loads(request.form.get('json_data'))
-        count_new = 0
-        count_overwritten = 0
-        count_skipped = 0
         for i, item in enumerate(data):
             action = request.form.get(f'action_{i}', 'new')
-            if item.get('is_duplicate') and action == 'skip':
-                count_skipped += 1
-                continue
-            
-            final_options = None
-            if 'options' in item and item['options']:
-                if item['type'] == 'mc':
-                    opts = [x.strip() for x in item['options'].split(',')]
-                    if item['answer'] and item['answer'] not in opts: opts.append(item['answer'])
-                    final_options = json.dumps(opts)
-                else: final_options = item['options']
-
+            if item.get('is_duplicate') and action == 'skip': continue
             if item.get('is_duplicate') and action == 'overwrite':
                 c = Card.query.get(item.get('existing_id'))
-                if c:
-                    c.category = item['category']
-                    c.type = item['type']
-                    c.answer = item['answer']
-                    c.explanation = item.get('explanation', '')
-                    if final_options: c.options = final_options
-                    count_overwritten += 1
-                    continue
-            
-            c = Card(category=item['category'], type=item['type'], question=item['question'], answer=item['answer'])
-            c.explanation = item.get('explanation', '')
-            if final_options: c.options = final_options
-            db.session.add(c)
-            count_new += 1
-            
+            else:
+                c = Card(question=item['question'])
+                db.session.add(c)
+            c.category, c.type, c.answer, c.explanation = item['category'], item['type'], item['answer'], item.get('explanation', '')
+            c.options = item.get('options')
         db.session.commit()
-        flash(f'Import abgeschlossen: {count_new} neu, {count_overwritten} überschrieben, {count_skipped} übersprungen.', 'success')
+        flash('Import erfolgreich.', 'success')
     except Exception as e: flash(f'Import Fehler: {e}', 'danger')
     return redirect(url_for('admin.admin_dashboard'))
-
-@bp.route('/admin/bulk_delete', methods=['POST'])
-@admin_required
-def bulk_delete():
-    ids = request.form.getlist('selected_ids')
-    if not ids:
-        flash('Keine Fragen ausgewählt', 'warning')
-        return redirect(url_for('admin.admin_dashboard'))
-    count = 0
-    for cid in ids:
-        c = Card.query.get(int(cid))
-        if c:
-            UserProgress.query.filter_by(card_id=cid).delete()
-            db.session.delete(c)
-            count += 1
-    db.session.commit()
-    flash(f'{count} Fragen gelöscht.', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
-
-@bp.route('/admin/export')
-@admin_required
-def export_data():
-    d={'cards':[{'q':c.question,'a':c.answer,'cat':c.category, 'type':c.type, 'opts':c.options, 'expl': c.explanation} for c in Card.query.all()]}
-    return Response(json.dumps(d, indent=2), mimetype='application/json', headers={'Content-Disposition':f'attachment;filename=topp-nfs-backup.json'})

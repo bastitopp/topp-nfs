@@ -14,7 +14,8 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///local.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = 'static/uploads'
-    
+    app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
+
     # --- E-MAIL KONFIGURATION ---
     app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER')
     

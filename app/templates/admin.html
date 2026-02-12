@@ -28,12 +28,28 @@
                 <div class="card-body bg-light">
                     <form method="POST" enctype="multipart/form-data" id="questionForm" onsubmit="prepareMultiJson()">
                         <input type="hidden" name="multi_json" id="multi_json_input">
+                        
                         <div class="row g-3 mb-3">
-                            <div class="col-md-8"><label class="fw-bold small">Kategorie-Pfad</label><input type="text" name="category_path" class="form-control" list="catList" required><datalist id="catList">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist></div>
-                            <div class="col-md-4"><label class="fw-bold small">Typ</label><select name="type" id="typeSelect" class="form-select" onchange="updateFormFields()"><option value="flashcard">Karteikarte</option><option value="mc">Multiple Choice</option><option value="anatomy">Anatomie</option><option value="anatomy_multi">Anatomie Multi</option><option value="ordering">Sortieren</option><option value="assignment">Zuordnung</option></select></div>
+                            <div class="col-md-8">
+                                <label class="fw-bold small">Kategorie-Pfad</label>
+                                <input type="text" name="category_path" class="form-control" list="catList" required>
+                                <datalist id="catList">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="fw-bold small">Typ</label>
+                                <select name="type" id="typeSelect" class="form-select" onchange="updateFormFields()">
+                                    <option value="flashcard">Karteikarte</option>
+                                    <option value="mc">Multiple Choice</option>
+                                    <option value="anatomy">Anatomie</option>
+                                    <option value="anatomy_multi">Anatomie Multi</option>
+                                    <option value="ordering">Sortieren</option>
+                                    <option value="assignment">Zuordnung</option>
+                                </select>
+                            </div>
                         </div>
                         
-                        <label class="fw-bold small">Frage / Titel</label><textarea name="question" class="form-control mb-3" rows="2" required></textarea>
+                        <label class="fw-bold small">Frage / Titel</label>
+                        <textarea name="question" class="form-control mb-3" rows="2" required></textarea>
                         
                         <label class="fw-bold small">Erklärung (Optional)</label>
                         <textarea name="explanation" class="form-control mb-3" rows="2" placeholder="Zusätzliche Infos, die nach der Antwort angezeigt werden..."></textarea>
@@ -43,11 +59,34 @@
                             <div class="col-md-6"><label class="fw-bold small">Audio (Optional)</label><input type="file" name="audio" class="form-control" accept="audio/*"></div>
                         </div>
 
-                        <div id="field_standard_answer" class="mb-3"><label class="fw-bold small">Richtige Antwort</label><input name="answer" class="form-control"></div>
-                        <div id="field_options" class="mb-3 d-none"><label class="fw-bold small">Optionen (Komma)</label><input name="options" class="form-control"></div>
-                        <div id="field_anatomy" class="row g-3 mb-3 d-none"><div class="col-md-6"><label class="fw-bold small">Deutsch</label><input name="answer_de_field" class="form-control"></div><div class="col-md-6"><label class="fw-bold small">Latein</label><input name="answer_lat" class="form-control"></div></div>
-                        <div id="field_anatomy_multi" class="mb-3 d-none p-3 bg-white rounded border"><label class="fw-bold small mb-2">Strukturen</label><table class="table table-sm table-bordered"><tbody id="multiTableBody"></tbody></table><button type="button" class="btn btn-sm btn-outline-success" onclick="addMultiRow()">+ Zeile</button></div>
-                        <div id="field_json" class="mb-3 d-none"><label class="fw-bold small">JSON</label><textarea name="ordering_json" class="form-control" rows="3"></textarea></div>
+                        <div id="field_standard_answer" class="mb-3">
+                            <label class="fw-bold small">Richtige Antwort</label>
+                            <input name="answer" class="form-control">
+                        </div>
+                        
+                        <div id="field_options" class="mb-3 d-none">
+                            <label class="fw-bold small">Optionen (Komma)</label>
+                            <input name="options" class="form-control">
+                        </div>
+                        
+                        <div id="field_anatomy" class="row g-3 mb-3 d-none">
+                            <div class="col-md-6"><label class="fw-bold small">Deutsch</label><input name="answer_de_field" class="form-control"></div>
+                            <div class="col-md-6"><label class="fw-bold small">Latein</label><input name="answer_lat" class="form-control"></div>
+                        </div>
+                        
+                        <div id="field_anatomy_multi" class="mb-3 d-none p-3 bg-white rounded border">
+                            <label class="fw-bold small mb-2">Strukturen</label>
+                            <table class="table table-sm table-bordered">
+                                <tbody id="multiTableBody"></tbody>
+                            </table>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addMultiRow()">+ Zeile</button>
+                        </div>
+                        
+                        <div id="field_json" class="mb-3 d-none">
+                            <label class="fw-bold small">JSON (Sortieren / Zuordnung)</label>
+                            <textarea name="ordering_json" class="form-control" rows="3" placeholder='["A", "B", "C"] oder [{"name":"Gr1", "items":["A"]}]'></textarea>
+                        </div>
+                        
                         <button class="btn btn-primary w-100 mt-4 rounded-pill">Speichern</button>
                     </form>
                 </div>
@@ -160,7 +199,24 @@
     </div>
 
     <div class="tab-pane fade" id="reports">
-        {% if reports %}<div class="list-group">{% for r in reports %}<div class="list-group-item d-flex justify-content-between"><div>{{r.reason}}</div><form action="{{ url_for('admin.dismiss_report', rid=r.id) }}" method="POST"><button class="btn btn-sm btn-success">OK</button></form></div>{% endfor %}</div>{% else %}Keine Meldungen.{% endif %}
+        {% if reports %}
+        <div class="list-group">
+            {% for r in reports %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="flex-grow-1">
+                    {% if r.card %}
+                        <div class="fw-bold">{{ r.card.category }} <span class="text-muted fw-normal">| {{ r.card.question|truncate(50) }}</span></div>
+                    {% else %}<div class="fw-bold text-muted">Karte gelöscht</div>{% endif %}
+                    <div class="text-danger small"><i class="bi bi-exclamation-circle"></i> {{ r.reason }}</div>
+                </div>
+                <div class="d-flex gap-2">
+                    {% if r.card %}<a href="{{ url_for('admin.edit_card', card_id=r.card.id) }}" class="btn btn-sm btn-outline-primary">Bearbeiten</a>{% endif %}
+                    <form action="{{ url_for('admin.dismiss_report', rid=r.id) }}" method="POST"><button class="btn btn-sm btn-success">OK</button></form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}Keine Meldungen.{% endif %}
     </div>
     
     <div class="tab-pane fade" id="messages">
@@ -188,33 +244,54 @@ let nextId = 1;
 function updateFormFields() {
     const type = document.getElementById('typeSelect').value;
     ['field_standard_answer','field_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id=>document.getElementById(id).classList.add('d-none'));
-    if(type==='flashcard'||type==='mc') { document.getElementById('field_standard_answer').classList.remove('d-none'); if(type==='mc') document.getElementById('field_options').classList.remove('d-none'); }
+    
+    if(type==='flashcard'||type==='mc') { 
+        document.getElementById('field_standard_answer').classList.remove('d-none'); 
+        if(type==='mc') document.getElementById('field_options').classList.remove('d-none'); 
+    }
     else if(type==='anatomy') document.getElementById('field_anatomy').classList.remove('d-none');
-    else if(type==='anatomy_multi') { document.getElementById('field_anatomy_multi').classList.remove('d-none'); if(nextId===1) addMultiRow(); }
+    else if(type==='anatomy_multi') { 
+        document.getElementById('field_anatomy_multi').classList.remove('d-none'); 
+        if(nextId===1 && document.getElementById('multiTableBody').children.length === 0) addMultiRow(); 
+    }
     else if(type==='ordering'||type==='assignment') document.getElementById('field_json').classList.remove('d-none');
 }
-function addMultiRow() { document.getElementById('multiTableBody').innerHTML += `<tr><td><input class="form-control form-control-sm row-id" value="${nextId++}"></td><td><input class="form-control form-control-sm row-de"></td><td><input class="form-control form-control-sm row-lat"></td><td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()">X</button></td></tr>`; }
+
+function addMultiRow() { 
+    document.getElementById('multiTableBody').innerHTML += `<tr><td><input class="form-control form-control-sm row-id" value="${nextId++}"></td><td><input class="form-control form-control-sm row-de" placeholder="DE"></td><td><input class="form-control form-control-sm row-lat" placeholder="LAT"></td><td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()">X</button></td></tr>`; 
+}
+
 function prepareMultiJson() {
     if(document.getElementById('typeSelect').value === 'anatomy_multi') {
         const rows = [];
-        document.querySelectorAll('#multiTableBody tr').forEach(tr => { rows.push({id: tr.querySelector('.row-id').value, de: tr.querySelector('.row-de').value, lat: tr.querySelector('.row-lat').value}); });
+        document.querySelectorAll('#multiTableBody tr').forEach(tr => { 
+            rows.push({
+                id: tr.querySelector('.row-id').value, 
+                de: tr.querySelector('.row-de').value, 
+                lat: tr.querySelector('.row-lat').value
+            }); 
+        });
         document.getElementById('multi_json_input').value = JSON.stringify(rows);
     }
 }
+
 function filterQuestions() {
-    let input = document.getElementById("adminSearchInput").value.toLowerCase();
-    let items = document.querySelectorAll(".list-group-item");
-    items.forEach(item => {
-        if(input.length === 0) {
-            item.style.display = "";
-            return;
-        }
-        if(item.innerText.toLowerCase().includes(input)) {
-            item.style.display = "";
-            let parentCollapse = item.closest('.collapse');
-            if(parentCollapse) parentCollapse.classList.add('show');
-        } else {
-            // Ausblenden-Logik hier vereinfacht, da rekursive Struktur
+    const input = document.getElementById("adminSearchInput").value.toLowerCase();
+    if (!input) {
+        document.querySelectorAll('.list-group-item, tbody tr').forEach(el => el.style.display = "");
+        return;
+    }
+    document.querySelectorAll('.list-group-item').forEach(el => el.style.display = "none");
+    document.querySelectorAll('tbody tr').forEach(tr => {
+        if (tr.innerText.toLowerCase().includes(input)) {
+            tr.style.display = "";
+            let parent = tr.closest('.list-group-item');
+            while (parent) {
+                parent.style.display = "";
+                const collapse = parent.querySelector('.collapse');
+                if(collapse) collapse.classList.add('show');
+                parent = parent.parentElement.closest('.list-group-item');
+            }
         }
     });
 }
