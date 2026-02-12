@@ -3,6 +3,34 @@
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
+<style>
+    .cursor-grab { cursor: grab; }
+    .cursor-grab:active { cursor: grabbing; }
+    .blink { animation: blinker 1s linear infinite; }
+    @keyframes blinker { 50% { opacity: 0; } }
+    .hover-shadow:hover { box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
+
+    /* NEU: Schraffierte Fläche für leere Felder */
+    .anatomy-empty-slot {
+        background-color: transparent !important;
+        background-image: linear-gradient(45deg, rgba(128, 128, 128, 0.1) 25%, transparent 25%, transparent 50%, rgba(128, 128, 128, 0.1) 50%, rgba(128, 128, 128, 0.1) 75%, transparent 75%, transparent) !important;
+        background-size: 10px 10px !important;
+        border: 1px dashed var(--bs-border-color) !important;
+        color: var(--bs-secondary-color) !important;
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Darkmode Anpassung */
+    [data-bs-theme="dark"] .anatomy-empty-slot {
+        background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent) !important;
+    }
+</style>
+
 <div class="sticky-top bg-white border-bottom shadow-sm py-2 mb-4" style="top: 70px; z-index: 1040;">
     <div class="container d-flex justify-content-between align-items-center" style="max-width: 800px;">
         <h5 class="m-0 fw-bold text-secondary"><i class="bi bi-stopwatch"></i> Prüfung</h5>
@@ -69,8 +97,26 @@
                     {% for part in parts %}
                     <div class="row g-2 mb-2 align-items-center">
                         <div class="col-1 fw-bold text-center bg-secondary bg-opacity-10 rounded py-1">{{ part.id }}</div>
-                        <div class="col"><input type="text" name="q_{{ card.id }}_{{ part.id }}_de" class="form-control form-control-sm" placeholder="Deutsch" autocomplete="off"></div>
-                        <div class="col"><input type="text" name="q_{{ card.id }}_{{ part.id }}_lat" class="form-control form-control-sm" placeholder="Latein" autocomplete="off"></div>
+                        
+                        <div class="col">
+                            {% if part.de in ['-', '%'] %}
+                                <div class="form-control form-control-sm anatomy-empty-slot" title="Feld entfällt">
+                                    <i class="bi bi-slash-lg small"></i>
+                                </div>
+                            {% else %}
+                                <input type="text" name="q_{{ card.id }}_{{ part.id }}_de" class="form-control form-control-sm" placeholder="Deutsch" autocomplete="off">
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col">
+                            {% if part.lat in ['-', '%'] %}
+                                <div class="form-control form-control-sm anatomy-empty-slot" title="Feld entfällt">
+                                    <i class="bi bi-slash-lg small"></i>
+                                </div>
+                            {% else %}
+                                <input type="text" name="q_{{ card.id }}_{{ part.id }}_lat" class="form-control form-control-sm" placeholder="Latein" autocomplete="off">
+                            {% endif %}
+                        </div>
                     </div>
                     {% endfor %}
 

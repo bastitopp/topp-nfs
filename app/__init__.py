@@ -13,7 +13,10 @@ def create_app():
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'geheimnis_fuer_topp_nfs_dev_key')
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///local.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['UPLOAD_FOLDER'] = 'static/uploads'
+    
+    # FIX: Absoluten Pfad verwenden, damit Docker/Gunicorn den richtigen Ordner treffen
+    app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
+    
     app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
     # --- E-MAIL KONFIGURATION ---
@@ -77,6 +80,4 @@ def create_app():
 
     return app
 
-# --- WICHTIG: Diese Zeile hat gefehlt! ---
-# Sie erstellt die 'app' Variable, die Gunicorn sucht.
 app = create_app()
