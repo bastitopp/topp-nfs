@@ -41,27 +41,22 @@
         font-size: 0.7em; margin-right: 10px; font-family: monospace;
     }
 
-    /* NEU: Schraffierte Fläche für leere Felder */
+    /* Schraffiertes Design für leere Felder (identisch zur Prüfung) */
     .anatomy-empty-slot {
-        /* Hintergrund transparent machen, um das Weiß zu verhindern */
         background-color: transparent !important;
-        /* Schräge Streifen (Hatching) erzeugen */
         background-image: linear-gradient(45deg, rgba(128, 128, 128, 0.1) 25%, transparent 25%, transparent 50%, rgba(128, 128, 128, 0.1) 50%, rgba(128, 128, 128, 0.1) 75%, transparent 75%, transparent) !important;
         background-size: 10px 10px !important;
-        
-        /* Rahmen dezent und gestrichelt */
         border: 1px dashed var(--bs-border-color) !important;
         color: var(--bs-secondary-color) !important;
-        
+        opacity: 0.6;
         cursor: not-allowed;
         box-shadow: none !important;
         display: flex;
         align-items: center;
         justify-content: center;
-        opacity: 0.6;
+        height: 38px;
     }
     
-    /* Darkmode-spezifische Anpassung für die Streifen (falls nötig) */
     [data-bs-theme="dark"] .anatomy-empty-slot {
         background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent) !important;
     }
@@ -219,8 +214,22 @@
                         <input type="hidden" name="start_time" value="{{ start_time }}">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
                         <div class="row g-3">
-                            <div class="col-md-6"><label class="fw-bold small">Deutsch</label><input type="text" name="input_de" class="form-control form-control-lg" autocomplete="off" {% if not card.answer %}disabled placeholder="Entfällt"{% endif %}></div>
-                            <div class="col-md-6"><label class="fw-bold small">Latein</label><input type="text" name="input_lat" class="form-control form-control-lg" autocomplete="off" {% if not card.answer_lat %}disabled placeholder="Entfällt"{% endif %}></div>
+                            <div class="col-md-6">
+                                <label class="fw-bold small">Deutsch</label>
+                                {% if not card.answer %}
+                                    <div class="form-control anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
+                                {% else %}
+                                    <input type="text" name="input_de" class="form-control form-control-lg" autocomplete="off">
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold small">Latein</label>
+                                {% if not card.answer_lat %}
+                                    <div class="form-control anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
+                                {% else %}
+                                    <input type="text" name="input_lat" class="form-control form-control-lg" autocomplete="off">
+                                {% endif %}
+                            </div>
                         </div>
                         <button class="btn btn-primary w-100 mt-4 rounded-pill">Prüfen</button>
                     </form>
@@ -240,22 +249,22 @@
                             <div class="col-1 fw-bold text-center bg-light rounded">{{ item.id }}</div>
                             
                             <div class="col">
-                                {% if item.de in ['-', '%'] %}
+                                {% if item.de in ['-', '%'] or not item.de %}
                                     <div class="form-control anatomy-empty-slot" title="Feld entfällt">
                                         <i class="bi bi-slash-lg small"></i>
                                     </div>
                                 {% else %}
-                                    <input name="de_{{ item.id }}" class="form-control" placeholder="Deutsch" autocomplete="off" {% if not item.de %}disabled{% endif %}>
+                                    <input name="de_{{ item.id }}" class="form-control" placeholder="Deutsch" autocomplete="off">
                                 {% endif %}
                             </div>
                             
                             <div class="col">
-                                {% if item.lat in ['-', '%'] %}
+                                {% if item.lat in ['-', '%'] or not item.lat %}
                                     <div class="form-control anatomy-empty-slot" title="Feld entfällt">
                                         <i class="bi bi-slash-lg small"></i>
                                     </div>
                                 {% else %}
-                                    <input name="lat_{{ item.id }}" class="form-control" placeholder="Latein" autocomplete="off" {% if not item.lat %}disabled{% endif %}>
+                                    <input name="lat_{{ item.id }}" class="form-control" placeholder="Latein" autocomplete="off">
                                 {% endif %}
                             </div>
                         </div>

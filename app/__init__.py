@@ -1,4 +1,5 @@
 import os
+import json  # Import für den Filter hinzugefügt
 from datetime import datetime
 import markdown
 from markupsafe import Markup
@@ -13,9 +14,13 @@ def create_app():
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'geheimnis_fuer_topp_nfs_dev_key')
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///local.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    
+
     # FIX: Absoluten Pfad verwenden, damit Docker/Gunicorn den richtigen Ordner treffen
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
+    
+    # Sicherstellen, dass der Upload-Ordner existiert
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
     
     app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
@@ -24,7 +29,7 @@ def create_app():
     
     try:
         app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
-    except ValueError:
+    except (ValueError, TypeError):
         app.config['MAIL_PORT'] = 587
 
     use_tls = os.getenv('MAIL_USE_TLS', 'False').lower() in ['true', 'on', '1']
@@ -43,14 +48,18 @@ def create_app():
     limiter.init_app(app)
 
     # --- TEMPLATE FILTER ---
+    
+    # FIX: from_json Filter registrieren, um TemplateRuntimeError zu beheben
+    @app.template_filter('from_json')
+    def from_json_filter(value):
+        try:
+            return json.loads(value)
+        except (ValueError, TypeError):
+            return []
+
     @app.template_filter('markdown')
     def render_markdown(text):
         if not text: return ""
-        allowed_tags = [
-            'p', 'strong', 'em', 'ul', 'ol', 'li', 'br', 'h1', 'h2', 'h3', 
-            'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 
-            'details', 'summary'
-        ]
         rendered = markdown.markdown(text, extensions=['nl2br', 'tables', 'fenced_code', 'attr_list'])
         return Markup(rendered)
 

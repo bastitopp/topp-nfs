@@ -86,10 +86,17 @@ def submit(card_id):
                 ul = request.form.get(f"lat_{rid}",'').strip().lower()
                 correct_de = i.get('de','').strip().lower() if i.get('de') else ""
                 correct_lat = i.get('lat','').strip().lower() if i.get('lat') else ""
-                cde = (ud == correct_de) if correct_de else True
-                clat = (ul == correct_lat) if correct_lat else True
-                if (correct_de and not cde) or (correct_lat and not clat): sub = False
+                
+                # Nur prüfen, wenn Feld nicht als leer markiert ist
+                cde = (ud == correct_de) if correct_de not in ['-', '%', ''] else True
+                clat = (ul == correct_lat) if correct_lat not in ['-', '%', ''] else True
+                
+                if (correct_de and correct_de not in ['-', '%'] and not cde) or \
+                   (correct_lat and correct_lat not in ['-', '%'] and not clat): 
+                    sub = False
+                
                 res.append({'label': rid, 'user_de': request.form.get(f"de_{rid}",''), 'user_lat': request.form.get(f"lat_{rid}",''), 'correct_de': i.get('de'), 'correct_lat': i.get('lat'), 'is_de_ok': cde, 'is_lat_ok': clat})
+            
             update_progress(current_user, card, sub)
             award_badges(current_user)
             p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
@@ -187,7 +194,6 @@ def learn_errors():
 @bp.route('/exam')
 @login_required
 def exam_index():
-    # Setup Seite für die Prüfung
     valid_types = ['mc', 'anatomy', 'anatomy_multi', 'ordering', 'assignment', 'calculation']
     max_count = Card.query.filter(Card.type.in_(valid_types)).count()
     return render_template('exam_setup.html', max_questions=max_count)
@@ -199,23 +205,23 @@ def exam_start():
         count = int(request.form.get('question_count', 30))
     except: count = 30
     
-    valid = ['mc', 'anatomy', 'anatomy_multi', 'ordering', 'assignment', 'calculation']
-    questions = Card.query.filter(Card.type.in_(valid)).order_by(func.random()).limit(count).all()
+    # Verhältnis 1:15 für Anatomy Multi erzwingen
+    multi_count = max(1, count // 15)
+    multi_questions = Card.query.filter(Card.type == 'anatomy_multi').order_by(func.random()).limit(multi_count).all()
     
-    if not questions:
-        flash("Keine geeigneten Fragen gefunden.", "warning")
-        return redirect(url_for('learn.exam_index'))
-
+    other_types = ['mc', 'anatomy', 'ordering', 'assignment', 'calculation']
+    other_questions = Card.query.filter(Card.type.in_(other_types)).order_by(func.random()).limit(count - len(multi_questions)).all()
+    
+    questions = multi_questions + other_questions
+    random.shuffle(questions)
+    
     prepared = []
     exam_vars = {} 
-    
-    # Zeitberechnung
     total_seconds = 0
 
     for card in questions:
-        # Zeit addieren
         if card.type == 'mc': total_seconds += 45
-        else: total_seconds += 120 # 2 Minuten für komplexe Fragen
+        else: total_seconds += 120
 
         opts = []
         pool = [] 
@@ -227,10 +233,8 @@ def exam_start():
             
         if card.type == 'mc': 
             opts = get_mc_options(card)
-        
         elif card.type == 'ordering':
             random.shuffle(opts)
-            
         elif card.type == 'assignment':
             temp_pool = []
             for gr in opts:
@@ -238,7 +242,6 @@ def exam_start():
                     temp_pool.append({'val': item, 'group': gr.get('name')})
             random.shuffle(temp_pool)
             pool = temp_pool
-            
         elif card.type == 'calculation':
             try:
                 conf = opts
@@ -253,10 +256,7 @@ def exam_start():
         prepared.append({'card': card, 'options': opts, 'pool': pool, 'calc_data': calc_data})
     
     session['exam_vars'] = exam_vars
-    
-    # Auf Minuten runden (mindestens 1 Minute)
     est_time = max(1, round(total_seconds / 60))
-    
     return render_template('exam.html', questions=prepared, estimated_time=est_time)
 
 @bp.route('/exam/submit', methods=['POST'])
@@ -291,29 +291,30 @@ def exam_submit():
                 ul = request.form.get(f'q_{cid}_lat','').strip().lower()
                 sd = card.answer.strip().lower() if card.answer else ""
                 sl = card.answer_lat.strip().lower() if card.answer_lat else ""
-                
                 user_sol = json.dumps({'de': request.form.get(f'q_{cid}_de',''), 'lat': request.form.get(f'q_{cid}_lat','')})
                 correct_sol = json.dumps({'de': card.answer, 'lat': card.answer_lat})
-                
                 if ((not sd or ud==sd) and (not sl or ul==sl)): is_correct = True
 
             elif card.type == 'anatomy_multi':
                 try:
                     parts = json.loads(card.options)
                     correct_sol = card.options
-                    
                     user_parts = []
                     part_correct = True
                     for p in parts:
                         pid = str(p['id'])
-                        ud = request.form.get(f'q_{cid}_{pid}_de','').strip().lower()
-                        ul = request.form.get(f'q_{cid}_{pid}_lat','').strip().lower()
-                        sd = p.get('de','').strip().lower()
-                        sl = p.get('lat','').strip().lower()
+                        
+                        # Felder nur prüfen, wenn sie nicht mit - oder % markiert sind
+                        de_target = p.get('de','').strip().lower()
+                        lat_target = p.get('lat','').strip().lower()
+                        
+                        u_de = request.form.get(f'q_{cid}_{pid}_de','').strip().lower()
+                        u_lat = request.form.get(f'q_{cid}_{pid}_lat','').strip().lower()
                         
                         user_parts.append({'id': p['id'], 'de': request.form.get(f'q_{cid}_{pid}_de',''), 'lat': request.form.get(f'q_{cid}_{pid}_lat','')})
                         
-                        if (sd and ud!=sd) or (sl and ul!=sl): part_correct = False
+                        if de_target not in ['-', '%', ''] and u_de != de_target: part_correct = False
+                        if lat_target not in ['-', '%', ''] and u_lat != lat_target: part_correct = False
                     
                     user_sol = json.dumps(user_parts)
                     is_correct = part_correct
@@ -323,10 +324,9 @@ def exam_submit():
                 try:
                     u_raw = request.form.get(f'q_{cid}', '[]')
                     uo = json.loads(u_raw)
-                    opts = json.loads(card.options)
                     user_sol = u_raw
                     correct_sol = card.options
-                    if uo == opts: is_correct = True
+                    if uo == json.loads(card.options): is_correct = True
                 except: pass
 
             elif card.type == 'assignment':
@@ -334,10 +334,8 @@ def exam_submit():
                     u_raw = request.form.get(f'q_{cid}', '{}')
                     ud = json.loads(u_raw)
                     groups = json.loads(card.options)
-                    
                     user_sol = u_raw
                     correct_sol = card.options
-                    
                     assign_ok = True
                     for gr in groups:
                         target_items = set(gr.get('items', []))
@@ -350,38 +348,20 @@ def exam_submit():
                 u_var = float(exam_vars.get(str(cid), 0))
                 u_val_raw = request.form.get(f'q_{cid}', '0')
                 u_val = float(u_val_raw.replace(',', '.'))
-                
                 if '-' in card.answer: f_min, f_max = map(float, card.answer.split('-'))
                 else: f_min = f_max = float(card.answer)
                 t_min = u_var * f_min; t_max = u_var * f_max
-                
                 user_sol = f"{u_val_raw} (Faktor: {u_var})"
                 correct_sol = f"{t_min:.2f} - {t_max:.2f}"
-                
                 if round(t_min, 3) <= round(u_val, 3) <= round(t_max, 3): is_correct = True
 
             if is_correct: score += 1
-            
-            db.session.add(ExamDetail(
-                attempt_id=attempt.id, 
-                question_text=card.question, 
-                question_type=card.type, 
-                is_correct=is_correct,
-                user_solution=user_sol,
-                correct_solution=correct_sol
-            ))
-            
+            db.session.add(ExamDetail(attempt_id=attempt.id, question_text=card.question, question_type=card.type, is_correct=is_correct, user_solution=user_sol, correct_solution=correct_sol))
         except Exception as e: print(f"Exam check error card {cid}: {e}")
 
     attempt.score = score
     attempt.passed = (score >= (len(card_ids) * 0.6)) if card_ids else False
-    
-    if attempt.passed:
-        add_xp(current_user, 100)
-        flash(f"Prüfung bestanden! {score}/{len(card_ids)} Punkte (+100 XP)", "success")
-    else:
-        flash(f"Nicht bestanden. {score}/{len(card_ids)} Punkte.", "warning")
-        
+    if attempt.passed: add_xp(current_user, 100)
     db.session.commit()
     session.pop('exam_vars', None)
     return redirect(url_for('learn.review_exam', attempt_id=attempt.id))
@@ -392,25 +372,14 @@ def review_exam(attempt_id):
     att = ExamAttempt.query.get_or_404(attempt_id)
     if att.user_id != current_user.id and not current_user.is_admin: 
         flash("Zugriff verweigert", "danger"); return redirect(url_for('main.profile'))
-    
     res = []
     for d in att.details:
-        u_data = d.user_solution
-        c_data = d.correct_solution
-        
+        u_data, c_data = d.user_solution, d.correct_solution
         if d.question_type in ['anatomy', 'anatomy_multi', 'ordering', 'assignment']:
             try:
                 if u_data: u_data = json.loads(u_data)
                 if c_data: c_data = json.loads(c_data)
             except: pass
-            
-        res.append({
-            'question': d.question_text, 
-            'type': d.question_type, 
-            'is_correct': d.is_correct,
-            'user_data': u_data,
-            'correct_data': c_data
-        })
-        
+        res.append({'question': d.question_text, 'type': d.question_type, 'is_correct': d.is_correct, 'user_data': u_data, 'correct_data': c_data})
     percent = int((att.score / att.total_questions) * 100) if att.total_questions > 0 else 0
     return render_template('exam_result.html', score=att.score, total=att.total_questions, percent=percent, passed=att.passed, results=res, date=att.timestamp)
