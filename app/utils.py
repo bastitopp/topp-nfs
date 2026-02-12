@@ -1,10 +1,22 @@
 import json
 import random
+import difflib
 from datetime import datetime, timedelta
 from flask import render_template, flash
 from sqlalchemy.sql.expression import func, or_
 from .extensions import db
 from .models import UserProgress, Card, Badge
+
+def fuzzy_match(user_input, correct_answer, threshold=0.85):
+    """
+    Prüft, ob der User-Input ähnlich genug zur korrekten Antwort ist.
+    Beachtet dabei Groß-/Kleinschreibung und kleinere Tippfehler.
+    """
+    target = correct_answer.strip().lower() if correct_answer else ""
+    if target in ['-', '%', '']: return True
+    inp = user_input.strip().lower() if user_input else ""
+    if not inp: return False
+    return difflib.SequenceMatcher(None, inp, target).ratio() >= threshold
 
 def check_gamification(user):
     today = datetime.utcnow().date()
@@ -34,24 +46,42 @@ def award_badges(user):
             if b not in user.badges: user.badges.append(b); new.append(n)
     if new: db.session.commit(); flash(f"🏆 Neue Auszeichnung: {', '.join(new)}", "warning")
 
-def get_next_card(user, paths, force=False):
+def get_next_card(user, paths, force=False, exclude_id=None):
+    """Sucht die nächste fällige oder neue Karte, optional unter Ausschluss einer ID."""
     now = datetime.utcnow()
     conditions = [Card.category.like(f"{p}%") for p in paths]
     filter_cond = or_(*conditions)
-    query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id, filter_cond)
     
     # Prio 1: Überfällige Karten
+    due_query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id, filter_cond)
+    if exclude_id:
+        due_query = due_query.filter(Card.id != exclude_id)
+    
     if not force: 
-        due = query.filter(UserProgress.next_review <= now).order_by(func.random()).first()
+        due = due_query.filter(UserProgress.next_review <= now).order_by(func.random()).first()
         if due: return due.card, due
 
     # Prio 2: Neue Karten (noch nie gelernt)
     sub = db.session.query(UserProgress.card_id).filter(UserProgress.user_id==user.id)
-    new = Card.query.filter(filter_cond, ~Card.id.in_(sub)).order_by(func.random()).first()
+    new_query = Card.query.filter(filter_cond, ~Card.id.in_(sub))
+    if exclude_id:
+        new_query = new_query.filter(Card.id != exclude_id)
+        
+    new = new_query.order_by(func.random()).first()
     
-    # Fallback für "Lernen erzwingen": Einfach irgendeine Karte nehmen
+    # Fallback für "Lernen erzwingen"
     if not new and force:
-        return query.order_by(func.random()).first().card, None
+        fallback_query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id, filter_cond)
+        res = None
+        if exclude_id:
+            res = fallback_query.filter(Card.id != exclude_id).order_by(func.random()).first()
+        if not res: # Falls keine andere Karte außer der ausgeschlossenen existiert
+            res = fallback_query.order_by(func.random()).first()
+        return (res.card, None) if res else (None, None)
+        
+    # Wenn durch den Ausschluss nichts gefunden wurde, aber ohne Ausschluss was da wäre (Endlosschleife verhindern)
+    if not new and exclude_id:
+        return get_next_card(user, paths, force=force, exclude_id=None)
         
     return new, None
 
@@ -72,10 +102,8 @@ def update_progress(user, card, quality):
         elif p.box == 1: p.interval = 6
         else: p.interval = int(p.interval * p.easiness_factor)
         
-        # --- ALGORITHMUS VERFEINERUNG: FUZZING ---
-        # Verhindert "Clumping" (Kartenklumpen am selben Tag)
         if p.interval > 3:
-            fuzz = random.uniform(0.9, 1.1) # +/- 10% Variation
+            fuzz = random.uniform(0.9, 1.1) 
             p.interval = int(p.interval * fuzz)
             if p.interval < 3: p.interval = 3
             
@@ -83,31 +111,23 @@ def update_progress(user, card, quality):
     else:
         p.box = 0; p.interval = 0
 
-    # Easiness Factor Anpassung (SM-2 Standard)
     p.easiness_factor = p.easiness_factor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
     if p.easiness_factor < 1.3: p.easiness_factor = 1.3
     
-    # Nächstes Datum setzen
-    if p.interval == 0: delta = timedelta(minutes=5) # 5 Min Cooldown bei Fehler
+    if p.interval == 0: delta = timedelta(minutes=5)
     else: delta = timedelta(days=p.interval)
     
     p.next_review = datetime.utcnow() + delta
     db.session.commit()
 
 def get_learning_stats(user):
-    """Berechnet detaillierte Lernstatistiken für das Dashboard"""
     if not user.is_authenticated: return {'total':0, 'learned':0, 'due':0, 'new':0}
-    
     total = Card.query.count()
-    # Gelernt = Mindestens einmal Box > 0
     learned = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.box>0).count()
-    # Fällig = Review Datum in Vergangenheit
     due = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review <= datetime.utcnow()).count()
-    # Neu = Total - Einträge in Progress
     progress_count = UserProgress.query.filter_by(user_id=user.id).count()
     new = total - progress_count
     if new < 0: new = 0
-    
     return {'total': total, 'learned': learned, 'due': due, 'new': new}
 
 def build_category_tree(cards, user):

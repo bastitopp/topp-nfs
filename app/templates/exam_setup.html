@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
+        <div class="col-md-10 col-lg-8">
             <div class="card shadow border-0">
                 <div class="card-body p-5">
                     <div class="text-center mb-4">
@@ -11,21 +11,72 @@
                             <i class="bi bi-clipboard-check display-4"></i>
                         </div>
                         <h2 class="fw-bold">Prüfungsmodus</h2>
-                        <p class="text-muted">Simuliere eine echte Prüfungssituation. Die Fragen werden zufällig aus allen Bereichen gewählt.</p>
+                        <p class="text-muted">Simuliere eine echte Prüfungssituation. Wähle deine Kriterien aus.</p>
                     </div>
 
                     <form action="{{ url_for('learn.exam_start') }}" method="POST">
-                        <div class="mb-4">
-                            <label class="form-label fw-bold d-flex justify-content-between">
-                                <span>Anzahl der Fragen</span>
-                                <span class="badge bg-secondary">{{ max_questions }} Verfügbar</span>
-                            </label>
-                            <div class="d-flex align-items-center gap-3">
-                                <input type="range" class="form-range flex-grow-1" min="5" max="{{ max_questions if max_questions < 100 else 100 }}" value="30" id="qRange" name="question_count" oninput="updateVal(this.value)">
-                                <span class="h4 fw-bold text-primary mb-0" style="width: 50px; text-align: center;" id="qVal">30</span>
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold d-flex justify-content-between">
+                                    <span>Anzahl der Fragen</span>
+                                    <span class="badge bg-secondary">{{ max_questions }} Verfügbar</span>
+                                </label>
+                                <div class="d-flex align-items-center gap-3">
+                                    <input type="range" class="form-range flex-grow-1" min="5" max="{{ max_questions if max_questions < 100 else 100 }}" value="30" id="qRange" name="question_count" oninput="updateVal(this.value)">
+                                    <span class="h4 fw-bold text-primary mb-0" style="width: 50px; text-align: center;" id="qVal">30</span>
+                                </div>
+                                <div class="form-text mt-2">
+                                    <i class="bi bi-clock"></i> Geschätzte Dauer: <span id="timeEst">~45</span> Min.
+                                </div>
                             </div>
-                            <div class="form-text mt-2">
-                                <i class="bi bi-clock"></i> Geschätzte Dauer: <span id="timeEst">~45</span> Min.
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Optionen</label>
+                            <div class="card p-3 bg-light border-0">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="excludeAnatomy" name="exclude_anatomy">
+                                    <label class="form-check-label" for="excludeAnatomy">Anatomie (Single) ausschließen</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="excludeAnatomyMulti" name="exclude_anatomy_multi">
+                                    <label class="form-check-label" for="excludeAnatomyMulti">Anatomie (Multi) ausschließen</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Bereiche eingrenzen (optional)</label>
+                            <p class="small text-muted mb-3">Wenn nichts gewählt ist, werden alle Bereiche abgefragt.</p>
+                            
+                            <div class="list-group" style="max-height: 400px; overflow-y: auto;">
+                                {% macro render_tree(nodes, level=0) %}
+                                    {% for key, val in nodes.items() %}
+                                        <div class="list-group-item border-0 p-0 mb-1 bg-transparent">
+                                            <div class="d-flex align-items-center p-2 bg-white rounded-3 shadow-sm border" style="margin-left: {{ level * 20 }}px;">
+                                                <div class="me-3">
+                                                    <input class="form-check-input" type="checkbox" name="categories" value="{{ val._path }}">
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <span class="fw-bold small">{{ key }}</span>
+                                                    <span class="text-muted x-small ms-1">({{ val._stats.total }} Fragen)</span>
+                                                </div>
+                                                {% if val._subs %}
+                                                <a class="text-muted ms-2" data-bs-toggle="collapse" href="#collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}">
+                                                    <i class="bi bi-chevron-down small"></i>
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                            {% if val._subs %}
+                                                <div class="collapse" id="collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}">
+                                                    {{ render_tree(val._subs, level + 1) }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                {% endmacro %}
+
+                                {{ render_tree(tree) }}
                             </div>
                         </div>
 
@@ -50,8 +101,6 @@
 <script>
     function updateVal(val) {
         document.getElementById('qVal').innerText = val;
-        // Grobe Schätzung für die Vorschau (Mittelwert ca. 1.5 Min pro Frage um nicht zu komplex zu werden in JS)
-        // MC (0.75) vs Andere (2.0). Mix ist unbekannt. Gehen wir von 50/50 aus ~ 1.3 Min
         let est = Math.round(val * 1.3);
         document.getElementById('timeEst').innerText = "~" + est;
     }

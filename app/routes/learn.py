@@ -6,7 +6,8 @@ from flask_login import login_required, current_user
 from sqlalchemy.sql.expression import func, or_
 from ..extensions import db
 from ..models import Card, UserProgress, ExamAttempt, ExamDetail, CardReport
-from ..utils import get_next_card, update_progress, award_badges, render_learn_card, get_mc_options, add_xp
+from ..utils import (get_next_card, update_progress, award_badges, render_learn_card, 
+                     get_mc_options, add_xp, fuzzy_match, build_category_tree)
 
 bp = Blueprint('learn', __name__)
 
@@ -24,7 +25,9 @@ def learn_custom():
 def learn(category_path):
     paths = category_path.split('|')
     force = request.args.get('force') == 'true'
-    card, p = get_next_card(current_user, paths, force=force)
+    skip_id = request.args.get('skip_id', type=int)
+    
+    card, p = get_next_card(current_user, paths, force=force, exclude_id=skip_id)
     
     if not card: 
         conds = [Card.category.like(f"{p}%") for p in paths]
@@ -67,40 +70,31 @@ def submit(card_id):
             return render_template('quiz.html', card=card, options=opts_feedback, finished=False, feedback=True, user_answer=u, is_correct=corr, box=p.box if p else 0, current_category=origin)
         
         elif card.type == 'anatomy':
-            ud = request.form.get('input_de','').strip().lower()
-            ul = request.form.get('input_lat','').strip().lower()
-            sd = card.answer.strip().lower() if card.answer else ""
-            sl = card.answer_lat.strip().lower() if card.answer_lat else ""
-            corr = ((ud == sd) if sd else True) and ((ul == sl) if sl else True)
+            ud = request.form.get('input_de','')
+            ul = request.form.get('input_lat','')
+            res_de = fuzzy_match(ud, card.answer)
+            res_lat = fuzzy_match(ul, card.answer_lat)
+            corr = res_de and res_lat
             update_progress(current_user, card, corr)
             award_badges(current_user)
             p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
-            return render_template('quiz.html', card=card, finished=False, feedback_anatomy=True, result_de=(ud==sd), result_lat=(ul==sl if sl else True), box=p.box if p else 0, current_category=origin)
+            return render_template('quiz.html', card=card, finished=False, feedback_anatomy=True, is_correct=corr, result_de=res_de, result_lat=res_lat, box=p.box if p else 0, current_category=origin)
         
         elif card.type == 'anatomy_multi':
-            sub = True
+            all_correct = True
             res = []
             for i in card_opts:
                 rid = str(i.get('id'))
-                ud = request.form.get(f"de_{rid}",'').strip().lower()
-                ul = request.form.get(f"lat_{rid}",'').strip().lower()
-                correct_de = i.get('de','').strip().lower() if i.get('de') else ""
-                correct_lat = i.get('lat','').strip().lower() if i.get('lat') else ""
-                
-                # Nur prüfen, wenn Feld nicht als leer markiert ist
-                cde = (ud == correct_de) if correct_de not in ['-', '%', ''] else True
-                clat = (ul == correct_lat) if correct_lat not in ['-', '%', ''] else True
-                
-                if (correct_de and correct_de not in ['-', '%'] and not cde) or \
-                   (correct_lat and correct_lat not in ['-', '%'] and not clat): 
-                    sub = False
-                
-                res.append({'label': rid, 'user_de': request.form.get(f"de_{rid}",''), 'user_lat': request.form.get(f"lat_{rid}",''), 'correct_de': i.get('de'), 'correct_lat': i.get('lat'), 'is_de_ok': cde, 'is_lat_ok': clat})
-            
-            update_progress(current_user, card, sub)
+                ud = request.form.get(f"de_{rid}",'')
+                ul = request.form.get(f"lat_{rid}",'')
+                cde = fuzzy_match(ud, i.get('de'))
+                clat = fuzzy_match(ul, i.get('lat'))
+                if not cde or not clat: all_correct = False
+                res.append({'label': rid, 'user_de': ud, 'user_lat': ul, 'correct_de': i.get('de'), 'correct_lat': i.get('lat'), 'is_de_ok': cde, 'is_lat_ok': clat})
+            update_progress(current_user, card, all_correct)
             award_badges(current_user)
             p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
-            return render_template('quiz.html', card=card, finished=False, feedback_multi=True, multi_results=res, all_correct=sub, box=p.box if p else 0, current_category=origin)
+            return render_template('quiz.html', card=card, finished=False, feedback_multi=True, is_correct=all_correct, multi_results=res, all_correct=all_correct, box=p.box if p else 0, current_category=origin)
 
         elif card.type == 'ordering':
             try: uo = json.loads(request.form.get('order_json', '[]'))
@@ -109,7 +103,7 @@ def submit(card_id):
             update_progress(current_user, card, corr)
             award_badges(current_user)
             p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
-            return render_template('quiz.html', card=card, finished=False, feedback_ordering=True, user_order=uo, correct_order=card_opts, is_correct=corr, box=p.box if p else 0, current_category=origin)
+            return render_template('quiz.html', card=card, finished=False, feedback_ordering=True, is_correct=corr, user_order=uo, correct_order=card_opts, box=p.box if p else 0, current_category=origin)
 
         elif card.type == 'assignment':
             try: ud = json.loads(request.form.get('assignment_json', '{}'))
@@ -117,17 +111,13 @@ def submit(card_id):
             all_c = True
             res = []
             for g in card_opts:
-                gn = g.get('name')
-                ci = g.get('items', [])
-                ui = ud.get(gn, [])
+                gn = g.get('name'); ci = g.get('items', []); ui = ud.get(gn, [])
                 gr = {'name': gn, 'group_items': [], 'missing': []}
                 for i, u in enumerate(ui):
                     st = {'text': u}
-                    if u not in ci: 
-                        all_c = False; st['correct'] = False; st['reason'] = 'wrong_group'
+                    if u not in ci: all_c = False; st['correct'] = False; st['reason'] = 'wrong_group'
                     elif i < len(ci) and ci[i] == u: st['correct'] = True
-                    else: 
-                        all_c = False; st['correct'] = False; st['reason'] = 'wrong_order'
+                    else: all_c = False; st['correct'] = False; st['reason'] = 'wrong_order'
                     gr['group_items'].append(st)
                 for c in ci: 
                     if c not in ui: all_c = False; gr['missing'].append(c)
@@ -135,7 +125,7 @@ def submit(card_id):
             update_progress(current_user, card, all_c)
             award_badges(current_user)
             p = UserProgress.query.filter_by(user_id=current_user.id, card_id=card.id).first()
-            return render_template('quiz.html', card=card, finished=False, feedback_assignment=True, all_correct=all_c, assignment_results=res, box=p.box if p else 0, current_category=origin)
+            return render_template('quiz.html', card=card, finished=False, feedback_assignment=True, is_correct=all_c, all_correct=all_c, assignment_results=res, box=p.box if p else 0, current_category=origin)
 
         elif card.type == 'calculation':
             try:
@@ -195,8 +185,11 @@ def learn_errors():
 @login_required
 def exam_index():
     valid_types = ['mc', 'anatomy', 'anatomy_multi', 'ordering', 'assignment', 'calculation']
+    all_cards = Card.query.all()
+    # Erstellt den Kategorie-Baum für die Auswahl
+    tree = build_category_tree(all_cards, current_user)
     max_count = Card.query.filter(Card.type.in_(valid_types)).count()
-    return render_template('exam_setup.html', max_questions=max_count)
+    return render_template('exam_setup.html', max_questions=max_count, tree=tree)
 
 @bp.route('/exam/start', methods=['POST'])
 @login_required
@@ -205,14 +198,39 @@ def exam_start():
         count = int(request.form.get('question_count', 30))
     except: count = 30
     
-    # Verhältnis 1:15 für Anatomy Multi erzwingen
-    multi_count = max(1, count // 15)
-    multi_questions = Card.query.filter(Card.type == 'anatomy_multi').order_by(func.random()).limit(multi_count).all()
+    # Filter-Optionen aus dem Formular
+    cats = request.form.getlist('categories')
+    exclude_anatomy_single = 'exclude_anatomy' in request.form
+    exclude_anatomy_multi = 'exclude_anatomy_multi' in request.form
     
-    other_types = ['mc', 'anatomy', 'ordering', 'assignment', 'calculation']
-    other_questions = Card.query.filter(Card.type.in_(other_types)).order_by(func.random()).limit(count - len(multi_questions)).all()
+    base_query = Card.query
+    if cats:
+        # Filtert nach den gewählten Kategorien (und deren Unterkategorien)
+        conds = [Card.category.like(f"{c}%") for c in cats]
+        base_query = base_query.filter(or_(*conds))
     
-    questions = multi_questions + other_questions
+    questions = []
+    
+    # Anatomie Multi Logik
+    if not exclude_anatomy_multi:
+        multi_count = max(1, count // 15)
+        multi_questions = base_query.filter(Card.type == 'anatomy_multi').order_by(func.random()).limit(multi_count).all()
+        questions.extend(multi_questions)
+    
+    # Andere Typen Logik
+    other_types = ['mc', 'ordering', 'assignment', 'calculation']
+    if not exclude_anatomy_single:
+        other_types.append('anatomy')
+        
+    needed = count - len(questions)
+    if needed > 0:
+        other_questions = base_query.filter(Card.type.in_(other_types)).order_by(func.random()).limit(needed).all()
+        questions.extend(other_questions)
+    
+    if not questions:
+        flash("Keine Fragen gefunden, die den gewählten Filtern entsprechen.", "warning")
+        return redirect(url_for('learn.exam_index'))
+        
     random.shuffle(questions)
     
     prepared = []
@@ -287,13 +305,12 @@ def exam_submit():
                 if u_val == card.answer: is_correct = True
             
             elif card.type == 'anatomy':
-                ud = request.form.get(f'q_{cid}_de','').strip().lower()
-                ul = request.form.get(f'q_{cid}_lat','').strip().lower()
-                sd = card.answer.strip().lower() if card.answer else ""
-                sl = card.answer_lat.strip().lower() if card.answer_lat else ""
-                user_sol = json.dumps({'de': request.form.get(f'q_{cid}_de',''), 'lat': request.form.get(f'q_{cid}_lat','')})
+                ud = request.form.get(f'q_{cid}_de','')
+                ul = request.form.get(f'q_{cid}_lat','')
+                user_sol = json.dumps({'de': ud, 'lat': ul})
                 correct_sol = json.dumps({'de': card.answer, 'lat': card.answer_lat})
-                if ((not sd or ud==sd) and (not sl or ul==sl)): is_correct = True
+                if fuzzy_match(ud, card.answer) and fuzzy_match(ul, card.answer_lat): 
+                    is_correct = True
 
             elif card.type == 'anatomy_multi':
                 try:
@@ -303,19 +320,11 @@ def exam_submit():
                     part_correct = True
                     for p in parts:
                         pid = str(p['id'])
-                        
-                        # Felder nur prüfen, wenn sie nicht mit - oder % markiert sind
-                        de_target = p.get('de','').strip().lower()
-                        lat_target = p.get('lat','').strip().lower()
-                        
-                        u_de = request.form.get(f'q_{cid}_{pid}_de','').strip().lower()
-                        u_lat = request.form.get(f'q_{cid}_{pid}_lat','').strip().lower()
-                        
-                        user_parts.append({'id': p['id'], 'de': request.form.get(f'q_{cid}_{pid}_de',''), 'lat': request.form.get(f'q_{cid}_{pid}_lat','')})
-                        
-                        if de_target not in ['-', '%', ''] and u_de != de_target: part_correct = False
-                        if lat_target not in ['-', '%', ''] and u_lat != lat_target: part_correct = False
-                    
+                        u_de = request.form.get(f'q_{cid}_{pid}_de','')
+                        u_lat = request.form.get(f'q_{cid}_{pid}_lat','')
+                        user_parts.append({'id': p['id'], 'de': u_de, 'lat': u_lat})
+                        if not fuzzy_match(u_de, p.get('de')) or not fuzzy_match(u_lat, p.get('lat')):
+                            part_correct = False
                     user_sol = json.dumps(user_parts)
                     is_correct = part_correct
                 except: pass
