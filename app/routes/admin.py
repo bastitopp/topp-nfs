@@ -122,6 +122,39 @@ def bulk_delete():
     flash(f'{count} Fragen gelöscht.', 'success')
     return redirect(url_for('admin.admin_dashboard'))
 
+# --- NEU: KATEGORIE BEARBEITEN (UMBENENNEN / STRUKTUR ÄNDERN) ---
+@bp.route('/admin/category/edit', methods=['POST'])
+@admin_required
+def edit_category():
+    old_name = request.form.get('old_category_name', '').strip('/')
+    new_name = request.form.get('new_category_name', '').strip('/')
+    
+    if not old_name or not new_name:
+        flash('Ungültige Eingabe', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
+        
+    if old_name == new_name:
+        return redirect(url_for('admin.admin_dashboard'))
+
+    # 1. Exakte Matches aktualisieren (Fragen direkt in dieser Kategorie)
+    exact_cards = Card.query.filter(Card.category == old_name).all()
+    count = 0
+    for c in exact_cards:
+        c.category = new_name
+        count += 1
+        
+    # 2. Unterkategorien aktualisieren (Prefix ändern)
+    # Wenn old="Anatomie", new="Körper", dann wird "Anatomie/Knochen" zu "Körper/Knochen"
+    sub_cards = Card.query.filter(Card.category.like(f"{old_name}/%")).all()
+    for c in sub_cards:
+        # Ersetze den Start des Strings
+        c.category = new_name + c.category[len(old_name):]
+        count += 1
+        
+    db.session.commit()
+    flash(f'Kategorie "{old_name}" zu "{new_name}" geändert ({count} Fragen aktualisiert).', 'success')
+    return redirect(url_for('admin.admin_dashboard'))
+
 @bp.route('/admin/category/delete', methods=['POST'])
 @admin_required
 def delete_category():

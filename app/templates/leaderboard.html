@@ -1,56 +1,124 @@
 {% extends "layout.html" %}
+
 {% block content %}
-<h2 class="text-center mb-4">🏆 Ruhmeshalle</h2>
-<div class="row g-4">
-    <div class="col-md-6">
-        <div class="card border-primary h-100 shadow-sm">
-            <div class="card-header bg-primary text-white fw-bold">
-                <i class="bi bi-star-fill"></i> Top Performer (XP & Level)
-            </div>
-            <ul class="list-group list-group-flush">
+<div class="container py-4" style="max-width: 800px;">
+    <h2 class="fw-bold mb-4 text-center"><i class="bi bi-trophy-fill text-warning"></i> Bestenliste</h2>
+    
+    <ul class="nav nav-pills nav-fill mb-4 gap-2 p-1 bg-light rounded-pill" id="leaderTab" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active rounded-pill" data-bs-toggle="tab" data-bs-target="#xp">
+                <i class="bi bi-star-fill text-warning"></i> Nach XP
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill" data-bs-toggle="tab" data-bs-target="#time">
+                <i class="bi bi-clock-history text-info"></i> Nach Zeit
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill" data-bs-toggle="tab" data-bs-target="#streak">
+                <i class="bi bi-fire text-danger"></i> Nach Streak
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="xp">
+            <div class="list-group shadow-sm">
                 {% for u in by_xp %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="fw-bold">#{{ loop.index }}</span> {{ u.username }}
-                        <span class="badge bg-info text-dark ms-2">Lvl {{ u.get_level() }}</span>
+                    <div class="list-group-item d-flex align-items-center p-3 {{ 'bg-primary bg-opacity-10 border-primary' if current_user.id == u.id }}">
+                        <div class="fs-4 fw-bold me-3 text-muted" style="width: 40px; text-align: center;">
+                            {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}.{% endif %}
+                        </div>
+                        
+                        {% if u.profile_image %}
+                            <img src="{{ u.profile_image }}" class="rounded-circle me-3 border" width="50" height="50" style="object-fit: cover;">
+                        {% else %}
+                            <div class="rounded-circle me-3 bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center text-secondary fw-bold border" style="width: 50px; height: 50px;">
+                                {{ u.username[:2]|upper }}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="flex-grow-1">
+                            <h5 class="mb-0 fw-bold">
+                                {{ u.username }}
+                                {% if u.id == current_user.id %} <span class="badge bg-primary ms-1 small">Du</span>{% endif %}
+                            </h5>
+                            {% if u.real_name %}
+                                <div class="small text-muted">{{ u.real_name }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="text-end">
+                            <div class="fs-5 fw-bold text-primary">{{ u.xp }} XP</div>
+                            <div class="small text-muted">Level {{ u.get_level() }}</div>
+                        </div>
                     </div>
-                    <strong class="text-primary">{{ u.xp }} XP</strong>
-                </li>
                 {% endfor %}
-            </ul>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="card border-danger h-100 shadow-sm">
-            <div class="card-header bg-danger text-white fw-bold">
-                <i class="bi bi-fire"></i> Serie (Daily Streak)
             </div>
-            <ul class="list-group list-group-flush">
+        </div>
+
+        <div class="tab-pane fade" id="time">
+             <div class="list-group shadow-sm">
+                {% for u in by_time %}
+                    <div class="list-group-item d-flex align-items-center p-3 {{ 'bg-primary bg-opacity-10 border-primary' if current_user.id == u.id }}">
+                        <div class="fs-4 fw-bold me-3 text-muted" style="width: 40px; text-align: center;">
+                             {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}.{% endif %}
+                        </div>
+                        {% if u.profile_image %}
+                            <img src="{{ u.profile_image }}" class="rounded-circle me-3 border" width="50" height="50" style="object-fit: cover;">
+                        {% else %}
+                            <div class="rounded-circle me-3 bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center text-secondary fw-bold border" style="width: 50px; height: 50px;">
+                                {{ u.username[:2]|upper }}
+                            </div>
+                        {% endif %}
+                        <div class="flex-grow-1">
+                            <h5 class="mb-0 fw-bold">
+                                {{ u.username }}
+                                {% if u.id == current_user.id %} <span class="badge bg-primary ms-1 small">Du</span>{% endif %}
+                            </h5>
+                             {% if u.real_name %}
+                                <div class="small text-muted">{{ u.real_name }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            <div class="fs-5 fw-bold text-info">{{ u.total_learning_time | format_duration }}</div>
+                            <div class="small text-muted">Gelernt</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="streak">
+             <div class="list-group shadow-sm">
                 {% for u in by_streak %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span><span class="fw-bold">#{{ loop.index }}</span> {{ u.username }}</span>
-                    <strong class="text-danger">{{ u.streak }} Tage</strong>
-                </li>
+                    <div class="list-group-item d-flex align-items-center p-3 {{ 'bg-primary bg-opacity-10 border-primary' if current_user.id == u.id }}">
+                        <div class="fs-4 fw-bold me-3 text-muted" style="width: 40px; text-align: center;">
+                             {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}.{% endif %}
+                        </div>
+                        {% if u.profile_image %}
+                            <img src="{{ u.profile_image }}" class="rounded-circle me-3 border" width="50" height="50" style="object-fit: cover;">
+                        {% else %}
+                            <div class="rounded-circle me-3 bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center text-secondary fw-bold border" style="width: 50px; height: 50px;">
+                                {{ u.username[:2]|upper }}
+                            </div>
+                        {% endif %}
+                        <div class="flex-grow-1">
+                            <h5 class="mb-0 fw-bold">
+                                {{ u.username }}
+                                {% if u.id == current_user.id %} <span class="badge bg-primary ms-1 small">Du</span>{% endif %}
+                            </h5>
+                             {% if u.real_name %}
+                                <div class="small text-muted">{{ u.real_name }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            <div class="fs-5 fw-bold text-danger">{{ u.streak }} Tage</div>
+                            <div class="small text-muted">Serie</div>
+                        </div>
+                    </div>
                 {% endfor %}
-            </ul>
-        </div>
-    </div>
-
-    <div class="col-md-12 mt-4">
-        <div class="card border-warning shadow-sm">
-            <div class="card-header bg-warning text-dark fw-bold">
-                <i class="bi bi-hourglass-split"></i> Gesamte Lernzeit
-            </div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    {% for u in by_time %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><span class="fw-bold">#{{ loop.index }}</span> {{ u.username }}</span>
-                        <span class="text-muted">{{ u.total_learning_time|format_duration }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
             </div>
         </div>
     </div>

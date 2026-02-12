@@ -93,6 +93,31 @@
             </div>
         </div>
         
+        <div class="modal fade" id="editCategoryModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="{{ url_for('admin.edit_category') }}" method="POST">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Kategorie bearbeiten</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" name="old_category_name" id="oldCategoryInput">
+                            <div class="mb-3">
+                                <label class="form-label">Neuer Name / Pfad</label>
+                                <input type="text" name="new_category_name" id="newCategoryInput" class="form-control" required>
+                                <div class="form-text small">Dies ändert den Namen für alle enthaltenen Fragen und Unterkategorien.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                            <button type="submit" class="btn btn-primary">Speichern</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <form action="{{ url_for('admin.bulk_delete') }}" method="POST" id="bulkDeleteForm">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h5 class="fw-bold text-muted">Fragen nach Kategorie</h5>
@@ -103,6 +128,7 @@
                 {% macro render_admin_tree(nodes, level=0) %}
                     {% for key, val in nodes.items()|sort %}
                         {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') %}
+                        {% set raw_path = val._path | replace('/', '') if val._path.endswith('/') else val._path %}
                         
                         <div class="list-group-item border-0 p-0 mb-1 bg-transparent">
                             <div class="d-flex align-items-center p-2 bg-white rounded shadow-sm border position-relative" style="margin-left: {{ level * 20 }}px;">
@@ -113,7 +139,9 @@
                                 {% endif %}
                                 <span class="fw-bold flex-grow-1">{{ key }}</span>
                                 {% if val._cards %}<span class="badge bg-secondary me-2">{{ val._cards|length }} Fragen</span>{% endif %}
-                                <div class="z-2">
+                                <div class="z-2 d-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary border-0" onclick="openEditCategory('{{ val._path | trim('/') }}')" title="Kategorie umbenennen"><i class="bi bi-pencil"></i></button>
+                                    
                                     <button type="submit" form="delCatForm_{{ unique_id }}" class="btn btn-sm btn-outline-danger border-0" onclick="return confirm('ACHTUNG: Kategorie {{ key }} und ALLE Unterkategorien/Fragen unwiderruflich löschen?');" title="Ganze Kategorie löschen"><i class="bi bi-trash"></i></button>
                                 </div>
                             </div>
@@ -258,7 +286,8 @@ function updateFormFields() {
 }
 
 function addMultiRow() { 
-    document.getElementById('multiTableBody').innerHTML += `<tr><td><input class="form-control form-control-sm row-id" value="${nextId++}"></td><td><input class="form-control form-control-sm row-de" placeholder="DE"></td><td><input class="form-control form-control-sm row-lat" placeholder="LAT"></td><td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()">X</button></td></tr>`; 
+    const row = `<tr><td><input class="form-control form-control-sm row-id" value="${nextId++}"></td><td><input class="form-control form-control-sm row-de" placeholder="DE"></td><td><input class="form-control form-control-sm row-lat" placeholder="LAT"></td><td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()">X</button></td></tr>`;
+    document.getElementById('multiTableBody').insertAdjacentHTML('beforeend', row);
 }
 
 function prepareMultiJson() {
@@ -295,6 +324,13 @@ function filterQuestions() {
         }
     });
 }
+
+function openEditCategory(name) {
+    document.getElementById('oldCategoryInput').value = name;
+    document.getElementById('newCategoryInput').value = name;
+    new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
+}
+
 document.addEventListener('DOMContentLoaded', updateFormFields);
 </script>
 {% endblock %}

@@ -44,24 +44,6 @@
                                 {% endif %}
                             </td>
                         </tr>
-                        
-                        <div class="modal fade" id="editUser{{ u.id }}" tabindex="-1">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <form action="{{ url_for('admin.edit_user', uid=u.id) }}" method="POST">
-                                        <div class="modal-header"><h5 class="modal-title">Bearbeiten: {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                                        <div class="modal-body">
-                                            <div class="mb-3"><label class="form-label">Username</label><input name="username" class="form-control" value="{{ u.username }}" required></div>
-                                            <div class="mb-3"><label class="form-label">E-Mail</label><input name="email" class="form-control" value="{{ u.email }}"></div>
-                                            <div class="mb-3"><label class="form-label">Name</label><input name="real_name" class="form-control" value="{{ u.real_name }}"></div>
-                                            <div class="mb-3"><label class="form-label">Neues Passwort (leer lassen für keins)</label><input name="new_password" class="form-control" placeholder="***"></div>
-                                            <div class="form-check"><input type="checkbox" class="form-check-input" name="is_admin" id="adm{{u.id}}" {% if u.is_admin %}checked{% endif %}><label class="form-check-label" for="adm{{u.id}}">Administrator</label></div>
-                                        </div>
-                                        <div class="modal-footer"><button class="btn btn-primary">Speichern</button></div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -69,6 +51,26 @@
         </div>
     </div>
 </div>
+
+{% for u in users %}
+<div class="modal fade" id="editUser{{ u.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.edit_user', uid=u.id) }}" method="POST">
+                <div class="modal-header"><h5 class="modal-title">Bearbeiten: {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label class="form-label">Username</label><input name="username" class="form-control" value="{{ u.username }}" required></div>
+                    <div class="mb-3"><label class="form-label">E-Mail</label><input name="email" class="form-control" value="{{ u.email }}"></div>
+                    <div class="mb-3"><label class="form-label">Name</label><input name="real_name" class="form-control" value="{{ u.real_name }}"></div>
+                    <div class="mb-3"><label class="form-label">Neues Passwort (leer lassen für keins)</label><input name="new_password" class="form-control" placeholder="***"></div>
+                    <div class="form-check"><input type="checkbox" class="form-check-input" name="is_admin" id="adm{{u.id}}" {% if u.is_admin %}checked{% endif %}><label class="form-check-label" for="adm{{u.id}}">Administrator</label></div>
+                </div>
+                <div class="modal-footer"><button class="btn btn-primary">Speichern</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
 
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
