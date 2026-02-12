@@ -80,10 +80,11 @@ def reset_category(category_path):
 
 @bp.route('/leaderboard')
 def leaderboard(): 
+    # Änderung: Admin ausblenden (username != 'admin')
     return render_template('leaderboard.html', 
-                           by_xp=User.query.order_by(User.xp.desc()).limit(10).all(),
-                           by_time=User.query.order_by(User.total_learning_time.desc()).limit(10).all(), 
-                           by_streak=User.query.order_by(User.streak.desc()).limit(10).all())
+                           by_xp=User.query.filter(User.username != 'admin').order_by(User.xp.desc()).limit(10).all(),
+                           by_time=User.query.filter(User.username != 'admin').order_by(User.total_learning_time.desc()).limit(10).all(), 
+                           by_streak=User.query.filter(User.username != 'admin').order_by(User.streak.desc()).limit(10).all())
 
 @bp.route('/search')
 def search():
