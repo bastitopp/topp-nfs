@@ -15,13 +15,9 @@ def index():
         return redirect(url_for('auth.login'))
     
     check_gamification(current_user)
-    
-    # NEU: Detaillierte Statistiken aus utils.py
     global_stats = get_learning_stats(current_user)
-    
     all_cards = Card.query.all()
-    u = current_user if current_user.is_authenticated else type('obj', (object,), {'id':0, 'is_authenticated':False})
-    tree = build_category_tree(all_cards, u)
+    tree = build_category_tree(all_cards, current_user)
     msgs = DashboardMessage.query.filter_by(active=True).order_by(DashboardMessage.created_at.desc()).all()
     
     return render_template('index.html', tree=tree, messages=msgs, global_stats=global_stats)
@@ -80,7 +76,6 @@ def reset_category(category_path):
 
 @bp.route('/leaderboard')
 def leaderboard(): 
-    # Filtert den Benutzer 'admin' aus allen Bestenlisten-Abfragen heraus
     return render_template('leaderboard.html', 
                            by_xp=User.query.filter(User.username != 'admin').order_by(User.xp.desc()).limit(10).all(),
                            by_time=User.query.filter(User.username != 'admin').order_by(User.total_learning_time.desc()).limit(10).all(), 

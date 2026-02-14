@@ -32,11 +32,32 @@
                 </div>
             </div>
 
+            <div class="card border-0 shadow-sm mb-4 bg-light">
+                <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
+                    <span class="small text-muted fw-bold">Lern-Prognose:</span>
+                    <div>
+                        <span class="badge bg-white text-dark border me-1">+24h: <strong>{{ global_stats.f24 }}</strong></span>
+                        <span class="badge bg-white text-dark border">+48h: <strong>{{ global_stats.f48 }}</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            {% if global_stats.error_categories %}
+            <div class="mb-4">
+                <h6 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Deine Schwerpunkte:</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for cat, count in global_stats.error_categories %}
+                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-10 p-2">
+                        {{ cat }} ({{ count }})
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{{ url_for('learn.learn_errors') }}" class="btn btn-warning flex-grow-1 text-dark py-3 shadow-sm fw-bold"><i class="bi bi-bandaid"></i> Fehler üben</a>
             </div>
-        {% else %}
-            <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg mt-3 w-100">Jetzt anmelden</a>
         {% endif %}
     </div>
     
@@ -69,7 +90,7 @@
     
     <div class="list-group">
         {% macro render_tree(nodes, level=0) %}
-            {% for key, val in nodes.items() %}
+            {% for key, val in nodes | dictsort %}
                 <div class="list-group-item border-0 p-0 mb-2 bg-transparent">
                     <div class="d-flex align-items-center p-3 bg-body rounded-4 shadow-sm border position-relative" style="margin-left: {{ level * 15 }}px;">
                         
@@ -114,7 +135,7 @@
 </form>
 
 {% macro render_reset_forms(nodes, level=0) %}
-    {% for key, val in nodes.items() %}
+    {% for key, val in nodes | dictsort %}
         <form id="resetForm_{{ loop.index }}_{{ level }}" action="{{ url_for('main.reset_category', category_path=val._path) }}" method="POST" style="display:none;"></form>
         {% if val._subs %}
             {{ render_reset_forms(val._subs, level + 1) }}
