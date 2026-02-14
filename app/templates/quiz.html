@@ -5,23 +5,34 @@
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
 <style>
-    .cursor-grab { cursor: grab; }
-    .cursor-zoom { cursor: zoom-in; }
-    .flip-card { background-color: transparent; width: 100%; height: 450px; perspective: 1000px; }
-    .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
-    .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
-    .flip-card-front, .flip-card-back { 
-        position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 24px; 
-        display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; 
-        box-shadow: var(--shadow-soft); background: var(--bs-body-bg); border: 1px solid var(--bs-border-color);
-        color: var(--bs-body-color); 
-    }
-    .flip-card-back { transform: rotateY(180deg); background: var(--bs-tertiary-bg); border-color: var(--bs-primary); }
-    .shortcut-badge { display: inline-block; width: 20px; height: 20px; background: rgba(0,0,0,0.1); border-radius: 4px; text-align: center; line-height: 20px; font-size: 0.7em; margin-right: 10px; font-family: monospace; }
+    /* Verhindert das Springen der Card-Höhe bei Feedback */
+    .quiz-container { min-height: 520px; display: flex; flex-direction: column; }
+    .answer-section { flex-grow: 1; }
+
+    /* Stabiles Layout für MC-Optionen */
+    .mc-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
     
-    /* Modal Z-Index Fix */
-    .modal { z-index: 2000 !important; }
-    .modal-backdrop { z-index: 1999 !important; }
+    .btn-answer {
+        min-height: 64px;
+        display: flex;
+        align-items: center;
+        text-align: left;
+        border-width: 2px;
+        transition: transform 0.1s, background-color 0.2s;
+    }
+    
+    .btn-answer:active { transform: scale(0.98); }
+
+    .shortcut-badge { 
+        display: inline-block; width: 24px; height: 24px; background: rgba(0,0,0,0.1); 
+        border-radius: 4px; text-align: center; line-height: 24px; font-size: 0.8em; 
+        margin-right: 12px; font-family: monospace; flex-shrink: 0;
+    }
+
+    .explanation-box {
+        margin-top: 1.5rem; border-left: 4px solid var(--bs-info);
+        background: var(--bs-info-bg-subtle); padding: 1rem; border-radius: 8px;
+    }
 </style>
 
 <div class="container py-3" style="max-width: 800px;">
@@ -40,72 +51,85 @@
         </div>
     </div>
 
-    <div class="card p-4 shadow mb-4">
-        {% if feedback %}
-            <div class="alert alert-{{ 'success' if is_correct else 'danger' }} d-flex align-items-center gap-3 mb-4 shadow-sm">
-                <i class="bi bi-{{ 'check-circle' if is_correct else 'x-circle' }}-fill fs-3"></i>
-                <div><h5 class="alert-heading fw-bold mb-0">{{ 'Richtig!' if is_correct else 'Falsch' }}</h5>
-                {% if not is_correct %}<small>Richtige Antwort: <strong>{{ card.answer }}</strong></small>{% endif %}</div>
-            </div>
-        {% endif %}
-
+    <div class="card p-4 shadow mb-4 quiz-container">
         <div class="text-center mb-2"><span class="badge bg-primary bg-opacity-10 text-primary">{{ card.category }}</span></div>
         <div class="fw-bold text-center mb-4 fs-4">{{ (calc_data.question if card.type == 'calculation' and calc_data else card.question) | markdown }}</div>
 
-        {% if card.type == 'mc' %}
-            {% if feedback %}
-                <div class="d-grid gap-3">{% for opt in options %}
-                    <div class="btn p-3 rounded-4 {{ 'btn-success' if opt==card.answer else ('btn-danger' if opt==user_answer else 'btn-light') }}" style="pointer-events: none;">{{ opt | markdown }}</div>
-                {% endfor %}</div>
-            {% else %}
-                <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
-                    <input type="hidden" name="start_time" value="{{ now.timestamp() }}"><input type="hidden" name="origin_path" value="{{ current_category }}">
-                    <div class="d-grid gap-3">{% for opt in options %}<button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary p-3 text-start position-relative"><span class="shortcut-badge">{{ loop.index }}</span>{{ opt | markdown }}</button>{% endfor %}</div>
-                </form>
-            {% endif %}
-        {% elif card.type == 'calculation' %}
-            {% if feedback %}<div class="text-center py-3"><h1 class="display-6 fw-bold {{ 'text-success' if is_correct else 'text-danger' }}">{{ user_val }}</h1><p class="text-muted">Ziel: {{ result_text }}</p></div>
-            {% else %}
-                <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
-                    <input type="hidden" name="start_time" value="{{ now.timestamp() }}"><input type="hidden" name="origin_path" value="{{ current_category }}"><input type="hidden" name="calc_var" value="{{ calc_data.val }}">
-                    <div class="input-group input-group-lg mb-3"><input type="number" step="any" name="calc_input" class="form-control text-center fw-bold" placeholder="Dein Ergebnis" required autofocus></div>
-                    <button class="btn btn-primary w-100 rounded-pill btn-lg">Bestätigen</button>
-                </form>
-            {% endif %}
-        {% else %}
-             <div class="flip-card mx-auto mb-4" id="myCard" onclick="this.classList.toggle('flipped')">
-                 <div class="flip-card-inner">
-                     <div class="flip-card-front"><div class="fw-bold fs-4">{{ card.question | markdown }}</div></div>
-                     <div class="flip-card-back"><div class="fw-bold fs-4">{{ card.answer | markdown }}</div>
-                         <div class="mt-auto w-100 px-2 pb-2" onclick="event.stopPropagation();">
-                             <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" class="d-flex flex-wrap gap-2">
-                                 <input type="hidden" name="start_time" value="{{ now.timestamp() }}"><input type="hidden" name="origin_path" value="{{ current_category }}">
-                                 <button type="submit" name="result" value="0" class="btn btn-danger flex-grow-1">Nochmal<br><small>[1]</small></button>
-                                 <button type="submit" name="result" value="3" class="btn btn-warning flex-grow-1">Schwer<br><small>[2]</small></button>
-                                 <button type="submit" name="result" value="4" class="btn btn-success flex-grow-1">Gut<br><small>[3]</small></button>
-                                 <button type="submit" name="result" value="5" class="btn btn-primary flex-grow-1">Einfach<br><small>[4]</small></button>
-                             </form>
-                         </div>
-                     </div>
-                 </div>
-             </div>
+        {% if feedback %}
+            <div class="alert alert-{{ 'success' if is_correct else 'danger' }} d-flex align-items-center gap-3 mb-4 shadow-sm animate__animated animate__fadeIn">
+                <i class="bi bi-{{ 'check-circle' if is_correct else 'x-circle' }}-fill fs-3"></i>
+                <div>
+                    <h5 class="alert-heading fw-bold mb-0">{{ 'Richtig!' if is_correct else 'Leider falsch' }}</h5>
+                    {% if not is_correct %}<small>Richtige Antwort: <strong>{{ card.answer }}</strong></small>{% endif %}
+                </div>
+            </div>
         {% endif %}
 
+        <div class="answer-section">
+            {% if card.type == 'mc' %}
+                <div class="mc-grid">
+                    {% if feedback %}
+                        {% for opt in options %}
+                            <div class="btn-answer p-3 rounded-4 w-100 border {{ 'btn-success border-success text-white' if opt==card.answer else ('btn-danger border-danger text-white' if opt==user_answer else 'btn-light border-light') }}">
+                                <span class="shortcut-badge">{{ loop.index }}</span>
+                                <div>{{ opt | markdown }}</div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="quizForm">
+                            <input type="hidden" name="start_time" value="{{ now.timestamp() }}">
+                            <input type="hidden" name="origin_path" value="{{ current_category }}">
+                            <input type="hidden" name="shuffled_options" value='{{ options | tojson }}'>
+                            
+                            <div class="mc-grid">
+                                {% for opt in options %}
+                                    <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary btn-answer p-3 rounded-4">
+                                        <span class="shortcut-badge">{{ loop.index }}</span>
+                                        <div>{{ opt | markdown }}</div>
+                                    </button>
+                                {% endfor %}
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+            {% elif card.type == 'calculation' %}
+                {% if feedback %}
+                    <div class="text-center py-4">
+                        <h1 class="display-5 fw-bold {{ 'text-success' if is_correct else 'text-danger' }}">{{ user_val }}</h1>
+                        <p class="text-muted">Zielbereich: {{ result_text }}</p>
+                    </div>
+                {% else %}
+                    <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
+                        <input type="hidden" name="start_time" value="{{ now.timestamp() }}"><input type="hidden" name="origin_path" value="{{ current_category }}"><input type="hidden" name="calc_var" value="{{ calc_data.val }}">
+                        <div class="input-group input-group-lg mb-3">
+                            <input type="number" step="any" name="calc_input" class="form-control text-center fw-bold rounded-pill" placeholder="Dein Ergebnis" required autofocus>
+                        </div>
+                        <button class="btn btn-primary w-100 rounded-pill btn-lg shadow-sm">Bestätigen</button>
+                    </form>
+                {% endif %}
+            {% endif %}
+        </div>
+
         {% if feedback %}
-            {% if card.explanation %}<div class="mt-4 alert alert-info small markdown-content"><h6>Erklärung:</h6>{{ card.explanation | markdown }}</div>{% endif %}
+            {% if card.explanation %}
+                <div class="explanation-box small animate__animated animate__fadeIn">
+                    <h6 class="fw-bold"><i class="bi bi-info-circle"></i> Erklärung:</h6>
+                    <div class="markdown-content">{{ card.explanation | markdown }}</div>
+                </div>
+            {% endif %}
             
-            {% if is_correct %}
-                <div class="mt-4 pt-3 border-top text-center">
-                    <p class="small text-muted mb-3">Wie sicher warst du dir?</p>
+            <div class="mt-auto pt-4 border-top">
+                {% if is_correct %}
+                    <p class="small text-muted text-center mb-3">Wie sicher warst du dir?</p>
                     <form action="{{ url_for('learn.submit_quality', card_id=card.id) }}" method="POST" class="d-flex gap-2">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
-                        <button type="submit" name="quality" value="3" class="btn btn-outline-warning flex-grow-1 py-3 rounded-4"><b>Geraten</b></button>
-                        <button type="submit" name="quality" value="5" class="btn btn-outline-primary btn-quality-safe flex-grow-1 py-3 rounded-4"><b>Sicher</b></button>
+                        <button type="submit" name="quality" value="3" class="btn btn-outline-warning flex-grow-1 py-3 rounded-4 fw-bold">Geraten <small class="d-block text-muted">[1]</small></button>
+                        <button type="submit" name="quality" value="5" class="btn btn-outline-primary btn-quality-safe flex-grow-1 py-3 rounded-4 fw-bold shadow-sm">Sicher <small class="d-block text-muted">[2]</small></button>
                     </form>
-                </div>
-            {% else %}
-                <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-next-question w-100 mt-4 rounded-pill">Weiter [Enter]</a>
-            {% endif %}
+                {% else %}
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-next-question w-100 py-3 rounded-pill fw-bold shadow">Nächste Frage [Enter]</a>
+                {% endif %}
+            </div>
         {% endif %}
     </div>
 
@@ -114,13 +138,18 @@
             <form action="{{ url_for('learn.report_card', card_id=card.id) }}" method="POST" class="modal-content">
                 <div class="modal-header"><h5 class="modal-title">Fehler melden</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body"><textarea name="reason" class="form-control" rows="3" required placeholder="Beschreibung..."></textarea></div>
-                <div class="modal-footer"><button type="submit" class="btn btn-danger">Absenden</button></div>
+                <div class="modal-footer"><button type="submit" class="btn btn-danger rounded-pill">Absenden</button></div>
             </form>
         </div>
     </div>
 
     {% else %}
-        <div class="text-center py-5"><h1>🎉 Fertig!</h1><a href="{{ url_for('main.index') }}" class="btn btn-primary rounded-pill px-5 mt-4">Zur Übersicht</a></div>
+        <div class="text-center py-5">
+            <h1 class="display-3">🎉</h1>
+            <h1 class="fw-bold">Hervorragend!</h1>
+            <p class="text-muted">Du hast alle Fragen für heute erledigt.</p>
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary rounded-pill px-5 mt-4 shadow">Zur Übersicht</a>
+        </div>
         <script>confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });</script>
     {% endif %}
 </div>
@@ -137,18 +166,18 @@ document.addEventListener('keydown', function(event) {
         return;
     }
 
-    {% if not feedback %}
-    if (event.key.toLowerCase() === 's') document.getElementById('skipBtn')?.click();
-    const mcBtns = document.querySelectorAll('button[name="mc_answer"]');
-    if (mcBtns.length > 0 && !isNaN(event.key) && event.key > 0 && event.key <= mcBtns.length) mcBtns[event.key - 1].click();
+    {% if feedback and is_correct %}
+        if (event.key === '1') document.querySelector('button[value="3"]').click();
+        if (event.key === '2') document.querySelector('button[value="5"]').click();
     {% endif %}
 
-    const card = document.getElementById('myCard');
-    if (card && event.key === ' ') { event.preventDefault(); card.classList.toggle('flipped'); }
-    if (card?.classList.contains('flipped')) {
-        const btns = document.querySelectorAll('button[name="result"]');
-        if (['1','2','3','4'].includes(event.key)) btns[parseInt(event.key)-1].click();
-    }
+    {% if not feedback %}
+        if (event.key.toLowerCase() === 's') document.getElementById('skipBtn')?.click();
+        const mcBtns = document.querySelectorAll('button[name="mc_answer"]');
+        if (mcBtns.length > 0 && !isNaN(event.key) && event.key > 0 && event.key <= mcBtns.length) {
+            mcBtns[event.key - 1].click();
+        }
+    {% endif %}
 });
 </script>
 {% endblock %}

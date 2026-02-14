@@ -72,7 +72,15 @@ def submit(card_id):
         if card.type == 'mc':
             u = request.form.get('mc_answer')
             is_correct = (u == card.answer)
-            f_data = {'user_answer': u, 'options': get_mc_options(card)}
+            
+            # FIX: Übernehme die Reihenfolge aus dem Hidden-Field des Formulars
+            shuffled_json = request.form.get('shuffled_options')
+            if shuffled_json:
+                options = json.loads(shuffled_json)
+            else:
+                options = get_mc_options(card)
+                
+            f_data = {'user_answer': u, 'options': options}
         
         elif card.type == 'anatomy':
             ud = request.form.get('input_de','')
