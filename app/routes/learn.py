@@ -72,26 +72,18 @@ def submit(card_id):
         if card.type == 'mc':
             u = request.form.get('mc_answer')
             is_correct = (u == card.answer)
-            
-            # FIX: Übernehme die Reihenfolge aus dem Hidden-Field des Formulars
             shuffled_json = request.form.get('shuffled_options')
-            if shuffled_json:
-                options = json.loads(shuffled_json)
-            else:
-                options = get_mc_options(card)
-                
+            options = json.loads(shuffled_json) if shuffled_json else get_mc_options(card)
             f_data = {'user_answer': u, 'options': options}
         
         elif card.type == 'anatomy':
-            ud = request.form.get('input_de','')
-            ul = request.form.get('input_lat','')
-            res_de = fuzzy_match(ud, card.answer)
-            res_lat = fuzzy_match(ul, card.answer_lat)
+            ud, ul = request.form.get('input_de',''), request.form.get('input_lat','')
+            res_de, res_lat = fuzzy_match(ud, card.answer), fuzzy_match(ul, card.answer_lat)
             is_correct = res_de and res_lat
-            f_data = {'result_de': res_de, 'result_lat': res_lat}
+            f_data = {'result_de': res_de, 'result_lat': res_lat, 'user_de': ud, 'user_lat': ul}
         
         elif card.type == 'anatomy_multi':
-            all_c = True; res = []
+            all_c, res = True, []
             for i in card_opts:
                 rid = str(i.get('id'))
                 ud, ul = request.form.get(f"de_{rid}",''), request.form.get(f"lat_{rid}",'')
@@ -107,12 +99,12 @@ def submit(card_id):
 
         elif card.type == 'assignment':
             ud = json.loads(request.form.get('assignment_json', '{}'))
-            all_c = True; res = []
+            all_c, res = True, []
             for g in card_opts:
                 gn, ci, ui = g.get('name'), g.get('items', []), ud.get(gn, [])
                 gr = {'name': gn, 'group_items': [], 'missing': []}
                 for i, u in enumerate(ui):
-                    st = {'text': u, 'correct': (u in ci and (i < len(ci) and ci[i] == u))}
+                    st = {'text': u, 'correct': (u in ci)}
                     if not st['correct']: all_c = False
                     gr['group_items'].append(st)
                 for c in ci: 
@@ -141,13 +133,16 @@ def submit(card_id):
 @bp.route('/report/<int:card_id>', methods=['GET', 'POST'])
 @login_required
 def report_card(card_id):
+    """FIX: Meldet Fehler und leitet sauber zur nächsten Karte weiter (vermeidet 405)"""
     if request.method == 'POST':
         reason = request.form.get('reason')
+        origin = request.form.get('origin_path', 'Alle') 
         if reason:
             db.session.add(CardReport(card_id=card_id, user_id=current_user.id, reason=reason))
             db.session.commit()
             flash('Frage wurde gemeldet.', 'success')
-        return redirect(request.referrer or url_for('main.index'))
+        # Sicherer Redirect zur nächsten Lern-Karte statt Zurück-Funktion
+        return redirect(url_for('learn.learn', category_path=origin))
     return redirect(url_for('main.index'))
 
 @bp.route('/learn/errors')
@@ -158,7 +153,6 @@ def learn_errors():
     if not card: flash("Keine Fehler gefunden!", "success"); return redirect(url_for('main.index'))
     return render_learn_card(card, current_user, "errors")
 
-# --- PRÜFUNGSMODUS ---
 @bp.route('/exam')
 @login_required
 def exam_index():
@@ -186,14 +180,13 @@ def exam_start():
     for card in questions:
         total_s += 45 if card.type == 'mc' else 120
         opts = json.loads(card.options) if card.options else []
-        pool, calc_data = [], None
+        calc_data = None
         if card.type == 'mc': opts = get_mc_options(card)
-        elif card.type == 'ordering': random.shuffle(opts)
         elif card.type == 'calculation':
             val = random.randrange(opts.get('min',10), opts.get('max',150)+1, opts.get('step',1))
             exam_vars[str(card.id)] = val
             calc_data = {'question': card.question.replace('{weight}', str(val)), 'unit': opts.get('unit','')}
-        prepared.append({'card': card, 'options': opts, 'pool': pool, 'calc_data': calc_data})
+        prepared.append({'card': card, 'options': opts, 'calc_data': calc_data})
     
     session['exam_vars'] = exam_vars
     return render_template('exam.html', questions=prepared, estimated_time=max(1, round(total_s / 60)))
@@ -201,22 +194,84 @@ def exam_start():
 @bp.route('/exam/submit', methods=['POST'])
 @login_required
 def exam_submit():
-    score = 0; card_ids = request.form.getlist('card_ids'); attempt = ExamAttempt(user_id=current_user.id, total_questions=len(card_ids))
-    db.session.add(attempt); db.session.flush(); exam_vars = session.get('exam_vars', {})
+    score = 0
+    card_ids = request.form.getlist('card_ids')
+    attempt = ExamAttempt(user_id=current_user.id, total_questions=len(card_ids))
+    db.session.add(attempt)
+    db.session.flush()
+    exam_vars = session.get('exam_vars', {})
+
     for cid in card_ids:
-        card = Card.query.get(int(cid)); is_c = False; u_sol, c_sol = None, None
+        card = Card.query.get(int(cid))
+        is_c = False
+        u_sol, c_sol = None, None
+        
         if card.type == 'mc':
-            u_sol = request.form.get(f'q_{cid}'); c_sol = card.answer; is_c = (u_sol == c_sol)
-        # Andere Typen analog...
+            u_sol = request.form.get(f'q_{cid}')
+            c_sol = card.answer
+            is_c = (u_sol == c_sol)
+        elif card.type == 'calculation':
+            try:
+                u_val = float(request.form.get(f'q_{cid}', '0').replace(',', '.'))
+                u_var = float(exam_vars.get(str(cid), '0'))
+                f_min, f_max = map(float, card.answer.split('-')) if '-' in card.answer else (float(card.answer), float(card.answer))
+                is_c = (round(u_var * f_min, 3) <= round(u_val, 3) <= round(u_var * f_max, 3))
+                u_sol, c_sol = str(u_val), f"{u_var*f_min:.2f} - {u_var*f_max:.2f}"
+            except: pass
+        elif card.type == 'anatomy':
+            ud, ul = request.form.get(f'q_{cid}_de',''), request.form.get(f'q_{cid}_lat','')
+            is_c = fuzzy_match(ud, card.answer) and fuzzy_match(ul, card.answer_lat)
+            u_sol, c_sol = json.dumps({'de': ud, 'lat': ul}), json.dumps({'de': card.answer, 'lat': card.answer_lat})
+        elif card.type == 'anatomy_multi':
+            card_opts = json.loads(card.options) if card.options else []
+            all_c, u_list = True, []
+            for i in card_opts:
+                rid = str(i.get('id'))
+                ud, ul = request.form.get(f"q_{cid}_de_{rid}",''), request.form.get(f"q_{cid}_lat_{rid}",'')
+                if not fuzzy_match(ud, i.get('de')) or not fuzzy_match(ul, i.get('lat')): all_c = False
+                u_list.append({'id': rid, 'de': ud, 'lat': ul})
+            is_c, u_sol, c_sol = all_c, json.dumps(u_list), card.options
+        elif card.type == 'ordering':
+            u_list = json.loads(request.form.get(f'q_{cid}_order', '[]'))
+            is_c = (u_list == json.loads(card.options))
+            u_sol, c_sol = json.dumps(u_list), card.options
+        elif card.type == 'assignment':
+            u_dict = json.loads(request.form.get(f'q_{cid}_assignment', '{}'))
+            card_opts = json.loads(card.options)
+            all_c = True
+            for g in card_opts:
+                if set(u_dict.get(g.get('name'), [])) != set(g.get('items', [])): all_c = False
+            is_c, u_sol, c_sol = all_c, json.dumps(u_dict), card.options
+            
         if is_c: score += 1
-        db.session.add(ExamDetail(attempt_id=attempt.id, question_text=card.question, question_type=card.type, is_correct=is_c, user_solution=u_sol, correct_solution=c_sol))
-    attempt.score = score; attempt.passed = (score >= (len(card_ids) * 0.6))
+        db.session.add(ExamDetail(
+            attempt_id=attempt.id, question_text=card.question, question_type=card.type,
+            is_correct=is_c, user_solution=u_sol, correct_solution=c_sol
+        ))
+
+    attempt.score = score
+    attempt.passed = (score >= (len(card_ids) * 0.6))
     if attempt.passed: add_xp(current_user, 100)
-    db.session.commit(); return redirect(url_for('learn.review_exam', attempt_id=attempt.id))
+    db.session.commit()
+    return redirect(url_for('learn.review_exam', attempt_id=attempt.id))
 
 @bp.route('/profile/exam/<int:attempt_id>')
 @login_required
 def review_exam(attempt_id):
     att = ExamAttempt.query.get_or_404(attempt_id)
-    res = [{'question': d.question_text, 'type': d.question_type, 'is_correct': d.is_correct} for d in att.details]
-    return render_template('exam_result.html', score=att.score, total=att.total_questions, results=res, passed=att.passed)
+    res = []
+    for d in att.details:
+        u_data, c_data = d.user_solution, d.correct_solution
+        if d.question_type in ['anatomy', 'anatomy_multi', 'ordering', 'assignment']:
+            try:
+                u_data = json.loads(d.user_solution) if d.user_solution else None
+                c_data = json.loads(d.correct_solution) if d.correct_solution else None
+            except: pass
+        res.append({
+            'question': d.question_text, 'type': d.question_type, 'is_correct': d.is_correct,
+            'user_solution': u_data, 'correct_solution': c_data
+        })
+    
+    percent = int((att.score / att.total_questions) * 100) if att.total_questions > 0 else 0
+    return render_template('exam_result.html', score=att.score, total=att.total_questions, 
+                           percent=percent, results=res, passed=att.passed, date=att.timestamp)
