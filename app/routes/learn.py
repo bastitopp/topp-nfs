@@ -141,7 +141,6 @@ def report_card(card_id):
             db.session.add(CardReport(card_id=card_id, user_id=current_user.id, reason=reason))
             db.session.commit()
             flash('Frage wurde gemeldet.', 'success')
-        # Sicherer Redirect zur nächsten Lern-Karte statt Zurück-Funktion
         return redirect(url_for('learn.learn', category_path=origin))
     return redirect(url_for('main.index'))
 
@@ -157,8 +156,8 @@ def learn_errors():
 @login_required
 def exam_index():
     valid_types = ['mc', 'anatomy', 'anatomy_multi', 'ordering', 'assignment', 'calculation']
-    all_cards = Card.query.all()
-    tree = build_category_tree(all_cards, current_user)
+    # OPTIMIERT: Nutzt build_category_tree(current_user) ohne alle Karten zu laden
+    tree = build_category_tree(current_user)
     max_count = Card.query.filter(Card.type.in_(valid_types)).count()
     return render_template('exam_setup.html', max_questions=max_count, tree=tree)
 

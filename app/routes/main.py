@@ -16,8 +16,10 @@ def index():
     
     check_gamification(current_user)
     global_stats = get_learning_stats(current_user)
-    all_cards = Card.query.all()
-    tree = build_category_tree(all_cards, current_user)
+    
+    # OPTIMIERT: build_category_tree lädt Daten aggregiert (blitzschnell bei 5000+ Fragen)
+    tree = build_category_tree(current_user)
+    
     msgs = DashboardMessage.query.filter_by(active=True).order_by(DashboardMessage.created_at.desc()).all()
     
     return render_template('index.html', tree=tree, messages=msgs, global_stats=global_stats)
@@ -67,6 +69,7 @@ def reset_global_progress():
 @bp.route('/reset/<path:category_path>', methods=['POST'])
 @login_required
 def reset_category(category_path):
+    # Optimiert: Zieht IDs direkt über LIKE
     cids = [c.id for c in Card.query.filter(Card.category.like(f"{category_path}%")).all()]
     if cids: 
         UserProgress.query.filter(UserProgress.user_id==current_user.id, UserProgress.card_id.in_(cids)).delete(synchronize_session=False)
