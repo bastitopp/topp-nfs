@@ -15,7 +15,6 @@
         white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; width: 100%;
     }
     
-    /* FIX: Zwingt Texte in Feedback-Buttons weiß zu bleiben */
     .btn-answer div, .btn-answer p, .btn-answer span { color: inherit !important; margin-bottom: 0; }
     .btn-answer > div { flex: 1; min-width: 0; }
 
@@ -33,6 +32,53 @@
         background-color: rgba(13, 202, 240, 0.1); padding: 1rem; border-radius: 8px;
         display: block !important;
     }
+
+    /* NEU: Wunderschönes Multi-Anatomie Styling */
+    .anatomy-number-badge {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        border-radius: 50%;
+        background-color: var(--bs-primary);
+        color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .anatomy-row {
+        background-color: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 12px;
+        padding: 10px;
+        margin-bottom: 12px;
+        transition: box-shadow 0.2s;
+    }
+    .anatomy-row:focus-within {
+        box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+        border-color: var(--bs-primary);
+    }
+    .anatomy-empty-slot {
+        background-color: transparent !important;
+        background-image: linear-gradient(45deg, rgba(128, 128, 128, 0.1) 25%, transparent 25%, transparent 50%, rgba(128, 128, 128, 0.1) 50%, rgba(128, 128, 128, 0.1) 75%, transparent 75%, transparent) !important;
+        background-size: 10px 10px !important;
+        border: 1px dashed var(--bs-border-color) !important;
+        color: var(--bs-secondary-color) !important;
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    [data-bs-theme="dark"] .anatomy-empty-slot {
+        background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent) !important;
+    }
+
+    .cursor-grab { cursor: grab; }
+    .cursor-grab:active { cursor: grabbing; }
+    .bg-adaptive { background-color: var(--bs-tertiary-bg) !important; }
 </style>
 
 <div class="container py-3" style="max-width: 800px;">
@@ -51,137 +97,419 @@
         </div>
     </div>
 
-    <div class="card p-4 shadow mb-4 quiz-container">
+    <div class="card p-4 shadow mb-4 quiz-container border-0">
         <div class="text-center mb-3">
-            <span class="badge bg-primary bg-opacity-10 text-primary text-wrap fs-6 px-3 py-2">{{ card.category }}</span>
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 text-wrap fs-6 px-3 py-2">{{ card.category }}</span>
         </div>
         
         <div class="fw-bold mb-4 fs-4 question-text">
             {{ (calc_data.question if card.type == 'calculation' and calc_data else card.question) | markdown }}
         </div>
 
+        {% if card.image_url %}
+            <div class="text-center mb-4">
+                <img src="{{ card.image_url }}" class="img-fluid rounded border shadow-sm" style="max-height: 400px; object-fit: contain;">
+            </div>
+        {% endif %}
+
+        {% if card.audio_url %}
+            <div class="mb-4 text-center">
+                <audio controls class="w-100" style="max-width: 400px;">
+                    <source src="{{ card.audio_url }}" type="audio/mpeg">
+                    Dein Browser unterstützt das Audio-Element nicht.
+                </audio>
+            </div>
+        {% endif %}
+
         {% if feedback %}
-            <div class="alert alert-{{ 'success' if is_correct else 'danger' }} d-flex align-items-center gap-3 mb-4 shadow-sm animate__animated animate__fadeIn">
+            <div class="alert alert-{{ 'success' if is_correct else 'danger' }} d-flex align-items-center gap-3 mb-4 shadow-sm animate__animated animate__fadeIn border-0">
                 <i class="bi bi-{{ 'check-circle' if is_correct else 'x-circle' }}-fill fs-3"></i>
                 <div>
                     <h5 class="alert-heading fw-bold mb-0">{{ 'Richtig!' if is_correct else 'Leider falsch' }}</h5>
-                    {% if not is_correct %}<small>Richtige Antwort: <strong>{{ card.answer }}</strong></small>{% endif %}
+                    {% if not is_correct and card.type in ['mc', 'calculation'] %}
+                        <small>Richtige Antwort: <strong>{{ result_text if card.type == 'calculation' else card.answer }}</strong></small>
+                    {% endif %}
                 </div>
             </div>
         {% endif %}
 
         <div class="answer-section">
-            {% if card.type == 'mc' %}
-                <div class="mc-grid">
-                    {% if feedback %}
-                        {% for opt in options %}
-                            {% if opt == card.answer %}
-                                <div class="btn-answer p-3 rounded-4 w-100 border" style="background-color: #198754 !important; border-color: #198754 !important; color: #ffffff !important;">
-                                    <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);">{{ loop.index }}</span>
-                                    <div>{{ opt | markdown }}</div>
-                                </div>
-                            {% elif opt == user_answer %}
-                                <div class="btn-answer p-3 rounded-4 w-100 border" style="background-color: #dc3545 !important; border-color: #dc3545 !important; color: #ffffff !important;">
-                                    <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);">{{ loop.index }}</span>
-                                    <div>{{ opt | markdown }}</div>
-                                </div>
-                            {% else %}
-                                <div class="btn-answer p-3 rounded-4 w-100 border bg-body-tertiary border-secondary border-opacity-25" style="color: var(--bs-body-color);">
+            <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="quizForm" class="w-100">
+                <input type="hidden" name="start_time" value="{{ now.timestamp() }}">
+                <input type="hidden" name="origin_path" value="{{ current_category }}">
+
+                {% if card.type == 'mc' %}
+                    <input type="hidden" name="shuffled_options" value='{{ options | tojson | forceescape }}'>
+                    <div class="mc-grid">
+                        {% if feedback %}
+                            {% for opt in options %}
+                                {% if opt == card.answer %}
+                                    <div class="btn-answer p-3 rounded-4 w-100 shadow-sm" style="background-color: #198754 !important; border-color: #198754 !important; color: #ffffff !important;">
+                                        <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);"><i class="bi bi-check-lg"></i></span>
+                                        <div>{{ opt | markdown }}</div>
+                                    </div>
+                                {% elif opt == user_answer %}
+                                    <div class="btn-answer p-3 rounded-4 w-100 shadow-sm" style="background-color: #dc3545 !important; border-color: #dc3545 !important; color: #ffffff !important;">
+                                        <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);"><i class="bi bi-x-lg"></i></span>
+                                        <div>{{ opt | markdown }}</div>
+                                    </div>
+                                {% else %}
+                                    <div class="btn-answer p-3 rounded-4 w-100 bg-body-tertiary border-secondary border-opacity-25" style="color: var(--bs-body-color); opacity: 0.6;">
+                                        <span class="shortcut-badge">-</span>
+                                        <div>{{ opt | markdown }}</div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            {% for opt in options %}
+                                <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary btn-answer p-3 rounded-4 w-100">
                                     <span class="shortcut-badge">{{ loop.index }}</span>
                                     <div>{{ opt | markdown }}</div>
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    {% else %}
-                        <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="quizForm" class="w-100">
-                            <input type="hidden" name="start_time" value="{{ now.timestamp() }}">
-                            <input type="hidden" name="origin_path" value="{{ current_category }}">
-                            <input type="hidden" name="shuffled_options" value='{{ options | tojson | forceescape }}'>
-                            <div class="mc-grid">
-                                {% for opt in options %}
-                                    <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary btn-answer p-3 rounded-4 w-100">
-                                        <span class="shortcut-badge">{{ loop.index }}</span>
-                                        <div>{{ opt | markdown }}</div>
-                                    </button>
-                                {% endfor %}
-                            </div>
-                        </form>
-                    {% endif %}
-                </div>
-            {% elif card.type == 'calculation' %}
-                {% if feedback %}
-                    <div class="text-center py-4">
-                        <h1 class="display-5 fw-bold {{ 'text-success' if is_correct else 'text-danger' }}">{{ user_val }}</h1>
-                        <p class="text-muted">Zielbereich: {{ result_text }}</p>
+                                </button>
+                            {% endfor %}
+                        {% endif %}
                     </div>
-                {% else %}
-                    <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST">
-                        <input type="hidden" name="start_time" value="{{ now.timestamp() }}">
-                        <input type="hidden" name="origin_path" value="{{ current_category }}">
+
+                {% elif card.type == 'calculation' %}
+                    {% if feedback %}
+                        <div class="text-center py-4 bg-light rounded-4 shadow-sm border">
+                            <h2 class="display-5 fw-bold {{ 'text-success' if is_correct else 'text-danger' }} mb-2">{{ user_val }}</h2>
+                            <p class="text-muted mb-0 fs-5">Zielbereich: <strong>{{ result_text }}</strong></p>
+                        </div>
+                    {% else %}
                         <input type="hidden" name="calc_var" value="{{ calc_data.val }}">
-                        <input type="number" step="any" name="calc_input" class="form-control text-center fw-bold rounded-pill mb-3" placeholder="Ergebnis" required autofocus>
-                        <button class="btn btn-primary w-100 rounded-pill py-3 shadow-sm">Bestätigen</button>
-                    </form>
+                        <div class="input-group input-group-lg mb-3 shadow-sm">
+                            <input type="number" step="any" name="calc_input" class="form-control text-center fw-bold" placeholder="Dein Ergebnis" required autofocus>
+                            {% if calc_data.unit %}<span class="input-group-text bg-light text-secondary fw-bold">{{ calc_data.unit }}</span>{% endif %}
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Bestätigen</button>
+                    {% endif %}
+
+                {% elif card.type == 'anatomy' %}
+                    {% if feedback %}
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="card border-{{ 'success' if result_de else 'danger' }} h-100">
+                                    <div class="card-header bg-{{ 'success' if result_de else 'danger' }} text-white fw-bold">Deutsch</div>
+                                    <div class="card-body">
+                                        <p class="mb-1 text-muted small">Deine Antwort:</p>
+                                        <h5 class="text-{{ 'success' if result_de else 'danger' }}">{{ user_de or '-' }}</h5>
+                                        {% if not result_de %}
+                                            <hr>
+                                            <p class="mb-1 text-muted small">Richtige Lösung:</p>
+                                            <h5 class="text-success">{{ card.answer }}</h5>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-{{ 'success' if result_lat else 'danger' }} h-100">
+                                    <div class="card-header bg-{{ 'success' if result_lat else 'danger' }} text-white fw-bold">Latein</div>
+                                    <div class="card-body">
+                                        <p class="mb-1 text-muted small">Deine Antwort:</p>
+                                        <h5 class="text-{{ 'success' if result_lat else 'danger' }}">{{ user_lat or '-' }}</h5>
+                                        {% if not result_lat %}
+                                            <hr>
+                                            <p class="mb-1 text-muted small">Richtige Lösung:</p>
+                                            <h5 class="text-success">{{ card.answer_lat }}</h5>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-2 text-secondary">Deutsch</label>
+                                {% if not card.answer %}
+                                    <div class="form-control form-control-lg anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
+                                {% else %}
+                                    <input type="text" name="input_de" class="form-control form-control-lg shadow-sm" placeholder="Deutscher Begriff" autocomplete="off" autofocus>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-2 text-secondary">Latein</label>
+                                {% if not card.answer_lat %}
+                                    <div class="form-control form-control-lg anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
+                                {% else %}
+                                    <input type="text" name="input_lat" class="form-control form-control-lg shadow-sm" placeholder="Lateinischer Begriff" autocomplete="off">
+                                {% endif %}
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Lösung prüfen</button>
+                    {% endif %}
+
+                {% elif card.type == 'anatomy_multi' %}
+                    {% if feedback %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle text-center mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Deutsch (Dein / Richtig)</th>
+                                        <th>Latein (Dein / Richtig)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in multi_results %}
+                                    <tr>
+                                        <td class="fw-bold fs-5 bg-light">{{ r.label }}</td>
+                                        
+                                        {% if r.correct_de in ['-', '%'] or not r.correct_de %}
+                                            <td class="text-muted"><i class="bi bi-dash"></i></td>
+                                        {% else %}
+                                            <td class="{{ 'table-success' if r.is_de_ok else 'table-danger' }}">
+                                                <div class="fw-bold">{{ r.user_de or '-' }}</div>
+                                                {% if not r.is_de_ok %}<div class="text-success small mt-1 border-top pt-1 border-success"><i class="bi bi-arrow-return-right"></i> {{ r.correct_de }}</div>{% endif %}
+                                            </td>
+                                        {% endif %}
+
+                                        {% if r.correct_lat in ['-', '%'] or not r.correct_lat %}
+                                            <td class="text-muted"><i class="bi bi-dash"></i></td>
+                                        {% else %}
+                                            <td class="{{ 'table-success' if r.is_lat_ok else 'table-danger' }}">
+                                                <div class="fw-bold">{{ r.user_lat or '-' }}</div>
+                                                {% if not r.is_lat_ok %}<div class="text-success small mt-1 border-top pt-1 border-success"><i class="bi bi-arrow-return-right"></i> {{ r.correct_lat }}</div>{% endif %}
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="d-flex flex-column gap-2 mb-4">
+                            {% for part in options %}
+                            <div class="anatomy-row d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                                <div class="anatomy-number-badge shadow-sm">{{ part.id }}</div>
+                                <div class="row g-2 flex-grow-1 m-0 w-100">
+                                    <div class="col-12 col-sm-6 p-0 pe-sm-1">
+                                        {% if part.de in ['-', '%'] or not part.de %}
+                                            <div class="form-control anatomy-empty-slot" title="Feld entfällt"><i class="bi bi-slash-lg small"></i></div>
+                                        {% else %}
+                                            <input type="text" name="de_{{ part.id }}" class="form-control" placeholder="Deutsch" autocomplete="off" {% if loop.first %}autofocus{% endif %}>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12 col-sm-6 p-0 ps-sm-1">
+                                        {% if part.lat in ['-', '%'] or not part.lat %}
+                                            <div class="form-control anatomy-empty-slot" title="Feld entfällt"><i class="bi bi-slash-lg small"></i></div>
+                                        {% else %}
+                                            <input type="text" name="lat_{{ part.id }}" class="form-control" placeholder="Latein" autocomplete="off">
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Lösung prüfen</button>
+                    {% endif %}
+                
+                {% elif card.type == 'ordering' %}
+                    {% if feedback %}
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold text-muted mb-3"><i class="bi bi-x-circle text-danger me-2"></i>Deine Reihenfolge</h6>
+                                <ol class="list-group list-group-numbered shadow-sm">
+                                    {% set user_order = request.form.get('order_json') | from_json %}
+                                    {% for item in user_order %}
+                                        <li class="list-group-item bg-light text-muted">{{ item }}</li>
+                                    {% endfor %}
+                                </ol>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold text-success mb-3"><i class="bi bi-check-circle-fill me-2"></i>Richtige Reihenfolge</h6>
+                                <ol class="list-group list-group-numbered shadow-sm border-success">
+                                    {% for item in correct_order %}
+                                        <li class="list-group-item list-group-item-success fw-bold border-success">{{ item }}</li>
+                                    {% endfor %}
+                                </ol>
+                            </div>
+                        </div>
+                    {% else %}
+                        <input type="hidden" name="order_json" id="order_json_input">
+                        <p class="text-muted small mb-3"><i class="bi bi-arrows-move me-1"></i> Ziehe die Elemente in die richtige Reihenfolge.</p>
+                        <ul class="list-group sortable-list shadow-sm mb-4" id="sortable_list">
+                            {% set shuffled = options | list %}
+                            {% for item in shuffled %}
+                            <li class="list-group-item cursor-grab bg-adaptive border d-flex align-items-center p-3 fs-5">
+                                <i class="bi bi-grip-vertical text-muted me-3"></i> <span>{{ item }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5" onclick="submitOrdering()">Lösung prüfen</button>
+                    {% endif %}
+                
+                {% elif card.type == 'assignment' %}
+                    {% if feedback %}
+                        <div class="row g-3">
+                            {% for gr in assignment_results %}
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm border-{{ 'success' if gr.missing|length == 0 and (gr.group_items | selectattr('correct', 'equalto', false) | list | length == 0) else 'danger' }}">
+                                    <div class="card-header bg-{{ 'success' if gr.missing|length == 0 and (gr.group_items | selectattr('correct', 'equalto', false) | list | length == 0) else 'danger' }} text-white fw-bold">
+                                        {{ gr.name }}
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled mb-0 d-flex flex-column gap-2">
+                                            {% for item in gr.group_items %}
+                                                {% if item.correct %}
+                                                    <li class="text-success fw-bold"><i class="bi bi-check-lg me-2"></i>{{ item.text }}</li>
+                                                {% else %}
+                                                    <li class="text-danger text-decoration-line-through"><i class="bi bi-x-lg me-2"></i>{{ item.text }}</li>
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% for m in gr.missing %}
+                                                <li class="text-primary fw-bold bg-primary bg-opacity-10 p-1 rounded"><i class="bi bi-arrow-right-short me-1"></i>Fehlt: {{ m }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <input type="hidden" name="assignment_json" id="assignment_json_input">
+                        
+                        <div class="card bg-light border-0 shadow-sm mb-4">
+                            <div class="card-body p-3">
+                                <div class="small fw-bold text-muted mb-2 text-uppercase letter-spacing-1">Begriffe (hierher ziehen)</div>
+                                <div id="assignment_pool" class="d-flex flex-wrap gap-2 p-2 min-vh-10 border border-dashed rounded bg-white" style="min-height: 80px;">
+                                    {% for item in pool_items %}
+                                    <div class="badge bg-primary fs-6 fw-normal cursor-grab shadow-sm border p-2">{{ item.val }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            {% for gr in options %}
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm border">
+                                    <div class="card-header bg-white fw-bold text-center border-bottom-0 pt-3">{{ gr.name }}</div>
+                                    <div class="card-body px-2 pb-2 pt-0">
+                                        <div class="assignment-dropzone p-2 rounded bg-adaptive h-100 d-flex flex-column gap-2" data-group="{{ gr.name }}" style="min-height: 120px; border: 2px dashed var(--bs-border-color);"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5" onclick="submitAssignment()">Lösung prüfen</button>
+                    {% endif %}
                 {% endif %}
-            {% endif %}
+            </form>
         </div>
 
         {% if feedback %}
             {% if card.explanation %}
-                <div class="explanation-box animate__animated animate__fadeIn">
-                    <h6 class="fw-bold text-info"><i class="bi bi-info-circle-fill"></i> Erklärung:</h6>
-                    <div class="markdown-content">{{ card.explanation | markdown }}</div>
+                <div class="explanation-box shadow-sm mt-4 animate__animated animate__fadeIn">
+                    <h6 class="fw-bold text-info"><i class="bi bi-info-circle-fill me-1"></i> Erklärung</h6>
+                    <div class="markdown-content text-muted">{{ card.explanation | markdown }}</div>
                 </div>
             {% endif %}
             
-            <div class="mt-auto pt-4 border-top">
+            <div class="mt-4 pt-4 border-top">
                 {% if is_correct %}
-                    <p class="small text-muted text-center mb-3">Wie sicher warst du dir?</p>
-                    <form action="{{ url_for('learn.submit_quality', card_id=card.id) }}" method="POST" class="d-flex gap-2">
+                    <p class="small text-muted text-center mb-3 fw-bold">Wie sicher warst du dir?</p>
+                    <form action="{{ url_for('learn.submit_quality', card_id=card.id) }}" method="POST" class="d-flex gap-3">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
-                        <button type="submit" name="quality" value="3" class="btn btn-outline-warning flex-grow-1 py-3 rounded-4 fw-bold">Geraten [1]</button>
-                        <button type="submit" name="quality" value="5" class="btn btn-outline-primary btn-quality-safe flex-grow-1 py-3 rounded-4 fw-bold shadow-sm">Gewusst [2]</button>
+                        <button type="submit" name="quality" value="3" class="btn btn-outline-warning flex-grow-1 py-3 rounded-pill fw-bold fs-5">Geraten <span class="badge bg-warning text-dark ms-2">[1]</span></button>
+                        <button type="submit" name="quality" value="5" class="btn btn-primary btn-quality-safe flex-grow-1 py-3 rounded-pill fw-bold shadow-sm fs-5">Gewusst <span class="badge bg-white text-primary ms-2">[2]</span></button>
                     </form>
                 {% else %}
-                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-next-question w-100 py-3 rounded-pill fw-bold shadow">Nächste Frage [Enter]</a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-next-question w-100 py-3 rounded-pill fw-bold shadow fs-5">Nächste Frage <span class="badge bg-white text-primary ms-2">[Enter]</span></a>
                 {% endif %}
             </div>
         {% endif %}
     </div>
 
     <div class="modal fade" id="reportModal" tabindex="-1">
-        <div class="modal-dialog">
-            <form action="{{ url_for('learn.report_card', card_id=card.id) }}" method="POST" class="modal-content">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="{{ url_for('learn.report_card', card_id=card.id) }}" method="POST" class="modal-content border-0 shadow">
                 <input type="hidden" name="origin_path" value="{{ current_category }}">
-                <div class="modal-header"><h5 class="modal-title">Fehler melden</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body"><textarea name="reason" class="form-control" rows="3" required placeholder="Was ist falsch?"></textarea></div>
-                <div class="modal-footer"><button type="submit" class="btn btn-danger rounded-pill">Absenden</button></div>
+                <div class="modal-header bg-danger text-white border-0">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-flag-fill me-2"></i>Fehler melden</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">Ist die Frage unverständlich, falsch oder enthält Rechtschreibfehler? Bitte beschreibe das Problem kurz.</p>
+                    <textarea name="reason" class="form-control bg-light" rows="4" required placeholder="Was genau ist falsch?"></textarea>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">Meldung absenden</button>
+                </div>
             </form>
         </div>
     </div>
     {% else %}
-        <div class="text-center py-5"><h1>🎉 Hervorragend!</h1><a href="{{ url_for('main.index') }}" class="btn btn-primary rounded-pill mt-4">Zur Übersicht</a></div>
-        <script>confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });</script>
+        <div class="text-center py-5 mt-5">
+            <div class="display-1 mb-4">🎉</div>
+            <h1 class="fw-bold mb-3">Hervorragend!</h1>
+            <p class="text-muted fs-5 mb-5">Du hast alle Fragen in diesem Bereich beantwortet oder für heute ist nichts mehr fällig.</p>
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg rounded-pill px-5 py-3 shadow fw-bold"><i class="bi bi-house-door-fill me-2"></i> Zurück zur Übersicht</a>
+        </div>
+        <script>
+            setTimeout(() => {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#0d6efd', '#198754', '#ffc107', '#dc3545'] });
+            }, 300);
+        </script>
     {% endif %}
 </div>
 
+{% if not feedback and not finished %}
 <script>
-document.addEventListener('keydown', function(event) {
-    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-    if (event.key === 'Enter') {
-        const nextBtn = document.querySelector('.btn-next-question');
-        const safeBtn = document.querySelector('.btn-quality-safe');
-        if (nextBtn) nextBtn.click();
-        else if (safeBtn) safeBtn.click();
+    // Sortable JS Initialisierung
+    document.addEventListener("DOMContentLoaded", function() {
+        const sortList = document.getElementById('sortable_list');
+        if (sortList) {
+            new Sortable(sortList, { animation: 150, ghostClass: 'bg-info', dragClass: 'shadow-lg' });
+        }
+
+        const poolEl = document.getElementById('assignment_pool');
+        if (poolEl) {
+            new Sortable(poolEl, { group: 'shared', animation: 150, ghostClass: 'opacity-50' });
+            document.querySelectorAll('.assignment-dropzone').forEach(dz => {
+                new Sortable(dz, { group: 'shared', animation: 150, ghostClass: 'bg-info' });
+            });
+        }
+    });
+
+    function submitOrdering() {
+        const list = document.getElementById('sortable_list');
+        if(!list) return;
+        const items = [];
+        list.querySelectorAll('li span').forEach(span => items.push(span.innerText.trim()));
+        document.getElementById('order_json_input').value = JSON.stringify(items);
     }
-    {% if feedback and is_correct %}
-        if (event.key === '1') document.querySelector('button[value="3"]').click();
-        if (event.key === '2') document.querySelector('button[value="5"]').click();
-    {% endif %}
-    {% if not feedback %}
-        const mcBtns = document.querySelectorAll('button[name="mc_answer"]');
-        if (event.key > 0 && event.key <= mcBtns.length) mcBtns[event.key - 1].click();
-    {% endif %}
-});
+
+    function submitAssignment() {
+        const result = {};
+        document.querySelectorAll('.assignment-dropzone').forEach(dz => {
+            const groupName = dz.getAttribute('data-group');
+            const items = [];
+            dz.querySelectorAll('.badge').forEach(b => items.push(b.innerText.trim()));
+            result[groupName] = items;
+        });
+        document.getElementById('assignment_json_input').value = JSON.stringify(result);
+    }
+
+    // Tastatur-Navigation
+    document.addEventListener('keydown', function(event) {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+        if (event.key === 'Enter') {
+            const nextBtn = document.querySelector('.btn-next-question');
+            const safeBtn = document.querySelector('.btn-quality-safe');
+            if (nextBtn) nextBtn.click();
+            else if (safeBtn) safeBtn.click();
+        }
+        {% if card.type == 'mc' %}
+            const mcBtns = document.querySelectorAll('button[name="mc_answer"]');
+            if (event.key > 0 && event.key <= mcBtns.length) mcBtns[event.key - 1].click();
+        {% endif %}
+        {% if feedback and is_correct %}
+            if (event.key === '1') document.querySelector('button[value="3"]').click();
+            if (event.key === '2') document.querySelector('button[value="5"]').click();
+        {% endif %}
+    });
 </script>
+{% endif %}
 {% endblock %}

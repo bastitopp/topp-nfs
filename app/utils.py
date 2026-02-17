@@ -153,10 +153,13 @@ def render_learn_card(card, user, context_path):
     """Rendert die Quiz-Ansicht."""
     p = UserProgress.query.filter_by(user_id=user.id, card_id=card.id).first(); box = p.box if p else 0
     opts = []
+    
+    # HIER FEHLTE 'anatomy_multi' -> Dadurch wurde [] ans Template geschickt!
     if card.type == 'mc': opts = get_mc_options(card)
-    elif card.type in ['ordering', 'assignment']: 
+    elif card.type in ['ordering', 'assignment', 'anatomy_multi']: 
         try: opts = json.loads(card.options)
         except: opts = []
+        
     calc_data = prepare_calculation_card(card) if card.type == 'calculation' else None
     pool = []
     if card.type == 'assignment':

@@ -10,10 +10,34 @@
     @keyframes blinker { 50% { opacity: 0; } }
     .hover-shadow:hover { box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
 
-    .bg-adaptive {
-        background-color: var(--bs-tertiary-bg) !important;
-    }
+    .bg-adaptive { background-color: var(--bs-tertiary-bg) !important; }
 
+    /* NEU: Wunderschönes Multi-Anatomie Styling */
+    .anatomy-number-badge {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        border-radius: 50%;
+        background-color: var(--bs-primary);
+        color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .anatomy-row {
+        background-color: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 12px;
+        padding: 10px;
+        margin-bottom: 12px;
+        transition: box-shadow 0.2s;
+    }
+    .anatomy-row:focus-within {
+        box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+        border-color: var(--bs-primary);
+    }
     .anatomy-empty-slot {
         background-color: transparent !important;
         background-image: linear-gradient(45deg, rgba(128, 128, 128, 0.1) 25%, transparent 25%, transparent 50%, rgba(128, 128, 128, 0.1) 50%, rgba(128, 128, 128, 0.1) 75%, transparent 75%, transparent) !important;
@@ -27,7 +51,6 @@
         align-items: center;
         justify-content: center;
     }
-    
     [data-bs-theme="dark"] .anatomy-empty-slot {
         background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent) !important;
     }
@@ -44,11 +67,9 @@
 </div>
 
 <div class="container py-2" style="max-width: 800px;">
-    
     <form method="POST" action="{{ url_for('learn.exam_submit') }}" id="examForm">
         {% for entry in questions %}
             <input type="hidden" name="card_ids" value="{{ entry.card.id }}">
-        
             {% set card = entry.card %}
             {% set opts = entry.options %}
             
@@ -64,8 +85,17 @@
                 <h5 class="fw-bold mb-3">{{ card.question }}</h5>
 
                 {% if card.image_url %}
-                    <div class="text-center mb-3">
-                        <img src="{{ card.image_url }}" class="img-fluid rounded border" style="max-height: 300px;">
+                    <div class="text-center mb-4">
+                        <img src="{{ card.image_url }}" class="img-fluid rounded border shadow-sm" style="max-height: 400px; object-fit: contain;">
+                    </div>
+                {% endif %}
+
+                {% if card.audio_url %}
+                    <div class="mb-4 text-center">
+                        <audio controls class="w-100" style="max-width: 400px;">
+                            <source src="{{ card.audio_url }}" type="audio/mpeg">
+                            Dein Browser unterstützt das Audio-Element nicht.
+                        </audio>
                     </div>
                 {% endif %}
 
@@ -91,49 +121,45 @@
                     </div>
                 
                 {% elif card.type == 'anatomy' %}
-                    <div class="row g-2">
+                    <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="small text-muted">Deutsch</label>
+                            <label class="small text-muted mb-1">Deutsch</label>
                             {% if not card.answer %}
                                 <div class="form-control anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
                             {% else %}
-                                <input type="text" name="q_{{ card.id }}_de" class="form-control" autocomplete="off">
+                                <input type="text" name="q_{{ card.id }}_de" class="form-control form-control-lg" autocomplete="off" placeholder="Deutscher Begriff">
                             {% endif %}
                         </div>
                         <div class="col-md-6">
-                            <label class="small text-muted">Latein</label>
+                            <label class="small text-muted mb-1">Latein</label>
                             {% if not card.answer_lat %}
                                 <div class="form-control anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
                             {% else %}
-                                <input type="text" name="q_{{ card.id }}_lat" class="form-control" autocomplete="off">
+                                <input type="text" name="q_{{ card.id }}_lat" class="form-control form-control-lg" autocomplete="off" placeholder="Lateinischer Begriff">
                             {% endif %}
                         </div>
                     </div>
 
                 {% elif card.type == 'anatomy_multi' %}
-                    <p class="small text-muted">Benenne die markierten Strukturen:</p>
+                    <p class="small text-muted mb-3">Benenne die markierten Strukturen:</p>
                     {% for part in opts %}
-                    <div class="row g-2 mb-2 align-items-center">
-                        <div class="col-1 fw-bold text-center bg-secondary bg-opacity-10 rounded py-1">{{ part.id }}</div>
-                        
-                        <div class="col">
-                            {% if part.de in ['-', '%'] or not part.de %}
-                                <div class="form-control form-control-sm anatomy-empty-slot" title="Feld entfällt">
-                                    <i class="bi bi-slash-lg small"></i>
-                                </div>
-                            {% else %}
-                                <input type="text" name="q_{{ card.id }}_{{ part.id }}_de" class="form-control form-control-sm" placeholder="Deutsch" autocomplete="off">
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col">
-                            {% if part.lat in ['-', '%'] or not part.lat %}
-                                <div class="form-control form-control-sm anatomy-empty-slot" title="Feld entfällt">
-                                    <i class="bi bi-slash-lg small"></i>
-                                </div>
-                            {% else %}
-                                <input type="text" name="q_{{ card.id }}_{{ part.id }}_lat" class="form-control form-control-sm" placeholder="Latein" autocomplete="off">
-                            {% endif %}
+                    <div class="anatomy-row d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                        <div class="anatomy-number-badge shadow-sm">{{ part.id }}</div>
+                        <div class="row g-2 flex-grow-1 m-0 w-100">
+                            <div class="col-12 col-sm-6 p-0 pe-sm-1">
+                                {% if part.de in ['-', '%'] or not part.de %}
+                                    <div class="form-control anatomy-empty-slot" title="Feld entfällt"><i class="bi bi-slash-lg small"></i></div>
+                                {% else %}
+                                    <input type="text" name="q_{{ card.id }}_{{ part.id }}_de" class="form-control" placeholder="Deutsch" autocomplete="off">
+                                {% endif %}
+                            </div>
+                            <div class="col-12 col-sm-6 p-0 ps-sm-1">
+                                {% if part.lat in ['-', '%'] or not part.lat %}
+                                    <div class="form-control anatomy-empty-slot" title="Feld entfällt"><i class="bi bi-slash-lg small"></i></div>
+                                {% else %}
+                                    <input type="text" name="q_{{ card.id }}_{{ part.id }}_lat" class="form-control" placeholder="Latein" autocomplete="off">
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                     {% endfor %}
@@ -143,17 +169,17 @@
                     <div class="small text-muted mb-2">Ziehe die Elemente in die richtige Reihenfolge:</div>
                     <ul class="list-group sortable-list" id="sort_{{ card.id }}" data-target="input_q_{{ card.id }}">
                         {% for item in opts %}
-                        <li class="list-group-item cursor-grab bg-adaptive my-1 border rounded d-flex align-items-center">
-                            <i class="bi bi-grip-vertical text-muted me-2"></i> {{ item }}
+                        <li class="list-group-item cursor-grab bg-adaptive my-1 border rounded d-flex align-items-center p-3 shadow-sm">
+                            <i class="bi bi-grip-vertical text-muted me-3 fs-5"></i> <span class="fw-medium">{{ item }}</span>
                         </li>
                         {% endfor %}
                     </ul>
 
                 {% elif card.type == 'assignment' %}
                     <input type="hidden" name="q_{{ card.id }}" id="input_q_{{ card.id }}" class="assign-input">
-                    <div class="mb-3">
-                        <div class="small text-muted mb-1">Begriffe (ziehen):</div>
-                        <div id="pool_{{ card.id }}" class="d-flex flex-wrap gap-2 p-2 bg-adaptive rounded border border-dashed">
+                    <div class="mb-4">
+                        <div class="small text-muted mb-2">Begriffe (hierher ziehen):</div>
+                        <div id="pool_{{ card.id }}" class="d-flex flex-wrap gap-2 p-3 bg-adaptive rounded border border-dashed shadow-sm min-vh-10" style="min-height: 80px;">
                             {% for item in entry.pool %}
                             <div class="badge bg-white text-dark border p-2 cursor-grab fs-6 shadow-sm" style="user-select:none">{{ item.val }}</div>
                             {% endfor %}
@@ -163,23 +189,25 @@
                         {% set groups = card.options | from_json %}
                         {% for gr in groups %}
                         <div class="col-md-6">
-                            <div class="card h-100 bg-adaptive border">
-                                <div class="card-header fw-bold small text-center">{{ gr.name }}</div>
-                                <div class="card-body p-2 dropzone-{{ card.id }}" data-group="{{ gr.name }}" style="min-height:100px;"></div>
+                            <div class="card h-100 bg-adaptive border shadow-sm">
+                                <div class="card-header fw-bold text-center bg-body">{{ gr.name }}</div>
+                                <div class="card-body p-2 dropzone-{{ card.id }} d-flex flex-column gap-2" data-group="{{ gr.name }}" style="min-height:120px;"></div>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
 
                 {% else %}
-                    <div class="alert alert-warning small">Typ "{{ card.type }}" nicht unterstützt.</div>
+                    <div class="alert alert-warning small">Typ "{{ card.type }}" wird in der Prüfung noch nicht vollständig unterstützt.</div>
                 {% endif %}
             </div>
         {% endfor %}
 
-        <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill shadow mb-5 py-3 fw-bold">
-            <i class="bi bi-check-circle-fill me-2"></i> Prüfung verbindlich abgeben
-        </button>
+        <div class="d-grid mt-5 mb-5 pb-5">
+            <button type="submit" class="btn btn-primary btn-lg rounded-pill shadow-lg py-3 fw-bold fs-5">
+                <i class="bi bi-check-circle-fill me-2"></i> Prüfung verbindlich abgeben
+            </button>
+        </div>
     </form>
 </div>
 

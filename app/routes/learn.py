@@ -178,13 +178,21 @@ def exam_start():
     random.shuffle(questions); prepared = []; exam_vars = {}; total_s = 0
     for card in questions:
         total_s += 45 if card.type == 'mc' else 120
-        opts = json.loads(card.options) if card.options else []
+        
+        # HIER WAR DER FEHLER: anatomy_multi Optionen wurden nicht als JSON geladen!
+        try:
+            opts = json.loads(card.options) if card.options else []
+        except:
+            opts = []
+            
         calc_data = None
         if card.type == 'mc': opts = get_mc_options(card)
         elif card.type == 'calculation':
             val = random.randrange(opts.get('min',10), opts.get('max',150)+1, opts.get('step',1))
             exam_vars[str(card.id)] = val
             calc_data = {'question': card.question.replace('{weight}', str(val)), 'unit': opts.get('unit','')}
+            
+        # Wir übergeben jetzt explizit die geladenen (geparsten) 'opts' ans Template
         prepared.append({'card': card, 'options': opts, 'calc_data': calc_data})
     
     session['exam_vars'] = exam_vars
@@ -226,21 +234,32 @@ def exam_submit():
             all_c, u_list = True, []
             for i in card_opts:
                 rid = str(i.get('id'))
-                ud, ul = request.form.get(f"q_{cid}_de_{rid}",''), request.form.get(f"q_{cid}_lat_{rid}",'')
-                if not fuzzy_match(ud, i.get('de')) or not fuzzy_match(ul, i.get('lat')): all_c = False
+                # HIER WAR DER FEHLER BEIM SUBMIT: In exam.html heißen die Felder q_{cid}_{rid}_de 
+                # und in learn.py wurde nach q_{cid}_de_{rid} gesucht!
+                ud = request.form.get(f"q_{cid}_{rid}_de", '')
+                ul = request.form.get(f"q_{cid}_{rid}_lat", '')
+                
+                if not fuzzy_match(ud, i.get('de')) or not fuzzy_match(ul, i.get('lat')): 
+                    all_c = False
                 u_list.append({'id': rid, 'de': ud, 'lat': ul})
             is_c, u_sol, c_sol = all_c, json.dumps(u_list), card.options
         elif card.type == 'ordering':
-            u_list = json.loads(request.form.get(f'q_{cid}_order', '[]'))
-            is_c = (u_list == json.loads(card.options))
-            u_sol, c_sol = json.dumps(u_list), card.options
+            try:
+                u_list = json.loads(request.form.get(f'q_{cid}', '[]')) # In exam.html heißt das Hidden Feld nur q_{cid}
+                is_c = (u_list == json.loads(card.options))
+                u_sol, c_sol = json.dumps(u_list), card.options
+            except:
+                is_c = False
         elif card.type == 'assignment':
-            u_dict = json.loads(request.form.get(f'q_{cid}_assignment', '{}'))
-            card_opts = json.loads(card.options)
-            all_c = True
-            for g in card_opts:
-                if set(u_dict.get(g.get('name'), [])) != set(g.get('items', [])): all_c = False
-            is_c, u_sol, c_sol = all_c, json.dumps(u_dict), card.options
+            try:
+                u_dict = json.loads(request.form.get(f'q_{cid}', '{}')) # In exam.html heißt das Hidden Feld nur q_{cid}
+                card_opts = json.loads(card.options)
+                all_c = True
+                for g in card_opts:
+                    if set(u_dict.get(g.get('name'), [])) != set(g.get('items', [])): all_c = False
+                is_c, u_sol, c_sol = all_c, json.dumps(u_dict), card.options
+            except:
+                is_c = False
             
         if is_c: score += 1
         db.session.add(ExamDetail(
