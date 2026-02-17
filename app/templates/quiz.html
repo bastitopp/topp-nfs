@@ -92,6 +92,9 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm">← Exit</a>
         <div class="d-flex gap-2">
+            {% if current_user.is_admin %}
+                <a href="{{ url_for('admin.edit_card', card_id=card.id, next=url_for('learn.learn', category_path=current_category)) }}" class="btn btn-sm btn-outline-primary border-0" title="Frage bearbeiten"><i class="bi bi-pencil-fill"></i></a>
+            {% endif %}
             {% if not feedback %}<a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Überspringen</a>{% endif %}
             <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal"><i class="bi bi-flag-fill"></i></button>
         </div>

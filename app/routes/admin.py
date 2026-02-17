@@ -256,8 +256,17 @@ def edit_card(card_id):
             
         db.session.commit()
         flash('Gespeichert', 'success')
+        
+        # NEU: Weiterleitung zurück zum Quiz falls der Parameter existiert
+        next_url = request.form.get('next')
+        if next_url:
+            return redirect(next_url)
+            
         return redirect(url_for('admin.admin_dashboard'))
-    return render_template('edit_card.html', card=card)
+    
+    # NEU: Übernahme des next_url aus der URL-Abfrage
+    next_url = request.args.get('next')
+    return render_template('edit_card.html', card=card, next_url=next_url)
 
 @bp.route('/admin/reports/dismiss/<int:rid>', methods=['POST'])
 @admin_required

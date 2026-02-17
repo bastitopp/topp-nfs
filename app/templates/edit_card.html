@@ -4,12 +4,15 @@
 <div class="container py-4" style="max-width: 800px;">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="fw-bold">Frage bearbeiten</h3>
-        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Abbrechen</a>
+        <a href="{{ next_url if next_url else url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Abbrechen</a>
     </div>
 
     <div class="card shadow-sm border-0">
         <div class="card-body bg-light">
             <form method="POST" enctype="multipart/form-data" onsubmit="prepareMultiJson()">
+                {% if next_url %}
+                <input type="hidden" name="next" value="{{ next_url }}">
+                {% endif %}
                 <input type="hidden" name="multi_json" id="multi_json_input">
                 
                 <div class="row g-3 mb-3">
