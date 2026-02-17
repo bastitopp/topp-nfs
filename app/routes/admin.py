@@ -254,17 +254,22 @@ def edit_card(card_id):
             url = handle_upload(request.files['audio'])
             if url: card.audio_url = url
             
+        # NEU: Zugehörige offene Meldungen für diese Frage suchen und löschen
+        reports = CardReport.query.filter_by(card_id=card.id, resolved=False).all()
+        for r in reports:
+            db.session.delete(r)
+            
         db.session.commit()
-        flash('Gespeichert', 'success')
+        flash('Gespeichert und offene Meldungen automatisch geschlossen!', 'success')
         
-        # NEU: Weiterleitung zurück zum Quiz falls der Parameter existiert
+        # NEU: Weiterleitung zurück (z.B. ins Quiz oder in den Reports-Tab), falls übergeben
         next_url = request.form.get('next')
         if next_url:
             return redirect(next_url)
             
         return redirect(url_for('admin.admin_dashboard'))
     
-    # NEU: Übernahme des next_url aus der URL-Abfrage
+    # URL Parameter 'next' abfangen und ans Template weitergeben
     next_url = request.args.get('next')
     return render_template('edit_card.html', card=card, next_url=next_url)
 
@@ -275,7 +280,7 @@ def dismiss_report(rid):
     if r:
         r.resolved = True
         db.session.commit()
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard') + '#reports')
 
 # --- BENUTZER VERWALTUNG ---
 

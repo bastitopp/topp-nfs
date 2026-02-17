@@ -1,6 +1,14 @@
 {% extends "layout.html" %}
 
 {% block content %}
+<style>
+    /* Sanfte Hover-Effekte und Pfeil-Animation für die Kategorien */
+    .admin-cat-row { transition: background-color 0.2s ease; }
+    .admin-cat-row:hover { background-color: #f8f9fa !important; }
+    .admin-cat-row[aria-expanded="true"] .transition-icon { transform: rotate(90deg); }
+    .transition-icon { transition: transform 0.2s ease-in-out; }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold"><i class="bi bi-gear-fill text-warning"></i> Admin Dashboard</h2>
     <a href="{{ url_for('admin.admin_users') }}" class="btn btn-outline-primary rounded-pill"><i class="bi bi-people-fill"></i> Benutzer verwalten</a>
@@ -146,18 +154,29 @@
             <div class="list-group">
                 {% macro render_admin_tree(nodes, level=0) %}
                     {% for key, val in nodes.items()|sort %}
-                        {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') %}
-                        {% set raw_path = val._path | replace('/', '') if val._path.endswith('/') else val._path %}
+                        {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') | replace('.', '_') | replace(',', '_') | replace('(', '_') | replace(')', '_') %}
                         
                         <div class="list-group-item border-0 p-0 mb-1 bg-transparent">
-                            <div class="d-flex align-items-center p-2 bg-white rounded shadow-sm border position-relative" style="margin-left: {{ level * 20 }}px;">
+                            <div class="d-flex align-items-center p-2 bg-white rounded shadow-sm border position-relative admin-cat-row" 
+                                 {% if val._subs or val._cards %}
+                                 onclick="window.toggleCat('collapse-{{ unique_id }}', this, event)" 
+                                 aria-expanded="false"
+                                 style="margin-left: {{ level * 20 }}px; cursor: pointer;"
+                                 {% else %}
+                                 style="margin-left: {{ level * 20 }}px;"
+                                 {% endif %}>
+                                
                                 {% if val._subs or val._cards %}
-                                    <a class="me-2 text-primary" data-bs-toggle="collapse" href="#collapse-{{ unique_id }}" role="button"><i class="bi bi-folder-fill fs-5"></i></a>
+                                    <i class="bi bi-chevron-right text-secondary me-2 transition-icon" style="font-size: 0.8rem;"></i>
+                                    <i class="bi bi-folder-fill text-primary me-2 fs-5"></i>
                                 {% else %}
+                                    <i class="bi bi-dash text-transparent me-2" style="font-size: 0.8rem; opacity: 0;"></i>
                                     <i class="bi bi-folder text-muted me-2 fs-5"></i>
                                 {% endif %}
-                                <span class="fw-bold flex-grow-1">{{ key }}</span>
+                                
+                                <span class="fw-bold flex-grow-1 user-select-none">{{ key }}</span>
                                 {% if val._cards %}<span class="badge bg-secondary me-2">{{ val._cards|length }} Fragen</span>{% endif %}
+                                
                                 <div class="z-2 d-flex gap-1">
                                     <button type="button" class="btn btn-sm btn-outline-secondary border-0" onclick="openEditCategory('{{ val._path | trim('/') }}')" title="Kategorie umbenennen"><i class="bi bi-pencil"></i></button>
                                     
@@ -168,16 +187,16 @@
                             <div class="collapse" id="collapse-{{ unique_id }}">
                                 <div class="pt-1">
                                     {% if val._cards %}
-                                    <div class="bg-light rounded p-2 mb-2 border" style="margin-left: {{ (level + 1) * 20 }}px;">
+                                    <div class="bg-light rounded p-2 mb-2 border shadow-sm" style="margin-left: {{ (level + 1) * 20 }}px;">
                                         <table class="table table-sm table-hover mb-0 bg-white">
                                             <tbody>
                                             {% for c in val._cards %}
                                                 <tr>
                                                     <td style="width: 30px;"><input type="checkbox" name="selected_ids" value="{{ c.id }}" class="form-check-input"></td>
                                                     <td style="width: 60px;"><small class="badge bg-light text-dark border">{{ c.type }}</small></td>
-                                                    <td class="text-truncate">{{ c.question }}</td>
+                                                    <td class="text-truncate" style="max-width: 300px;">{{ c.question }}</td>
                                                     <td class="text-end" style="width: 100px;">
-                                                        <a href="{{ url_for('admin.edit_card', card_id=c.id) }}" class="btn btn-sm btn-link text-primary p-0 me-2"><i class="bi bi-pencil-fill"></i></a>
+                                                        <a href="{{ url_for('admin.edit_card', card_id=c.id, next=url_for('admin.admin_dashboard')) }}" class="btn btn-sm btn-link text-primary p-0 me-2"><i class="bi bi-pencil-fill"></i></a>
                                                         <button type="submit" formaction="{{ url_for('admin.delete_card', card_id=c.id) }}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Löschen?');"><i class="bi bi-trash-fill"></i></button>
                                                     </td>
                                                 </tr>
@@ -198,7 +217,7 @@
         
         {% macro render_del_forms(nodes) %}
             {% for key, val in nodes.items() %}
-                {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') %}
+                {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') | replace('.', '_') | replace(',', '_') | replace('(', '_') | replace(')', '_') %}
                 <form action="{{ url_for('admin.delete_category') }}" method="POST" id="delCatForm_{{ unique_id }}" style="display:none;"><input type="hidden" name="category_name" value="{{ val._path }}"></form>
                 {% if val._subs %}{{ render_del_forms(val._subs) }}{% endif %}
             {% endfor %}
@@ -291,7 +310,9 @@
                     <div class="text-danger small"><i class="bi bi-exclamation-circle"></i> {{ r.reason }}</div>
                 </div>
                 <div class="d-flex gap-2">
-                    {% if r.card %}<a href="{{ url_for('admin.edit_card', card_id=r.card.id) }}" class="btn btn-sm btn-outline-primary">Bearbeiten</a>{% endif %}
+                    {% if r.card %}
+                        <a href="{{ url_for('admin.edit_card', card_id=r.card.id, next=url_for('admin.admin_dashboard') ~ '#reports') }}" class="btn btn-sm btn-outline-primary">Bearbeiten</a>
+                    {% endif %}
                     <form action="{{ url_for('admin.dismiss_report', rid=r.id) }}" method="POST"><button class="btn btn-sm btn-success">OK</button></form>
                 </div>
             </div>
@@ -321,6 +342,22 @@
 </div>
 
 <script>
+// Perfektes JavaScript zum Auf- und Zuklappen der Kategorien (Ignoriert Klicks auf Buttons/Checkboxen)
+if (!window.toggleCat) {
+    window.toggleCat = function(id, el, event) {
+        if (event.target.closest('input, button, a')) return;
+        
+        const target = document.getElementById(id);
+        if (target) {
+            const bsCollapse = bootstrap.Collapse.getOrCreateInstance(target, { toggle: false });
+            bsCollapse.toggle();
+            
+            const isExpanded = el.getAttribute('aria-expanded') === 'true';
+            el.setAttribute('aria-expanded', !isExpanded);
+        }
+    };
+}
+
 let nextId = 1;
 
 function updateFormFields() {
@@ -393,6 +430,18 @@ function openEditCategory(name) {
     new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
 }
 
-document.addEventListener('DOMContentLoaded', updateFormFields);
+function checkHashTab() {
+    if (window.location.hash) {
+        const triggerEl = document.querySelector(`button[data-bs-target="${window.location.hash}"]`);
+        if (triggerEl) {
+            new bootstrap.Tab(triggerEl).show();
+        }
+    }
+}
+
+(function() {
+    updateFormFields();
+    checkHashTab();
+})();
 </script>
 {% endblock %}

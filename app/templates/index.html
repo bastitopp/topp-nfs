@@ -3,6 +3,17 @@
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<style>
+    /* Sanfte Hover-Effekte und Pfeil-Animation für die Kategorien auf der Startseite */
+    .index-cat-row { transition: background-color 0.2s ease; cursor: pointer; }
+    .index-cat-row:hover { background-color: rgba(0,0,0,0.03) !important; }
+    .index-cat-row[aria-expanded="true"] .transition-icon { transform: rotate(90deg); }
+    .transition-icon { transition: transform 0.2s ease-in-out; }
+    
+    /* Darkmode Anpassung für den Hover */
+    [data-bs-theme="dark"] .index-cat-row:hover { background-color: rgba(255,255,255,0.05) !important; }
+</style>
+
 <div class="dashboard-wrapper animate__animated animate__fadeIn">
 
     <div class="mb-4">
@@ -105,22 +116,49 @@
         <div class="list-group border-0 shadow-sm rounded-4 overflow-hidden">
             {% macro render_tree(nodes, level=0) %}
                 {% for key, val in nodes | dictsort %}
+                    {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') | replace('.', '_') | replace(',', '_') | replace('(', '_') | replace(')', '_') %}
+                    
                     <div class="list-group-item border-0 p-0 bg-transparent border-bottom">
-                        <div class="d-flex align-items-center p-3 bg-body" style="padding-left: {{ 1.5 + (level * 1) }}rem !important;">
-                            <div class="me-3"><input class="form-check-input p-2 border-2" type="checkbox" name="categories" value="{{ val._path }}" style="width: 1.5em; height: 1.5em;"></div>
+                        <div class="d-flex align-items-center p-3 bg-body index-cat-row" 
+                             style="padding-left: {{ 1.5 + (level * 1.5) }}rem !important;"
+                             {% if val._subs %}
+                             onclick="window.toggleCat('collapse-{{ unique_id }}', this, event)" 
+                             aria-expanded="false"
+                             {% endif %}>
+                            
+                            <div class="me-3">
+                                <input class="form-check-input p-2 border-2" type="checkbox" name="categories" value="{{ val._path }}" style="width: 1.5em; height: 1.5em;">
+                            </div>
+                            
                             <div class="flex-grow-1 d-flex align-items-center">
-                                {% if val._subs %}<a class="text-warning me-3 fs-4" data-bs-toggle="collapse" href="#collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}"><i class="bi bi-folder-fill"></i></a>
-                                {% else %}<i class="bi bi-file-text text-secondary me-3 fs-4"></i>{% endif %}
-                                <div class="flex-grow-1">
+                                {% if val._subs %}
+                                    <i class="bi bi-chevron-right text-secondary me-2 transition-icon" style="font-size: 0.8rem;"></i>
+                                    <i class="bi bi-folder-fill text-warning me-3 fs-4"></i>
+                                {% else %}
+                                    <i class="bi bi-dash text-transparent me-2" style="font-size: 0.8rem; opacity: 0;"></i>
+                                    <i class="bi bi-file-text text-secondary me-3 fs-4"></i>
+                                {% endif %}
+                                
+                                <div class="flex-grow-1 user-select-none">
                                     <h6 class="fw-bold mb-1 fs-5">{{ key }}</h6>
                                     <div class="progress shadow-sm" style="height: 6px; width: 120px; border-radius: 10px;">
                                         <div class="progress-bar bg-primary rounded-pill" style="width: {{ (val._stats.learned / val._stats.total * 100) if val._stats.total > 0 else 0 }}%"></div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="ms-3 d-flex gap-2"><a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;"><i class="bi bi-play-fill fs-4"></i></a></div>
+                            
+                            <div class="ms-3 d-flex gap-2">
+                                <a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                                    <i class="bi bi-play-fill fs-4"></i>
+                                </a>
+                            </div>
                         </div>
-                        {% if val._subs %}<div class="collapse" id="collapse-{{ key|replace(' ','')|replace('/','') }}-{{ level }}">{{ render_tree(val._subs, level + 1) }}</div>{% endif %}
+                        
+                        {% if val._subs %}
+                        <div class="collapse" id="collapse-{{ unique_id }}">
+                            {{ render_tree(val._subs, level + 1) }}
+                        </div>
+                        {% endif %}
                     </div>
                 {% endfor %}
             {% endmacro %}
@@ -130,11 +168,26 @@
 </div>
 
 <script>
-// HTMX FIX: Das Script wird als IIFE ausgeführt, damit es direkt nach einem Seiten-Swap geladen wird.
+// Perfektes JavaScript zum Auf- und Zuklappen der Kategorien (Ignoriert Klicks auf Buttons/Checkboxen)
+if (!window.toggleCat) {
+    window.toggleCat = function(id, el, event) {
+        if (event.target.closest('input, button, a')) return;
+        
+        const target = document.getElementById(id);
+        if (target) {
+            const bsCollapse = bootstrap.Collapse.getOrCreateInstance(target, { toggle: false });
+            bsCollapse.toggle();
+            
+            const isExpanded = el.getAttribute('aria-expanded') === 'true';
+            el.setAttribute('aria-expanded', !isExpanded);
+        }
+    };
+}
+
+// Chart Render
 (function() {
     const ctx = document.getElementById('progressChart');
     if (ctx) {
-        // GANZ WICHTIG: Wenn das Chart bereits existiert, muss es vor dem Neuzeichnen zerstört werden
         if (window.dashboardProgressChart) {
             window.dashboardProgressChart.destroy();
         }
