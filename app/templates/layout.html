@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Topp-NFS | Notfallsanitäter Training</title>
 
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <meta name="htmx-config" content='{"globalViewTransitions":"true"}'>
+
     <script>
         (function() {
             const stored = localStorage.getItem('t');
@@ -106,9 +109,15 @@
         .profile-wrapper { position: relative; display: flex; align-items: center; justify-content: center; height: 32px; width: 32px; }
         .nav-profile-img { width: 32px; height: 32px; object-fit: cover; border-radius: 50%; border: 2px solid var(--bs-border-color); }
         .badge-lvl { position: absolute; bottom: -2px; right: -4px; background: #ffc107; color: #000; font-size: 0.55rem; font-weight: 800; padding: 1px 3px; border-radius: 4px; border: 1px solid var(--bs-body-bg); line-height: 1; }
+        
+        /* NEU: Optionale CSS-Anpassung, um die Überblendung flüssiger zu machen */
+        ::view-transition-old(root),
+        ::view-transition-new(root) {
+            animation-duration: 0.25s;
+        }
     </style>
 </head>
-<body class="d-flex flex-column">
+<body class="d-flex flex-column" hx-boost="true">
 
     <nav class="navbar navbar-expand-lg navbar-top sticky-top border-bottom">
         <div class="container">
@@ -241,7 +250,13 @@
             else { overlay.style.display = 'block'; setTimeout(() => document.getElementById('searchInputField').focus(), 100); }
         }
 
+        // Standard-Event für das erste Laden
         document.addEventListener('DOMContentLoaded', () => {
+            updateIcons(document.documentElement.getAttribute('data-bs-theme'));
+        });
+
+        // NEU: HTMX Event: Führt Theme-Aktualisierungen auch nach einem weichen Seitenwechsel aus
+        document.addEventListener('htmx:afterSwap', () => {
             updateIcons(document.documentElement.getAttribute('data-bs-theme'));
         });
     </script>

@@ -7,7 +7,7 @@
         <a href="{{ next_url if next_url else url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Abbrechen</a>
     </div>
 
-    <div class="card shadow-sm border-0">
+    <div class="card shadow-sm border-0 animate__animated animate__fadeIn">
         <div class="card-body bg-light">
             <form method="POST" enctype="multipart/form-data" onsubmit="prepareMultiJson()">
                 {% if next_url %}
@@ -29,6 +29,8 @@
                             <option value="anatomy_multi" {% if card.type == 'anatomy_multi' %}selected{% endif %}>Anatomie Multi</option>
                             <option value="ordering" {% if card.type == 'ordering' %}selected{% endif %}>Sortieren</option>
                             <option value="assignment" {% if card.type == 'assignment' %}selected{% endif %}>Zuordnung</option>
+                            <option value="calculation" {% if card.type == 'calculation' %}selected{% endif %}>Medikamenten-Rechnung</option>
+                            <option value="case_study" {% if card.type == 'case_study' %}selected{% endif %}>Fallbeispiel</option>
                         </select>
                     </div>
                 </div>
@@ -60,12 +62,12 @@
                     </div>
                 </div>
 
-                <div id="field_standard_answer" class="mb-3">
-                    <label class="fw-bold small">Richtige Antwort</label>
+                <div id="field_standard_answer" class="mb-3 {% if card.type not in ['flashcard', 'mc', 'calculation', 'case_study', 'anatomy'] %}d-none{% endif %}">
+                    <label class="fw-bold small">Richtige Antwort / Lösung <span class="text-muted fw-normal">(bei Anatomie: Deutsch)</span></label>
                     <input name="answer" class="form-control" value="{{ card.answer }}">
                 </div>
 
-                <div id="field_mc_options" class="mb-3 d-none p-3 bg-white rounded border">
+                <div id="field_mc_options" class="mb-3 p-3 bg-white rounded border {% if card.type != 'mc' %}d-none{% endif %}">
                     <label class="fw-bold small mb-2 text-secondary"><i class="bi bi-ui-radios me-1"></i> Falsche Antwort-Optionen (Multiple Choice)</label>
                     <div id="mcOptionsContainer">
                         {% if card.type == 'mc' and card.options %}
@@ -89,31 +91,42 @@
                     <div class="form-text small mt-2"><i class="bi bi-info-circle-fill text-info"></i> Die "Richtige Antwort" aus dem Feld darüber wird beim Lernen automatisch ergänzt.</div>
                 </div>
 
-                <div id="field_anatomy" class="row g-3 mb-3 d-none">
-                    <div class="col-md-6">
-                        <label class="fw-bold small">Deutsch</label>
-                        <input name="answer_de_field" class="form-control" value="{{ card.answer }}">
-                    </div>
-                    <div class="col-md-6">
+                <div id="field_anatomy" class="row g-3 mb-3 {% if card.type != 'anatomy' %}d-none{% endif %}">
+                    <div class="col-md-12">
                         <label class="fw-bold small">Latein</label>
                         <input name="answer_lat" class="form-control" value="{{ card.answer_lat }}">
                     </div>
                 </div>
 
-                <div id="field_anatomy_multi" class="mb-3 d-none p-3 bg-white rounded border">
+                <div id="field_anatomy_multi" class="mb-3 p-3 bg-white rounded border {% if card.type != 'anatomy_multi' %}d-none{% endif %}">
                     <label class="fw-bold small mb-2">Strukturen</label>
                     <table class="table table-sm table-bordered">
                         <thead><tr><th>Nr.</th><th>Deutsch</th><th>Latein</th><th></th></tr></thead>
                         <tbody id="multiTableBody">
-                            </tbody>
+                            {% if card.type == 'anatomy_multi' and card.options %}
+                                {% set parsed_multi = card.options | from_json %}
+                                {% for item in parsed_multi %}
+                                <tr>
+                                    <td><input class="form-control form-control-sm row-id" value="{{ item.id }}"></td>
+                                    <td><input class="form-control form-control-sm row-de" value="{{ item.de }}"></td>
+                                    <td><input class="form-control form-control-sm row-lat" value="{{ item.lat }}"></td>
+                                    <td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()">X</button></td>
+                                </tr>
+                                {% endfor %}
+                            {% endif %}
+                        </tbody>
                     </table>
                     <button type="button" class="btn btn-sm btn-outline-success" onclick="addMultiRow()">+ Zeile</button>
                 </div>
 
-                <div id="field_json" class="mb-3 d-none">
-                    <label class="fw-bold small">JSON Daten</label>
+                <div id="field_json" class="mb-3 {% if card.type not in ['ordering', 'assignment', 'calculation'] %}d-none{% endif %}">
+                    <label class="fw-bold small">JSON Daten (Optionen)</label>
                     <textarea name="ordering_json" class="form-control font-monospace" rows="5">{{ card.options }}</textarea>
-                    <div class="form-text small">Für "Sortieren": <code>["A", "B", "C"]</code><br>Für "Zuordnung": <code>[{"name":"Gruppe1", "items":["A","B"]}]</code></div>
+                    <div class="form-text small">
+                        Für "Sortieren": <code>["A", "B", "C"]</code><br>
+                        Für "Zuordnung": <code>[{"name":"Gruppe1", "items":["A","B"]}]</code><br>
+                        Für "Rechnung": <code>{"var": "weight", "min": 10, "max": 150, "step": 1, "unit": "mg"}</code>
+                    </div>
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
@@ -127,40 +140,13 @@
 <script>
 let nextId = 1;
 
-// Daten aus dem Backend (sicher als JSON parsen)
-const cardType = "{{ card.type }}";
-let multiData = [];
-try {
-    multiData = {{ card.options | tojson | safe }};
-    if (typeof multiData === 'string') multiData = JSON.parse(multiData);
-} catch(e) { multiData = []; }
-
-function updateFormFields() {
-    const type = document.getElementById('typeSelect').value;
-    
-    // Alle ausblenden
-    ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id => {
-        document.getElementById(id).classList.add('d-none');
+function initNextId() {
+    let maxId = 0;
+    document.querySelectorAll('.row-id').forEach(input => {
+        let val = parseInt(input.value) || 0;
+        if (val > maxId) maxId = val;
     });
-
-    // Je nach Typ einblenden
-    if (type === 'flashcard' || type === 'mc') {
-        document.getElementById('field_standard_answer').classList.remove('d-none');
-        if (type === 'mc') document.getElementById('field_mc_options').classList.remove('d-none');
-    }
-    else if (type === 'anatomy') {
-        document.getElementById('field_anatomy').classList.remove('d-none');
-    }
-    else if (type === 'anatomy_multi') {
-        document.getElementById('field_anatomy_multi').classList.remove('d-none');
-        // Tabelle füllen, falls noch leer
-        if (document.getElementById('multiTableBody').children.length === 0) {
-            initMultiRows();
-        }
-    }
-    else if (type === 'ordering' || type === 'assignment' || type === 'calculation') {
-        document.getElementById('field_json').classList.remove('d-none');
-    }
+    nextId = maxId + 1;
 }
 
 function addMcOption() {
@@ -171,31 +157,56 @@ function addMcOption() {
     document.getElementById('mcOptionsContainer').insertAdjacentHTML('beforeend', row);
 }
 
-function addMultiRow(data = null) {
+function addMultiRow() {
     const tbody = document.getElementById('multiTableBody');
-    const idVal = data ? data.id : nextId++;
-    const deVal = data ? data.de : '';
-    const latVal = data ? data.lat : '';
-    
     const row = `
         <tr>
-            <td><input class="form-control form-control-sm row-id" value="${idVal}"></td>
-            <td><input class="form-control form-control-sm row-de" value="${deVal}"></td>
-            <td><input class="form-control form-control-sm row-lat" value="${latVal}"></td>
+            <td><input class="form-control form-control-sm row-id" value="${nextId++}"></td>
+            <td><input class="form-control form-control-sm row-de" value=""></td>
+            <td><input class="form-control form-control-sm row-lat" value=""></td>
             <td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()">X</button></td>
         </tr>
     `;
     tbody.insertAdjacentHTML('beforeend', row);
 }
 
-function initMultiRows() {
-    if (Array.isArray(multiData)) {
-        multiData.forEach(item => addMultiRow(item));
-        // Update nextId
-        const maxId = multiData.reduce((max, item) => Math.max(max, parseInt(item.id) || 0), 0);
-        nextId = maxId + 1;
-    } else {
-        addMultiRow();
+function updateFormFields() {
+    const typeSelect = document.getElementById('typeSelect');
+    if(!typeSelect) return;
+    const type = typeSelect.value;
+    
+    // Alle Felder zuerst ausblenden
+    ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.classList.add('d-none');
+    });
+
+    // Je nach Typ die korrekten Felder einblenden
+    if (['flashcard', 'mc', 'calculation', 'case_study', 'anatomy'].includes(type)) {
+        const el = document.getElementById('field_standard_answer');
+        if(el) el.classList.remove('d-none');
+        
+        if (type === 'mc') {
+            const mcEl = document.getElementById('field_mc_options');
+            if(mcEl) mcEl.classList.remove('d-none');
+        }
+    }
+    
+    if (type === 'anatomy') {
+        const el = document.getElementById('field_anatomy');
+        if(el) el.classList.remove('d-none');
+    }
+    else if (type === 'anatomy_multi') {
+        const el = document.getElementById('field_anatomy_multi');
+        if(el) el.classList.remove('d-none');
+        if (document.getElementById('multiTableBody').children.length === 0) {
+            addMultiRow();
+        }
+    }
+    
+    if (['ordering', 'assignment', 'calculation'].includes(type)) {
+        const el = document.getElementById('field_json');
+        if(el) el.classList.remove('d-none');
     }
 }
 
@@ -213,7 +224,7 @@ function prepareMultiJson() {
     }
 }
 
-// Initial beim Laden ausführen
-document.addEventListener('DOMContentLoaded', updateFormFields);
+// Initialisieren beim Laden
+initNextId();
 </script>
 {% endblock %}

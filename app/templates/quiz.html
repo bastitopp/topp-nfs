@@ -3,6 +3,7 @@
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 
 <style>
     .quiz-container { min-height: 520px; display: flex; flex-direction: column; }
@@ -13,6 +14,12 @@
         min-height: 64px; display: flex; align-items: center; text-align: left;
         border-width: 2px; border-style: solid; transition: all 0.2s ease-in-out;
         white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; width: 100%;
+    }
+    
+    /* Fokus-Sichtbarkeit für Tastaturnavigation verbessern */
+    .btn-answer:focus-visible {
+        outline: 3px solid var(--bs-primary);
+        outline-offset: 2px;
     }
     
     .btn-answer div, .btn-answer p, .btn-answer span { color: inherit !important; margin-bottom: 0; }
@@ -33,7 +40,6 @@
         display: block !important;
     }
 
-    /* NEU: Wunderschönes Multi-Anatomie Styling */
     .anatomy-number-badge {
         width: 36px;
         height: 36px;
@@ -95,8 +101,8 @@
             {% if current_user.is_admin %}
                 <a href="{{ url_for('admin.edit_card', card_id=card.id, next=url_for('learn.learn', category_path=current_category)) }}" class="btn btn-sm btn-outline-primary border-0" title="Frage bearbeiten"><i class="bi bi-pencil-fill"></i></a>
             {% endif %}
-            {% if not feedback %}<a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Überspringen</a>{% endif %}
-            <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal"><i class="bi bi-flag-fill"></i></button>
+            {% if not feedback %}<a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3" title="Überspringen [S]">Überspringen</a>{% endif %}
+            <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal" title="Frage melden [R]"><i class="bi bi-flag-fill"></i></button>
         </div>
     </div>
 
@@ -125,7 +131,7 @@
         {% endif %}
 
         {% if feedback %}
-            <div class="alert alert-{{ 'success' if is_correct else 'danger' }} d-flex align-items-center gap-3 mb-4 shadow-sm animate__animated animate__fadeIn border-0">
+            <div class="alert alert-{{ 'success' if is_correct else 'danger' }} d-flex align-items-center gap-3 mb-4 shadow-sm animate__animated {{ 'animate__fadeIn' if is_correct else 'animate__shakeX' }} border-0">
                 <i class="bi bi-{{ 'check-circle' if is_correct else 'x-circle' }}-fill fs-3"></i>
                 <div>
                     <h5 class="alert-heading fw-bold mb-0">{{ 'Richtig!' if is_correct else 'Leider falsch' }}</h5>
@@ -460,21 +466,53 @@
 
 {% if not feedback and not finished %}
 <script>
-    // Sortable JS Initialisierung
-    document.addEventListener("DOMContentLoaded", function() {
+    // Funktion für das Initialisieren von Sortable, die bei jedem HTMX Swap neu feuert
+    function initQuizFeatures() {
         const sortList = document.getElementById('sortable_list');
         if (sortList) {
-            new Sortable(sortList, { animation: 150, ghostClass: 'bg-info', dragClass: 'shadow-lg' });
+            new Sortable(sortList, { 
+                animation: 150, 
+                ghostClass: 'bg-info', 
+                dragClass: 'shadow-lg',
+                delay: 100,             // Verhindert versehentliches Ziehen auf Smartphones
+                delayOnTouchOnly: true, 
+                fallbackTolerance: 3
+            });
         }
 
         const poolEl = document.getElementById('assignment_pool');
         if (poolEl) {
-            new Sortable(poolEl, { group: 'shared', animation: 150, ghostClass: 'opacity-50' });
+            new Sortable(poolEl, { 
+                group: 'shared', 
+                animation: 150, 
+                ghostClass: 'opacity-50',
+                delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3
+            });
             document.querySelectorAll('.assignment-dropzone').forEach(dz => {
-                new Sortable(dz, { group: 'shared', animation: 150, ghostClass: 'bg-info' });
+                new Sortable(dz, { 
+                    group: 'shared', 
+                    animation: 150, 
+                    ghostClass: 'bg-info',
+                    delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3
+                });
             });
         }
-    });
+
+        // Formular-Warnung Tracker aktivieren
+        let formChanged = false;
+        const quizForm = document.getElementById('quizForm');
+        if (quizForm) {
+            quizForm.addEventListener('input', () => formChanged = true);
+            quizForm.addEventListener('submit', function() {
+                this.setAttribute('data-submitting', 'true');
+            });
+        }
+        window.quizFormChanged = () => formChanged;
+    }
+
+    // Beim allerersten Laden und nach HTMX Seitenwechseln aufrufen
+    document.addEventListener("DOMContentLoaded", initQuizFeatures);
+    document.addEventListener("htmx:afterSwap", initQuizFeatures);
 
     function submitOrdering() {
         const list = document.getElementById('sortable_list');
@@ -495,24 +533,55 @@
         document.getElementById('assignment_json_input').value = JSON.stringify(result);
     }
 
-    // Tastatur-Navigation
-    document.addEventListener('keydown', function(event) {
-        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-        if (event.key === 'Enter') {
-            const nextBtn = document.querySelector('.btn-next-question');
-            const safeBtn = document.querySelector('.btn-quality-safe');
-            if (nextBtn) nextBtn.click();
-            else if (safeBtn) safeBtn.click();
-        }
-        {% if card.type == 'mc' %}
-            const mcBtns = document.querySelectorAll('button[name="mc_answer"]');
-            if (event.key > 0 && event.key <= mcBtns.length) mcBtns[event.key - 1].click();
-        {% endif %}
-        {% if feedback and is_correct %}
-            if (event.key === '1') document.querySelector('button[value="3"]').click();
-            if (event.key === '2') document.querySelector('button[value="5"]').click();
-        {% endif %}
-    });
+    // Unsaved Changes Warnung (Wird nur 1x pro Sitzung registriert)
+    if (!window.unloadWarningInitialized) {
+        window.addEventListener('beforeunload', function (e) {
+            const form = document.getElementById('quizForm');
+            if (window.quizFormChanged && window.quizFormChanged() && form && !form.hasAttribute('data-submitting')) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+        window.unloadWarningInitialized = true;
+    }
+
+    // Tastatur-Navigation (Sicherstellen, dass Events nicht mehrfach gestapelt werden)
+    if (!window.keyboardNavInitialized) {
+        document.addEventListener('keydown', function(event) {
+            // Wenn in einem Textfeld getippt wird, blockieren
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+            
+            if (event.key === 'Enter') {
+                const nextBtn = document.querySelector('.btn-next-question');
+                const safeBtn = document.querySelector('.btn-quality-safe');
+                if (nextBtn) nextBtn.click();
+                else if (safeBtn) safeBtn.click();
+            }
+            if (event.key.toLowerCase() === 's') {
+                const skipBtn = document.getElementById('skipBtn');
+                if (skipBtn) skipBtn.click();
+            }
+            if (event.key.toLowerCase() === 'r') {
+                const modalTarget = document.querySelector('[data-bs-target="#reportModal"]');
+                if (modalTarget) modalTarget.click();
+            }
+            if (event.key.toLowerCase() === 'e') {
+                const editBtn = document.querySelector('a[title="Frage bearbeiten"]');
+                if (editBtn) editBtn.click();
+            }
+            
+            {% if card.type == 'mc' %}
+                const mcBtns = document.querySelectorAll('button[name="mc_answer"]');
+                if (event.key > 0 && event.key <= mcBtns.length) mcBtns[event.key - 1].click();
+            {% endif %}
+            
+            {% if feedback and is_correct %}
+                if (event.key === '1') document.querySelector('button[value="3"]').click();
+                if (event.key === '2') document.querySelector('button[value="5"]').click();
+            {% endif %}
+        });
+        window.keyboardNavInitialized = true;
+    }
 </script>
 {% endif %}
 {% endblock %}

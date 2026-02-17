@@ -113,7 +113,9 @@
                                 {% else %}<i class="bi bi-file-text text-secondary me-3 fs-4"></i>{% endif %}
                                 <div class="flex-grow-1">
                                     <h6 class="fw-bold mb-1 fs-5">{{ key }}</h6>
-                                    <div class="progress" style="height: 5px; width: 100px;"><div class="progress-bar bg-primary" style="width: {{ (val._stats.learned / val._stats.total * 100) if val._stats.total > 0 else 0 }}%"></div></div>
+                                    <div class="progress shadow-sm" style="height: 6px; width: 120px; border-radius: 10px;">
+                                        <div class="progress-bar bg-primary rounded-pill" style="width: {{ (val._stats.learned / val._stats.total * 100) if val._stats.total > 0 else 0 }}%"></div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="ms-3 d-flex gap-2"><a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;"><i class="bi bi-play-fill fs-4"></i></a></div>
@@ -128,22 +130,28 @@
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const ctx = document.getElementById('progressChart');
-        if(ctx) {
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Sicher', 'Fällig', 'Neu'],
-                    datasets: [{
-                        data: [{{ global_stats.learned }}, {{ global_stats.due }}, {{ global_stats.new }}],
-                        backgroundColor: ['#198754', '#dc3545', '#adb5bd'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { cutout: '80%', plugins: { legend: { display: false }, tooltip: { enabled: true } }, maintainAspectRatio: false }
-            });
+// HTMX FIX: Das Script wird als IIFE ausgeführt, damit es direkt nach einem Seiten-Swap geladen wird.
+(function() {
+    const ctx = document.getElementById('progressChart');
+    if (ctx) {
+        // GANZ WICHTIG: Wenn das Chart bereits existiert, muss es vor dem Neuzeichnen zerstört werden
+        if (window.dashboardProgressChart) {
+            window.dashboardProgressChart.destroy();
         }
-    });
+        
+        window.dashboardProgressChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Sicher', 'Fällig', 'Neu'],
+                datasets: [{
+                    data: [{{ global_stats.learned }}, {{ global_stats.due }}, {{ global_stats.new }}],
+                    backgroundColor: ['#198754', '#dc3545', '#adb5bd'],
+                    borderWidth: 0
+                }]
+            },
+            options: { cutout: '80%', plugins: { legend: { display: false }, tooltip: { enabled: true } }, maintainAspectRatio: false }
+        });
+    }
+})();
 </script>
 {% endblock %}

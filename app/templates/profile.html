@@ -4,7 +4,7 @@
     <h2 class="fw-bold mb-4">Mein Profil</h2>
     <div class="row g-4">
         <div class="col-md-6">
-            <div class="card shadow-sm border-0 h-100">
+            <div class="card shadow-sm border-0 h-100 animate__animated animate__fadeIn">
                 <div class="card-header bg-white fw-bold">Daten bearbeiten</div>
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data">
@@ -20,13 +20,13 @@
                         <h6 class="text-primary mb-3">Passwort ändern</h6>
                         <div class="mb-3"><input type="password" name="new_password" class="form-control" placeholder="Neues Passwort"></div>
                         <div class="mb-4"><input type="password" name="confirm_password" class="form-control" placeholder="Bestätigen"></div>
-                        <button class="btn btn-success w-100 rounded-pill">Speichern</button>
+                        <button class="btn btn-success w-100 rounded-pill shadow-sm fw-bold">Speichern</button>
                     </form>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6 d-flex flex-column gap-4">
+        <div class="col-md-6 d-flex flex-column gap-4 animate__animated animate__fadeIn">
             <div class="row g-2">
                 <div class="col-6">
                     <div class="card shadow-sm border-0 h-100"><div class="card-body text-center"><h6 class="text-muted mb-1 small text-uppercase">Lernzeit</h6><h4 class="fw-bold mb-0 text-primary">{{ user.total_learning_time | format_duration }}</h4></div></div>
@@ -59,12 +59,13 @@
                     {% else %}<div class="p-3 text-center text-muted small">Noch keine Prüfungen absolviert.</div>{% endfor %}
                 </div>
             </div>
-            <div class="card border-danger shadow-sm">
+            
+            <div class="card border-danger shadow-sm mt-auto">
                 <div class="card-header bg-danger text-white fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> Gefahrenzone</div>
                 <div class="card-body">
                     <p class="small text-muted">Hiermit wird dein gesamter Lernfortschritt unwiderruflich gelöscht.</p>
-                    <form action="{{ url_for('main.reset_global_progress') }}" method="POST" onsubmit="return confirm('Bist du sicher?');">
-                        <button class="btn btn-outline-danger w-100">Fortschritt zurücksetzen</button>
+                    <form action="{{ url_for('main.reset_global_progress') }}" method="POST" onsubmit="return confirm('Bist du sicher? Alle Lernfortschritte gehen verloren.');">
+                        <button class="btn btn-outline-danger w-100 rounded-pill fw-bold">Fortschritt zurücksetzen</button>
                     </form>
                 </div>
             </div>
@@ -74,85 +75,95 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const config = {{ chart_config | safe }};
-        const ctx = document.getElementById('skillsChart');
-        const filter = document.getElementById('categoryFilter');
-        let myChart;
+// HTMX FIX: Skript als selbsterhaltende Funktion (IIFE) ausführen, damit es nach jedem weichen Ladevorgang triggert.
+(function() {
+    const config = {{ chart_config | safe }};
+    const ctx = document.getElementById('skillsChart');
+    const filter = document.getElementById('categoryFilter');
 
-        // Dropdown füllen
-        Object.keys(config.details).sort().forEach(cat => {
-            const opt = document.createElement('option');
-            opt.value = cat;
-            opt.textContent = cat;
-            filter.appendChild(opt);
-        });
+    if (!ctx || !filter) return;
 
-        function renderChart(labels, data) {
-            if (myChart) myChart.destroy();
-            
-            if (labels.length < 3) {
-                // Radar-Charts brauchen min. 3 Punkte zum Zeichnen, sonst Balken anzeigen
-                myChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: data,
-                            backgroundColor: 'rgba(13, 110, 253, 0.6)',
-                            borderRadius: 10
-                        }]
-                    },
-                    options: { 
-                        indexAxis: 'y', 
-                        plugins: { legend: { display: false } },
-                        scales: { x: { min: 0, max: 100 } }
-                    }
-                });
-                return;
-            }
+    // Dropdown zurücksetzen (verhindert doppelte Einträge bei HTMX-Reloads)
+    filter.innerHTML = '<option value="all">Gesamtübersicht</option>';
 
-            myChart = new Chart(ctx, {
-                type: 'radar',
+    // Dropdown füllen
+    Object.keys(config.details).sort().forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        filter.appendChild(opt);
+    });
+
+    function renderChart(labels, data) {
+        // Altes Diagramm zerstören, bevor ein neues gezeichnet wird (wichtig für HTMX!)
+        if (window.profileSkillsChart) {
+            window.profileSkillsChart.destroy();
+        }
+        
+        if (labels.length < 3) {
+            // Radar-Charts brauchen min. 3 Punkte zum Zeichnen, sonst Balken anzeigen
+            window.profileSkillsChart = new Chart(ctx, {
+                type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Gelernt (%)',
                         data: data,
-                        backgroundColor: 'rgba(13, 110, 253, 0.25)',
-                        borderColor: 'rgba(13, 110, 253, 1)',
-                        pointBackgroundColor: 'rgba(13, 110, 253, 1)',
-                        pointBorderColor: '#fff',
-                        borderWidth: 2
+                        backgroundColor: 'rgba(13, 110, 253, 0.6)',
+                        borderRadius: 10
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        r: {
-                            angleLines: { color: 'rgba(150, 150, 150, 0.3)' },
-                            grid: { color: 'rgba(150, 150, 150, 0.3)' },
-                            pointLabels: { font: { size: 10 } },
-                            ticks: { display: false, min: 0, max: 100, stepSize: 20 }
-                        }
-                    },
-                    plugins: { legend: { display: false } }
+                options: { 
+                    indexAxis: 'y', 
+                    plugins: { legend: { display: false } },
+                    scales: { x: { min: 0, max: 100 } },
+                    maintainAspectRatio: false
                 }
             });
+            return;
         }
 
-        filter.addEventListener('change', (e) => {
-            const val = e.target.value;
-            if (val === 'all') {
-                renderChart(config.main.labels, config.main.data);
-            } else {
-                renderChart(config.details[val].labels, config.details[val].data);
+        window.profileSkillsChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Gelernt (%)',
+                    data: data,
+                    backgroundColor: 'rgba(13, 110, 253, 0.25)',
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    pointBackgroundColor: 'rgba(13, 110, 253, 1)',
+                    pointBorderColor: '#fff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(150, 150, 150, 0.3)' },
+                        grid: { color: 'rgba(150, 150, 150, 0.3)' },
+                        pointLabels: { font: { size: 10 } },
+                        ticks: { display: false, min: 0, max: 100, stepSize: 20 }
+                    }
+                },
+                plugins: { legend: { display: false } }
             }
         });
+    }
 
-        // Initialer Render (Alle Hauptkategorien)
-        renderChart(config.main.labels, config.main.data);
-    });
+    // Event Listener direkt anhängen (onchange überschreibt alte Listeners bei HTMX Swaps)
+    filter.onchange = function(e) {
+        const val = e.target.value;
+        if (val === 'all') {
+            renderChart(config.main.labels, config.main.data);
+        } else {
+            renderChart(config.details[val].labels, config.details[val].data);
+        }
+    };
+
+    // Initialer Render (Alle Hauptkategorien)
+    renderChart(config.main.labels, config.main.data);
+})();
 </script>
 {% endblock %}
