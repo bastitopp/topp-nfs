@@ -29,7 +29,8 @@
                 <button type="submit" class="btn btn-primary w-100 btn-lg rounded-pill shadow-sm">Einloggen</button>
             </form>
             <div class="mt-4 text-center">
-                <a href="/forgot-password" class="text-muted small text-decoration-none">Passwort vergessen?</a>
+                <a href="/forgot-password" class="text-muted small text-decoration-none">Passwort vergessen?</a><br>
+                <a href="{{ url_for('auth.register') }}" class="btn btn-outline-secondary btn-sm rounded-pill mt-3 px-4">Noch keinen Account? Registrieren</a>
             </div>
         </div>
     </div>

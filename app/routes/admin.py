@@ -72,7 +72,6 @@ def check_question_quality(cards):
                     avg_len = sum(len(o) for o in distractors) / max(1, len(distractors))
                     if avg_len > 0:
                         # INTELLIGENTE REGEL: Toleranz von 30%, ABER Unterschied muss > 15 Zeichen sein!
-                        # Verhindert Fehlalarme bei sehr kurzen Antworten.
                         if c_len > avg_len * 1.30 and (c_len - avg_len) > 15:
                             issues.append(f"Richtige Antwort ist auffällig LÄNGER als die falschen.")
                         elif c_len < avg_len * 0.70 and (avg_len - c_len) > 15:
@@ -269,6 +268,8 @@ def dismiss_report(rid):
         db.session.commit()
     return redirect(url_for('admin.admin_dashboard'))
 
+# --- BENUTZER VERWALTUNG ---
+
 @bp.route('/admin/users')
 @admin_required
 def admin_users():
@@ -283,11 +284,31 @@ def add_user():
     if User.query.filter_by(username=username).first():
         flash('Benutzer existiert bereits!', 'danger')
     else:
-        u = User(username=username, is_admin=is_admin)
+        u = User(username=username, is_admin=is_admin, is_approved=True)
         u.set_password(password)
         db.session.add(u)
         db.session.commit()
         flash('Benutzer angelegt.', 'success')
+    return redirect(url_for('admin.admin_users'))
+
+@bp.route('/admin/users/approve/<int:uid>', methods=['POST'])
+@admin_required
+def approve_user(uid):
+    u = User.query.get_or_404(uid)
+    u.is_approved = True
+    db.session.commit()
+    
+    try:
+        if u.email:
+            from ..extensions import mail
+            from flask_mail import Message
+            msg = Message('Dein Account bei Topp-NFS wurde freigeschaltet!', recipients=[u.email])
+            msg.body = f'Hallo {u.real_name or u.username},\n\ndein Account wurde soeben durch einen Administrator freigeschaltet.\nDu kannst dich ab sofort unter folgendem Link einloggen:\n{url_for("auth.login", _external=True)}'
+            mail.send(msg)
+    except Exception as e:
+        print(f"Fehler beim Senden der Bestätigungsmail an Nutzer: {e}")
+        
+    flash(f'Benutzer {u.username} wurde erfolgreich freigeschaltet!', 'success')
     return redirect(url_for('admin.admin_users'))
 
 @bp.route('/admin/users/edit/<int:uid>', methods=['POST'])

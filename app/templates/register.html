@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="text-center mb-4">
+            <h4 class="fw-bold">Account erstellen</h4>
+            <p class="text-muted small">Registriere dich, um mit dem Lernen zu beginnen.</p>
+        </div>
+        <div class="card p-4 shadow-sm border-0">
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Vollständiger Name</label>
+                    <input type="text" name="real_name" class="form-control bg-light border-0" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Benutzername</label>
+                    <input type="text" name="username" class="form-control bg-light border-0" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted">E-Mail-Adresse</label>
+                    <input type="email" name="email" class="form-control bg-light border-0" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small text-muted">Passwort (min. 8 Zeichen)</label>
+                    <input type="password" name="password" class="form-control bg-light border-0" minlength="8" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 btn-lg rounded-pill shadow-sm">Registrieren</button>
+            </form>
+            <div class="mt-4 text-center">
+                <a href="{{ url_for('auth.login') }}" class="text-muted small text-decoration-none">Bereits registriert? Zum Login</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
