@@ -25,7 +25,6 @@ def allowed_file(fn):
     return '.' in fn and fn.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'csv'}
 
 def build_admin_tree(cards):
-    """Baut eine Baumstruktur für das Admin-Interface"""
     tree = {}
     for card in cards:
         cat_clean = card.category.strip('/')
@@ -50,6 +49,52 @@ def handle_upload(file_obj):
         return url_for('static', filename='uploads/'+fn)
     return None
 
+def check_question_quality(cards):
+    warnings = []
+    absolutes = [' immer ', ' nie ', ' niemals ', ' ausschließlich ', ' grundsätzlich ', ' keinesfalls ']
+    
+    for c in cards:
+        if c.type != 'mc': continue
+        issues = []
+        try:
+            db_opts = json.loads(c.options) if c.options else []
+            final_opts = list(db_opts)
+            if c.answer and c.answer not in final_opts:
+                final_opts.append(c.answer)
+            
+            if len(final_opts) != 4:
+                issues.append(f"Falsche Anzahl an Antwortmöglichkeiten: {len(final_opts)} (Erwartet: 4)")
+
+            if c.answer and final_opts:
+                c_len = len(c.answer)
+                distractors = [o for o in final_opts if o != c.answer]
+                if distractors:
+                    avg_len = sum(len(o) for o in distractors) / max(1, len(distractors))
+                    if avg_len > 0:
+                        # INTELLIGENTE REGEL: Toleranz von 30%, ABER Unterschied muss > 15 Zeichen sein!
+                        # Verhindert Fehlalarme bei sehr kurzen Antworten.
+                        if c_len > avg_len * 1.30 and (c_len - avg_len) > 15:
+                            issues.append(f"Richtige Antwort ist auffällig LÄNGER als die falschen.")
+                        elif c_len < avg_len * 0.70 and (avg_len - c_len) > 15:
+                            issues.append(f"Richtige Antwort ist auffällig KÜRZER als die falschen.")
+
+            found_absolutes = set()
+            for opt in final_opts:
+                opt_lower = f" {opt.lower()} " 
+                for w in absolutes:
+                    if w in opt_lower:
+                        found_absolutes.add(w.strip())
+            if found_absolutes:
+                issues.append(f"Absolut-Wörter gefunden: {', '.join(found_absolutes)}")
+
+        except Exception as e:
+            issues.append("Fehlerhaftes Format in den Optionen")
+
+        if issues:
+            warnings.append({'card': c, 'issues': issues})
+            
+    return warnings
+
 @bp.route('/admin', methods=['GET','POST'])
 @admin_required
 def admin_dashboard():
@@ -72,14 +117,15 @@ def admin_dashboard():
                 if url: c.audio_url = url
             
             c.answer = request.form.get('answer','')
-            if c.type=='mc':
-                opts = [x.strip() for x in request.form.get('options','').split(',')]
+            
+            if c.type == 'mc':
+                opts = [x.strip() for x in request.form.getlist('mc_options') if x.strip()]
                 if c.answer and c.answer not in opts: opts.append(c.answer)
                 c.options = json.dumps(opts)
-            elif c.type == 'anatomy_multi': c.options = request.form.get('multi_json')
-            elif c.type == 'ordering': c.options = request.form.get('ordering_json')
-            elif c.type == 'assignment': c.options = request.form.get('assignment_json')
-            elif c.type == 'calculation': c.options = request.form.get('calc_json')
+            elif c.type == 'anatomy_multi': 
+                c.options = request.form.get('multi_json')
+            elif c.type in ['ordering', 'assignment', 'calculation']: 
+                c.options = request.form.get('ordering_json')
             
             db.session.add(c)
             db.session.commit()
@@ -93,6 +139,8 @@ def admin_dashboard():
     reports = CardReport.query.options(db.joinedload(CardReport.card))\
         .filter_by(resolved=False)\
         .order_by(CardReport.created_at.desc()).all()
+        
+    quality_warnings = check_question_quality(standard_cards_raw)
     
     return render_template('admin.html', 
                            question_tree=question_tree,
@@ -101,7 +149,8 @@ def admin_dashboard():
                            categories=[c[0] for c in db.session.query(Card.category).distinct().all()], 
                            tags=Tag.query.all(), 
                            messages=DashboardMessage.query.all(), 
-                           reports=reports)
+                           reports=reports,
+                           quality_warnings=quality_warnings)
 
 @bp.route('/admin/bulk_delete', methods=['POST'])
 @admin_required
@@ -122,7 +171,6 @@ def bulk_delete():
     flash(f'{count} Fragen gelöscht.', 'success')
     return redirect(url_for('admin.admin_dashboard'))
 
-# --- NEU: KATEGORIE BEARBEITEN (UMBENENNEN / STRUKTUR ÄNDERN) ---
 @bp.route('/admin/category/edit', methods=['POST'])
 @admin_required
 def edit_category():
@@ -136,18 +184,14 @@ def edit_category():
     if old_name == new_name:
         return redirect(url_for('admin.admin_dashboard'))
 
-    # 1. Exakte Matches aktualisieren (Fragen direkt in dieser Kategorie)
     exact_cards = Card.query.filter(Card.category == old_name).all()
     count = 0
     for c in exact_cards:
         c.category = new_name
         count += 1
         
-    # 2. Unterkategorien aktualisieren (Prefix ändern)
-    # Wenn old="Anatomie", new="Körper", dann wird "Anatomie/Knochen" zu "Körper/Knochen"
     sub_cards = Card.query.filter(Card.category.like(f"{old_name}/%")).all()
     for c in sub_cards:
-        # Ersetze den Start des Strings
         c.category = new_name + c.category[len(old_name):]
         count += 1
         
@@ -194,12 +238,23 @@ def edit_card(card_id):
         card.answer = request.form.get('answer')
         card.answer_lat = request.form.get('answer_lat')
         card.explanation = request.form.get('explanation')
+        
+        if card.type == 'mc':
+            opts = [x.strip() for x in request.form.getlist('mc_options') if x.strip()]
+            if card.answer and card.answer not in opts: opts.append(card.answer)
+            card.options = json.dumps(opts)
+        elif card.type == 'anatomy_multi': 
+            card.options = request.form.get('multi_json')
+        elif card.type in ['ordering', 'assignment', 'calculation']: 
+            card.options = request.form.get('ordering_json')
+
         if 'image' in request.files:
             url = handle_upload(request.files['image'])
             if url: card.image_url = url
         if 'audio' in request.files:
             url = handle_upload(request.files['audio'])
             if url: card.audio_url = url
+            
         db.session.commit()
         flash('Gespeichert', 'success')
         return redirect(url_for('admin.admin_dashboard'))
@@ -213,8 +268,6 @@ def dismiss_report(rid):
         r.resolved = True
         db.session.commit()
     return redirect(url_for('admin.admin_dashboard'))
-
-# --- BENUTZER VERWALTUNG ---
 
 @bp.route('/admin/users')
 @admin_required
@@ -265,8 +318,6 @@ def delete_user(uid):
         db.session.commit()
         flash('Benutzer gelöscht.', 'success')
     return redirect(url_for('admin.admin_users'))
-
-# --- WEITERE ADMIN ROUTEN ---
 
 @bp.route('/admin/add_med', methods=['POST'])
 @admin_required
@@ -344,22 +395,16 @@ def import_confirm():
             
             c.category, c.type, c.answer, c.explanation = item['category'], item['type'], item['answer'], item.get('explanation', '')
             
-            # --- UPDATE: FIX FÜR MC-OPTIONEN IMPORT ---
-            # Wenn es MC ist und Optionen vorhanden sind, müssen diese als JSON-Liste gespeichert werden
             if c.type == 'mc' and item.get('options'):
                 raw_opts = item.get('options')
                 try:
-                    # Prüfen, ob es bereits ein gültiger JSON-String ist
                     json.loads(raw_opts)
                     c.options = raw_opts
                 except:
-                    # Falls nicht (z.B. CSV Text "A, B, C"), in Liste umwandeln und als JSON speichern
                     opts_list = [x.strip() for x in raw_opts.split(',') if x.strip()]
                     c.options = json.dumps(opts_list)
             else:
-                # Bei anderen Typen oder leeren Optionen einfach übernehmen
                 c.options = item.get('options')
-            # ------------------------------------------
 
         db.session.commit()
         flash('Import erfolgreich.', 'success')

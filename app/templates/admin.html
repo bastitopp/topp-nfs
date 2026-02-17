@@ -8,6 +8,14 @@
 
 <ul class="nav nav-pills mb-4 gap-2" id="adminTab" role="tablist">
     <li class="nav-item"><button class="nav-link active rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#questions">Standard Fragen</button></li>
+    <li class="nav-item">
+        <button class="nav-link rounded-pill px-4 position-relative border border-warning text-warning fw-bold" data-bs-toggle="tab" data-bs-target="#quality">
+            <i class="bi bi-shield-check"></i> Fragen-TÜV
+            {% if quality_warnings|length > 0 %}
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ quality_warnings|length }}</span>
+            {% endif %}
+        </button>
+    </li>
     <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#meds"><i class="bi bi-capsule"></i> Medikamente</button></li>
     <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#cases"><i class="bi bi-journal-medical"></i> Fallbeispiele</button></li>
     <li class="nav-item"><button class="nav-link rounded-pill px-4 position-relative" data-bs-toggle="tab" data-bs-target="#reports">Meldungen {% if reports|length > 0 %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ reports|length }}</span>{% endif %}</button></li>
@@ -64,9 +72,20 @@
                             <input name="answer" class="form-control">
                         </div>
                         
-                        <div id="field_options" class="mb-3 d-none">
-                            <label class="fw-bold small">Optionen (Komma)</label>
-                            <input name="options" class="form-control">
+                        <div id="field_mc_options" class="mb-3 d-none p-3 bg-white rounded border">
+                            <label class="fw-bold small mb-2 text-secondary"><i class="bi bi-ui-radios me-1"></i> Falsche Antwort-Optionen (Multiple Choice)</label>
+                            <div id="mcOptionsContainer">
+                                <div class="input-group mb-2 shadow-sm">
+                                    <input type="text" name="mc_options" class="form-control" placeholder="Falsche Antwort 1">
+                                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+                                </div>
+                                <div class="input-group mb-2 shadow-sm">
+                                    <input type="text" name="mc_options" class="form-control" placeholder="Falsche Antwort 2">
+                                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-success mt-2 fw-bold" onclick="addMcOption()">+ Weitere Option</button>
+                            <div class="form-text small mt-2"><i class="bi bi-info-circle-fill text-info"></i> Die "Richtige Antwort" aus dem Feld darüber wird beim Lernen automatisch ergänzt.</div>
                         </div>
                         
                         <div id="field_anatomy" class="row g-3 mb-3 d-none">
@@ -187,6 +206,40 @@
         {{ render_del_forms(question_tree) }}
     </div>
 
+    <div class="tab-pane fade" id="quality">
+        <div class="alert alert-warning border-0 shadow-sm mb-4">
+            <h5 class="fw-bold"><i class="bi bi-robot me-2"></i> Automatischer Fragen-TÜV</h5>
+            <p class="mb-0 text-dark">Dieser Check durchsucht deine Multiple-Choice Fragen nach typischen Fehlern (z.B. von KI-generierten Importen), die es den Nutzern zu leicht oder unmöglich machen, die Frage richtig zu beantworten.</p>
+        </div>
+
+        {% if quality_warnings %}
+            <div class="list-group shadow-sm">
+                {% for w in quality_warnings %}
+                <div class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="badge bg-secondary mb-2">{{ w.card.category }}</span>
+                            <h6 class="fw-bold mb-1">{{ w.card.question }}</h6>
+                            <ul class="text-danger small mb-0 ps-3">
+                                {% for issue in w.issues %}
+                                    <li><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ issue }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <a href="{{ url_for('admin.edit_card', card_id=w.card.id) }}" class="btn btn-sm btn-outline-primary ms-3">Korrigieren</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
+                <h4 class="fw-bold">Alles perfekt!</h4>
+                <p class="text-muted">Es wurden keine verdächtigen Muster in deinen MC-Fragen gefunden.</p>
+            </div>
+        {% endif %}
+    </div>
+
     <div class="tab-pane fade" id="meds">
         <div class="card shadow-sm border-0 mb-4 bg-primary bg-opacity-10">
             <div class="card-body">
@@ -269,13 +322,14 @@
 
 <script>
 let nextId = 1;
+
 function updateFormFields() {
     const type = document.getElementById('typeSelect').value;
-    ['field_standard_answer','field_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id=>document.getElementById(id).classList.add('d-none'));
+    ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id=>document.getElementById(id).classList.add('d-none'));
     
     if(type==='flashcard'||type==='mc') { 
         document.getElementById('field_standard_answer').classList.remove('d-none'); 
-        if(type==='mc') document.getElementById('field_options').classList.remove('d-none'); 
+        if(type==='mc') document.getElementById('field_mc_options').classList.remove('d-none'); 
     }
     else if(type==='anatomy') document.getElementById('field_anatomy').classList.remove('d-none');
     else if(type==='anatomy_multi') { 
@@ -283,6 +337,14 @@ function updateFormFields() {
         if(nextId===1 && document.getElementById('multiTableBody').children.length === 0) addMultiRow(); 
     }
     else if(type==='ordering'||type==='assignment') document.getElementById('field_json').classList.remove('d-none');
+}
+
+function addMcOption() {
+    const row = `<div class="input-group mb-2 shadow-sm">
+                    <input type="text" name="mc_options" class="form-control" placeholder="Weitere falsche Antwort">
+                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+                </div>`;
+    document.getElementById('mcOptionsContainer').insertAdjacentHTML('beforeend', row);
 }
 
 function addMultiRow() { 

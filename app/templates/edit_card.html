@@ -62,10 +62,28 @@
                     <input name="answer" class="form-control" value="{{ card.answer }}">
                 </div>
 
-                <div id="field_options" class="mb-3 d-none">
-                    <label class="fw-bold small">MC Optionen (Komma-getrennt)</label>
-                    <input name="options" class="form-control" value="{{ options_str if options_str else card.options }}">
-                    <div class="form-text small">Gib hier die falschen Antworten ein (durch Komma getrennt). Die richtige Antwort wird automatisch hinzugefügt.</div>
+                <div id="field_mc_options" class="mb-3 d-none p-3 bg-white rounded border">
+                    <label class="fw-bold small mb-2 text-secondary"><i class="bi bi-ui-radios me-1"></i> Falsche Antwort-Optionen (Multiple Choice)</label>
+                    <div id="mcOptionsContainer">
+                        {% if card.type == 'mc' and card.options %}
+                            {% set parsed_opts = card.options | from_json %}
+                            {% for opt in parsed_opts %}
+                                {% if opt != card.answer %}
+                                    <div class="input-group mb-2 shadow-sm">
+                                        <input type="text" name="mc_options" class="form-control" value="{{ opt }}">
+                                        <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="input-group mb-2 shadow-sm">
+                                <input type="text" name="mc_options" class="form-control" placeholder="Falsche Antwort 1">
+                                <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-success mt-2 fw-bold" onclick="addMcOption()">+ Weitere Option</button>
+                    <div class="form-text small mt-2"><i class="bi bi-info-circle-fill text-info"></i> Die "Richtige Antwort" aus dem Feld darüber wird beim Lernen automatisch ergänzt.</div>
                 </div>
 
                 <div id="field_anatomy" class="row g-3 mb-3 d-none">
@@ -118,14 +136,14 @@ function updateFormFields() {
     const type = document.getElementById('typeSelect').value;
     
     // Alle ausblenden
-    ['field_standard_answer','field_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id => {
+    ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id => {
         document.getElementById(id).classList.add('d-none');
     });
 
     // Je nach Typ einblenden
     if (type === 'flashcard' || type === 'mc') {
         document.getElementById('field_standard_answer').classList.remove('d-none');
-        if (type === 'mc') document.getElementById('field_options').classList.remove('d-none');
+        if (type === 'mc') document.getElementById('field_mc_options').classList.remove('d-none');
     }
     else if (type === 'anatomy') {
         document.getElementById('field_anatomy').classList.remove('d-none');
@@ -140,6 +158,14 @@ function updateFormFields() {
     else if (type === 'ordering' || type === 'assignment' || type === 'calculation') {
         document.getElementById('field_json').classList.remove('d-none');
     }
+}
+
+function addMcOption() {
+    const row = `<div class="input-group mb-2 shadow-sm">
+                    <input type="text" name="mc_options" class="form-control" placeholder="Weitere falsche Antwort">
+                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+                </div>`;
+    document.getElementById('mcOptionsContainer').insertAdjacentHTML('beforeend', row);
 }
 
 function addMultiRow(data = null) {
