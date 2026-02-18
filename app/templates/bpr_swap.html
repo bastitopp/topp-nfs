@@ -1,0 +1,59 @@
+<div class="tree-node completed mt-4">
+    <div class="node-icon completed"><i class="bi bi-check"></i></div>
+    <h5 class="fw-bold mb-1">{{ old_node.status_badge }}</h5>
+    <div class="text-muted mb-0 small">{{ old_node.situation_text | markdown }}</div>
+    <div class="chosen-action shadow-sm">
+        <i class="bi bi-arrow-return-right me-1"></i> {{ choice.action_text }}
+    </div>
+</div>
+
+{% if error %}
+<div class="tree-node active-node mt-4" id="error-node-container">
+    <div class="node-icon bg-danger text-white border-danger" style="border-color: var(--bs-body-bg) !important;"><i class="bi bi-x-lg"></i></div>
+    <div class="card border-danger shadow-lg mt-2 border-2">
+        <div class="card-body p-4 text-center">
+            <div class="display-1 text-danger mb-3"><i class="bi bi-heartbreak-fill"></i></div>
+            <h3 class="fw-bold text-danger mb-3">Fataler Fehler / SAA Abbruch</h3>
+            <p class="fs-5 text-dark">{{ error }}</p>
+            <hr class="my-4">
+            <a href="{{ url_for('learn.bpr_play', scenario_id=scenario_id) }}" class="btn btn-outline-danger fw-bold rounded-pill px-4">
+                <i class="bi bi-arrow-clockwise me-1"></i> Einsatz neu starten
+            </a>
+        </div>
+    </div>
+</div>
+<script>
+    setTimeout(() => {
+        document.getElementById('error-node-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+</script>
+
+{% else %}
+    {% set current_node = next_node %}
+    {% include 'bpr_node_active.html' %}
+    
+    <script>
+        setTimeout(() => {
+            document.getElementById('active-node-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+    </script>
+{% endif %}
+
+<div id="patient-monitor" class="corpuls-monitor" hx-swap-oob="true">
+    <div class="c-block c-ekg">
+        <div class="c-label">HF <span style="font-size:0.55rem; opacity:0.7;">{{ flags.get('rhythm', '') }}</span></div>
+        <div class="c-val">{{ flags.get('hf', '---') }}</div>
+    </div>
+    <div class="c-block c-spo2">
+        <div class="c-label">SpO2 <span style="font-size:0.55rem; opacity:0.7;">%</span></div>
+        <div class="c-val">{{ flags.get('spo2', '---') }}</div>
+    </div>
+    <div class="c-block c-nibp">
+        <div class="c-label">NIBP</div>
+        <div class="c-val" style="font-size: 1.1rem; margin-top: 5px;">{{ flags.get('rr', '---/---') }}</div>
+    </div>
+    <div class="c-block c-af">
+        <div class="c-label">AF</div>
+        <div class="c-val">{{ flags.get('af', '---') }}</div>
+    </div>
+</div>

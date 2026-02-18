@@ -24,6 +24,11 @@
             {% endif %}
         </button>
     </li>
+    <li class="nav-item">
+        <button class="nav-link rounded-pill px-4 fw-bold text-info border border-info bg-info bg-opacity-10" data-bs-toggle="tab" data-bs-target="#bpr">
+            <i class="bi bi-diagram-3-fill"></i> BPR-Trainer
+        </button>
+    </li>
     <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#meds"><i class="bi bi-capsule"></i> Medikamente</button></li>
     <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#cases"><i class="bi bi-journal-medical"></i> Fallbeispiele</button></li>
     <li class="nav-item"><button class="nav-link rounded-pill px-4 position-relative" data-bs-toggle="tab" data-bs-target="#reports">Meldungen {% if reports|length > 0 %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ reports|length }}</span>{% endif %}</button></li>
@@ -225,6 +230,65 @@
         {{ render_del_forms(question_tree) }}
     </div>
 
+    <div class="tab-pane fade" id="bpr" role="tabpanel">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4><i class="bi bi-diagram-3 text-info me-2"></i> BPR-Szenarien verwalten</h4>
+            <button class="btn btn-info text-white fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addScenarioModal">
+                <i class="bi bi-plus-lg me-1"></i> Neues Szenario
+            </button>
+        </div>
+
+        <div class="list-group shadow-sm">
+            {% for s in scenarios %}
+            <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                <div>
+                    <h5 class="mb-1 fw-bold">{{ s.title }}</h5>
+                    <p class="mb-0 text-muted small"><i class="bi bi-info-circle me-1"></i> Stichwort: <strong>{{ s.dispatch_text }}</strong> | Knotenpunkte: {{ s.nodes|length }}</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('admin.edit_bpr_scenario', scenario_id=s.id) }}" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-pencil-square"></i> Editor öffnen
+                    </a>
+                    <form action="{{ url_for('admin.delete_bpr_scenario', scenario_id=s.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Szenario mit allen Knoten unwiderruflich löschen?');">
+                        <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-muted text-center p-5 bg-white border rounded">
+                <i class="bi bi-diagram-3 display-4 text-muted opacity-25 mb-3 d-block"></i>
+                <h5>Keine Szenarien vorhanden</h5>
+                <p>Klicke oben auf "Neues Szenario", um den ersten interaktiven Behandlungspfad anzulegen.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="modal fade" id="addScenarioModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form action="{{ url_for('admin.add_bpr_scenario') }}" method="POST">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Neues BPR-Szenario erstellen</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">Titel (z.B. SAA 1.1 - ACS)</label>
+                                <input type="text" name="title" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">Einsatzstichwort (z.B. RD1 unklarer Thoraxschmerz)</label>
+                                <input type="text" name="dispatch_text" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-info text-white fw-bold">Erstellen & zum Editor</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="tab-pane fade" id="quality">
         <div class="alert alert-warning border-0 shadow-sm mb-4">
             <h5 class="fw-bold"><i class="bi bi-robot me-2"></i> Automatischer Fragen-TÜV</h5>

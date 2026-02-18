@@ -1,0 +1,80 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<style>
+    body { padding-bottom: 80px; }
+    
+    /* Baumstruktur-Design */
+    .sop-tree { position: relative; padding-left: 25px; margin-top: 20px; }
+    .sop-tree::before { content: ''; position: absolute; top: 0; bottom: 0; left: 39px; width: 3px; background-color: #e9ecef; z-index: 1; }
+    .tree-node { position: relative; margin-bottom: 30px; padding-left: 55px; z-index: 2; }
+    .node-icon { position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; border: 4px solid var(--bs-body-bg); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .tree-node.completed { opacity: 0.6; transition: opacity 0.3s; }
+    .tree-node.completed:hover { opacity: 1; }
+    .node-icon.completed { background-color: #198754; color: white; }
+    .chosen-action { display: inline-block; background-color: #e8f5e9; color: #198754; border: 1px solid #c8e6c9; padding: 6px 12px; border-radius: 8px; font-weight: 600; margin-top: 5px; font-size: 0.9rem;}
+    .node-icon.active { background-color: #0d6efd; color: white; animation: pulse-ring 1.5s infinite; }
+    @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0); } 100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); } }
+    .active-card { border-radius: 16px; border: 2px solid #e9ecef; background-color: var(--bs-body-bg); }
+    .btn-sop { border-radius: 10px; font-weight: 600; transition: transform 0.1s; }
+    .btn-sop:active { transform: scale(0.98); }
+
+    /* --- PATIENTENMONITOR DESIGN --- */
+    #patient-monitor {
+        background-color: #000000 !important;
+        border: 2px solid #444;
+        border-radius: 12px;
+        display: flex !important;
+        justify-content: space-around;
+        padding: 10px;
+        min-height: 80px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    .c-block { display: flex; flex-direction: column; align-items: center; min-width: 65px; }
+    .c-label { font-size: 0.65rem; font-weight: bold; color: #999; text-transform: uppercase; margin-bottom: 2px; }
+    .c-val { font-family: 'Courier New', monospace; font-size: 1.7rem; font-weight: bold; line-height: 1; text-shadow: 0 0 5px currentColor; }
+    
+    .c-ekg { color: #00ff00; }  /* HF - Grün */
+    .c-spo2 { color: #00ffff; } /* SpO2 - Cyan */
+    .c-nibp { color: #ff3333; } /* Blutdruck - Rot */
+    .c-af { color: #ffff00; }   /* Atemfrequenz - Gelb */
+</style>
+
+<div class="container" style="max-width: 800px;">
+    
+    <div class="p-3 rounded-4 shadow-sm border mb-4" style="background-color: var(--bs-body-bg); position: sticky; top: 75px; z-index: 1000;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <div class="fw-bold fs-6 mb-0">{{ scenario.title }}</div>
+                <div class="text-muted small">{{ scenario.dispatch_text }}</div>
+            </div>
+            <a href="{{ url_for('learn.bpr_index') }}" class="btn btn-sm btn-outline-secondary rounded-pill">Abbrechen</a>
+        </div>
+
+        <div id="patient-monitor">
+            <div class="c-block c-ekg">
+                <span class="c-label">HF <small style="font-size:0.5rem; color:#0f0;">{{ flags.get('rhythm', '') if flags else '' }}</small></span>
+                <span class="c-val">{{ flags.get('hf', '---') if flags else '---' }}</span>
+            </div>
+            <div class="c-block c-spo2">
+                <span class="c-label">SpO2</span>
+                <span class="c-val">{{ flags.get('spo2', '---') if flags else '---' }}</span>
+            </div>
+            <div class="c-block c-nibp">
+                <span class="c-label">NIBP</span>
+                <span class="c-val" style="font-size: 1.3rem; margin-top: 4px;">{{ flags.get('rr', '---/---') if flags else '---/---' }}</span>
+            </div>
+            <div class="c-block c-af">
+                <span class="c-label">AF</span>
+                <span class="c-val">{{ flags.get('af', '---') if flags else '---' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="sop-tree" id="sop-container">
+        {% include 'bpr_node_active.html' %}
+    </div>
+
+</div>
+{% endblock %}

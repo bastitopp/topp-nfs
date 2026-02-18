@@ -110,45 +110,14 @@
         .nav-profile-img { width: 32px; height: 32px; object-fit: cover; border-radius: 50%; border: 2px solid var(--bs-border-color); }
         .badge-lvl { position: absolute; bottom: -2px; right: -4px; background: #ffc107; color: #000; font-size: 0.55rem; font-weight: 800; padding: 1px 3px; border-radius: 4px; border: 1px solid var(--bs-body-bg); line-height: 1; }
         
+        /* NEU: Optionale CSS-Anpassung, um die Überblendung flüssiger zu machen */
         ::view-transition-old(root),
         ::view-transition-new(root) {
             animation-duration: 0.25s;
         }
-
-        /* --- HTMX Ladeanimation (Anti-Freeze Fix) --- */
-        #global-loader {
-            display: none; /* Im Normalzustand SOFORT komplett aus dem Layout entfernen */
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background-color: rgba(var(--bs-body-bg-rgb), 0.6);
-            backdrop-filter: blur(4px);
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #global-loader.htmx-request {
-            display: flex; /* Layout aktivieren, wenn geladen wird */
-            opacity: 0;
-            /* 150ms abwarten (damit schnelle Klicks unsichtbar bleiben), dann in 0.2s weich einblenden */
-            animation: fadeInLoader 0.2s ease-in 150ms forwards;
-        }
-
-        @keyframes fadeInLoader {
-            to { opacity: 1; }
-        }
     </style>
 </head>
-<body class="d-flex flex-column" hx-boost="true" hx-indicator="#global-loader">
-
-    <div id="global-loader">
-        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-            <span class="visually-hidden">Lade...</span>
-        </div>
-    </div>
+<body class="d-flex flex-column" hx-boost="true">
 
     <nav class="navbar navbar-expand-lg navbar-top sticky-top border-bottom">
         <div class="container">
@@ -164,6 +133,11 @@
                             <button class="btn nav-link p-2 no-loader" onclick="toggleSearch()"><i class="bi bi-search fs-5"></i></button>
                         </li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('learn.exam_index') }}">Prüfung</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'text-primary fw-bold' if '/bpr' in request.path }}" href="{{ url_for('learn.bpr_index') }}">
+                                <i class="bi bi-diagram-3-fill me-1 d-none d-lg-inline"></i>BPR-Trainer
+                            </a>
+                        </li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('main.leaderboard') }}">Rangliste</a></li>
                         {% if current_user.is_admin %}
                         <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('admin.admin_dashboard') }}"><i class="bi bi-gear-fill"></i></a></li>
@@ -249,6 +223,10 @@
     <div class="mobile-nav d-lg-none">
         <a href="{{ url_for('main.index') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.index') }}"><i class="bi bi-house-door{{ '-fill' if request.path == url_for('main.index') }}"></i><span>Start</span></a>
         <a href="{{ url_for('learn.exam_index') }}" class="mobile-nav-item {{ 'active' if '/exam' in request.path }}"><i class="bi bi-clipboard-check{{ '-fill' if '/exam' in request.path }}"></i><span>Prüfung</span></a>
+        <a href="{{ url_for('learn.bpr_index') }}" class="mobile-nav-item {{ 'active' if '/bpr' in request.path }}">
+            <i class="bi bi-diagram-3{{ '-fill' if '/bpr' in request.path }}"></i>
+            <span>BPR</span>
+        </a>
         <a href="{{ url_for('main.leaderboard') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.leaderboard') }}"><i class="bi bi-trophy{{ '-fill' if request.path == url_for('main.leaderboard') }}"></i><span>Rang</span></a>
         {% if current_user.is_admin %}<a href="{{ url_for('admin.admin_dashboard') }}" class="mobile-nav-item {{ 'active' if '/admin' in request.path }}"><i class="bi bi-gear{{ '-fill' if '/admin' in request.path }}"></i><span>Admin</span></a>{% endif %}
         <a href="{{ url_for('main.profile') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.profile') }}"><div class="profile-wrapper">{% if current_user.profile_image %}<img src="{{ current_user.profile_image }}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">{% else %}<i class="bi bi-person{{ '-fill' if request.path == url_for('main.profile') }}"></i>{% endif %}</div><span>Profil</span></a>
@@ -286,7 +264,7 @@
             updateIcons(document.documentElement.getAttribute('data-bs-theme'));
         });
 
-        // HTMX Event: Führt Theme-Aktualisierungen auch nach einem weichen Seitenwechsel aus
+        // NEU: HTMX Event: Führt Theme-Aktualisierungen auch nach einem weichen Seitenwechsel aus
         document.addEventListener('htmx:afterSwap', () => {
             updateIcons(document.documentElement.getAttribute('data-bs-theme'));
         });

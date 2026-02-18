@@ -16,9 +16,15 @@ def get_serializer():
 @bp.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")
 def login():
-    if request.method=='POST':
-        u = User.query.filter_by(username=request.form['username']).first()
-        if u and u.check_password(request.form['password']): 
+    if request.method == 'POST':
+        # Der identifier kann nun Benutzername oder E-Mail sein
+        identifier = request.form['username']
+        password = request.form['password']
+        
+        # Suche in der Datenbank nach Übereinstimmung in beiden Spalten
+        u = User.query.filter((User.username == identifier) | (User.email == identifier)).first()
+        
+        if u and u.check_password(password): 
             # Prüfen ob Account freigeschaltet ist
             if not u.is_approved:
                 flash('Dein Account muss erst von einem Administrator freigeschaltet werden.', 'warning')
@@ -30,7 +36,8 @@ def login():
             u.last_active = datetime.utcnow()
             db.session.commit()
             return redirect(url_for('main.index'))
-        flash('Fehler: Benutzer oder Passwort falsch', 'danger')
+            
+        flash('Fehler: Benutzer/E-Mail oder Passwort falsch', 'danger')
     return render_template('login.html')
 
 @bp.route('/register', methods=['GET', 'POST'])
@@ -71,8 +78,7 @@ def register():
         except Exception as e:
             print(f"Fehler beim Senden der Admin-Mail: {e}")
             
-        # --- HIER IST DIE ANGEPASSTE NACHRICHT ---
-        flash('Registrierung abgeschickt. Nach erfolgreicher Freigabe, bekommen Sie eine E-Mail zur Bestätigung', 'success')
+        flash('Registrierung abgeschickt. Nach erfolgreicher Freigabe bekommen Sie eine E-Mail zur Bestätigung.', 'success')
         return redirect(url_for('auth.login'))
         
     return render_template('register.html')
@@ -96,7 +102,7 @@ def forgot_password():
             
             try:
                 msg = Message('Passwort zurücksetzen - Topp-NFS', recipients=[user.email])
-                msg.body = f'Klicke auf den Link um dein Passwort zurückzusetzen: {link}\n\nLink ist 1 Stunde gültig.'
+                msg.body = f'Klicke auf den Link, um dein Passwort zurückzusetzen: {link}\n\nDer Link ist 1 Stunde gültig.'
                 mail.send(msg)
                 flash('Link gesendet. Bitte Postfach prüfen.', 'info')
             except Exception as e:

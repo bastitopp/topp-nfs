@@ -1,36 +1,52 @@
 {% extends "layout.html" %}
+
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-6 col-lg-4">
-        <div class="text-center mb-4">
-            <div class="d-inline-flex align-items-center justify-content-center bg-danger bg-opacity-10 rounded-circle mb-3" style="width: 80px; height: 80px;">
-                <i class="bi bi-heart-pulse-fill text-danger" style="font-size: 40px;"></i>
-            </div>
-            
-            <h4 class="fw-bold">Willkommen zurück</h4>
-            <p class="text-muted small">Bitte logge dich ein, um fortzufahren.</p>
-        </div>
-        <div class="card p-4 shadow-sm border-0">
-            <form method="POST">
-                <div class="mb-3">
-                    <label class="form-label small text-muted">Benutzername</label>
-                    <input type="text" name="username" class="form-control form-control-lg bg-light border-0" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small text-muted">Passwort</label>
-                    <input type="password" name="password" class="form-control form-control-lg bg-light border-0" required>
+<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
+    <div class="col-md-5">
+        <div class="card shadow-lg border-0" style="border-radius: 20px;">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <h2 class="fw-bold">Willkommen zurück</h2>
+                    <p class="text-muted">Melde dich an, um fortzufahren</p>
                 </div>
                 
-                <div class="mb-4 form-check">
-                    <input type="checkbox" class="form-check-input" id="rememberCheck" name="remember">
-                    <label class="form-check-label small text-muted" for="rememberCheck">Angemeldet bleiben</label>
-                </div>
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Benutzername oder E-Mail</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="bi bi-person"></i></span>
+                            <input type="text" name="username" class="form-control bg-light border-0" placeholder="Name oder E-Mail" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small">Passwort</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="bi bi-lock"></i></span>
+                            <input type="password" name="password" class="form-control bg-light border-0" placeholder="••••••••" required>
+                        </div>
+                    </div>
 
-                <button type="submit" class="btn btn-primary w-100 btn-lg rounded-pill shadow-sm">Einloggen</button>
-            </form>
-            <div class="mt-4 text-center">
-                <a href="/forgot-password" class="text-muted small text-decoration-none">Passwort vergessen?</a><br>
-                <a href="{{ url_for('auth.register') }}" class="btn btn-outline-secondary btn-sm rounded-pill mt-3 px-4">Noch keinen Account? Registrieren</a>
+                    <div class="text-end mb-4">
+                        <a href="{{ url_for('auth.forgot_password') }}" class="small text-decoration-none">Passwort vergessen?</a>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" name="remember" id="remember">
+                        <label class="form-check-label small text-muted" for="remember">
+                            Angemeldet bleiben
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 py-3 fw-bold rounded-pill shadow-sm">
+                        Anmelden <i class="bi bi-arrow-right ms-2"></i>
+                    </button>
+                </form>
+                
+                <div class="text-center mt-4">
+                    <p class="small text-muted mb-0">Noch keinen Account?</p>
+                    <a href="{{ url_for('auth.register') }}" class="fw-bold text-decoration-none">Jetzt registrieren</a>
+                </div>
             </div>
         </div>
     </div>

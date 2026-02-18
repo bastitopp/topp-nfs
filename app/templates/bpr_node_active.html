@@ -1,0 +1,32 @@
+<div class="tree-node active-node mt-4" id="active-node-container">
+    <div class="node-icon active"><i class="bi bi-arrow-down"></i></div>
+    
+    <div class="card active-card shadow-sm mt-2">
+        <div class="card-body p-4">
+            <h4 class="fw-bold text-primary mb-3">{{ current_node.status_badge }}</h4>
+            <div class="fs-5 mb-4 text-body">{{ current_node.situation_text | markdown }}</div>
+            
+            {% if current_node.is_endpoint %}
+                <div class="alert alert-{{ 'success' if current_node.is_success else 'warning' }} text-center border-0 shadow-sm mt-4">
+                    <h4 class="fw-bold mb-2">
+                        <i class="bi bi-check-circle-fill"></i> Einsatz beendet
+                    </h4>
+                    <p class="mb-0">Du hast die Station erfolgreich abgearbeitet und XP gesammelt!</p>
+                </div>
+                <a href="{{ url_for('learn.bpr_index') }}" class="btn btn-primary w-100 fw-bold rounded-pill mt-2">Nächsten Einsatz starten</a>
+            {% else %}
+                <div class="d-grid gap-3 mt-4">
+                    {% for c in current_node.choices %}
+                    <button class="btn btn-outline-secondary btn-lg btn-sop py-3 px-3 d-flex align-items-center text-start text-dark"
+                            hx-post="{{ url_for('learn.bpr_choice', choice_id=c.id) }}"
+                            hx-target="#active-node-container"
+                            hx-swap="outerHTML transition:false">
+                        <span class="fs-5 me-3 fw-bold border-end pe-3 text-primary">{{ loop.index }}</span> 
+                        {{ c.action_text }}
+                    </button>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

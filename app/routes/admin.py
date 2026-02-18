@@ -8,7 +8,8 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 from sqlalchemy import or_
 from ..extensions import db
-from ..models import Card, User, Tag, DashboardMessage, CardReport, UserProgress
+# HIER NEU: BPR Modelle importiert
+from ..models import Card, User, Tag, DashboardMessage, CardReport, UserProgress, Scenario, ScenarioNode, ScenarioChoice, ChoiceOutcome
 
 bp = Blueprint('admin', __name__)
 
@@ -71,7 +72,6 @@ def check_question_quality(cards):
                 if distractors:
                     avg_len = sum(len(o) for o in distractors) / max(1, len(distractors))
                     if avg_len > 0:
-                        # INTELLIGENTE REGEL: Toleranz von 30%, ABER Unterschied muss > 15 Zeichen sein!
                         if c_len > avg_len * 1.30 and (c_len - avg_len) > 15:
                             issues.append(f"Richtige Antwort ist auffällig LÄNGER als die falschen.")
                         elif c_len < avg_len * 0.70 and (avg_len - c_len) > 15:
@@ -141,6 +141,9 @@ def admin_dashboard():
         
     quality_warnings = check_question_quality(standard_cards_raw)
     
+    # NEU: Szenarien an das Template übergeben
+    scenarios = Scenario.query.all()
+    
     return render_template('admin.html', 
                            question_tree=question_tree,
                            med_cards=[c for c in all_cards if c.type == 'calculation'], 
@@ -149,7 +152,8 @@ def admin_dashboard():
                            tags=Tag.query.all(), 
                            messages=DashboardMessage.query.all(), 
                            reports=reports,
-                           quality_warnings=quality_warnings)
+                           quality_warnings=quality_warnings,
+                           scenarios=scenarios)
 
 @bp.route('/admin/bulk_delete', methods=['POST'])
 @admin_required
@@ -254,7 +258,6 @@ def edit_card(card_id):
             url = handle_upload(request.files['audio'])
             if url: card.audio_url = url
             
-        # NEU: Zugehörige offene Meldungen für diese Frage suchen und löschen
         reports = CardReport.query.filter_by(card_id=card.id, resolved=False).all()
         for r in reports:
             db.session.delete(r)
@@ -262,14 +265,12 @@ def edit_card(card_id):
         db.session.commit()
         flash('Gespeichert und offene Meldungen automatisch geschlossen!', 'success')
         
-        # NEU: Weiterleitung zurück (z.B. ins Quiz oder in den Reports-Tab), falls übergeben
         next_url = request.form.get('next')
         if next_url:
             return redirect(next_url)
             
         return redirect(url_for('admin.admin_dashboard'))
     
-    # URL Parameter 'next' abfangen und ans Template weitergeben
     next_url = request.args.get('next')
     return render_template('edit_card.html', card=card, next_url=next_url)
 
@@ -281,8 +282,6 @@ def dismiss_report(rid):
         r.resolved = True
         db.session.commit()
     return redirect(url_for('admin.admin_dashboard') + '#reports')
-
-# --- BENUTZER VERWALTUNG ---
 
 @bp.route('/admin/users')
 @admin_required
@@ -311,17 +310,6 @@ def approve_user(uid):
     u = User.query.get_or_404(uid)
     u.is_approved = True
     db.session.commit()
-    
-    try:
-        if u.email:
-            from ..extensions import mail
-            from flask_mail import Message
-            msg = Message('Dein Account bei Topp-NFS wurde freigeschaltet!', recipients=[u.email])
-            msg.body = f'Hallo {u.real_name or u.username},\n\ndein Account wurde soeben durch einen Administrator freigeschaltet.\nDu kannst dich ab sofort unter folgendem Link einloggen:\n{url_for("auth.login", _external=True)}'
-            mail.send(msg)
-    except Exception as e:
-        print(f"Fehler beim Senden der Bestätigungsmail an Nutzer: {e}")
-        
     flash(f'Benutzer {u.username} wurde erfolgreich freigeschaltet!', 'success')
     return redirect(url_for('admin.admin_users'))
 
@@ -445,3 +433,116 @@ def import_confirm():
         flash('Import erfolgreich.', 'success')
     except Exception as e: flash(f'Import Fehler: {e}', 'danger')
     return redirect(url_for('admin.admin_dashboard'))
+
+# ==========================================
+# --- BPR SZENARIO EDITOR ROUTEN ---
+# ==========================================
+
+@bp.route('/admin/bpr/add', methods=['POST'])
+@admin_required
+def add_bpr_scenario():
+    """Erstellt ein neues leeres Szenario"""
+    title = request.form.get('title')
+    dispatch = request.form.get('dispatch_text')
+    
+    s = Scenario(title=title, dispatch_text=dispatch)
+    db.session.add(s)
+    db.session.commit()
+    
+    flash('Neues Szenario erstellt. Du kannst jetzt Knotenpunkte hinzufügen.', 'success')
+    return redirect(url_for('admin.edit_bpr_scenario', scenario_id=s.id))
+
+@bp.route('/admin/bpr/edit/<int:scenario_id>', methods=['GET'])
+@admin_required
+def edit_bpr_scenario(scenario_id):
+    """Zeigt den Editor für ein bestimmtes Szenario an"""
+    scenario = Scenario.query.get_or_404(scenario_id)
+    return render_template('admin_bpr_editor.html', scenario=scenario)
+
+@bp.route('/admin/bpr/set_start/<int:scenario_id>', methods=['POST'])
+@admin_required
+def set_bpr_start(scenario_id):
+    """Legt fest, welcher Knotenpunkt der Startpunkt ist"""
+    s = Scenario.query.get_or_404(scenario_id)
+    s.first_node_id = request.form.get('first_node_id', type=int)
+    db.session.commit()
+    flash('Startpunkt aktualisiert.', 'success')
+    return redirect(url_for('admin.edit_bpr_scenario', scenario_id=s.id))
+
+@bp.route('/admin/bpr/delete/<int:scenario_id>', methods=['POST'])
+@admin_required
+def delete_bpr_scenario(scenario_id):
+    """Löscht ein gesamtes Szenario mit allen Ästen"""
+    s = Scenario.query.get_or_404(scenario_id)
+    db.session.delete(s)
+    db.session.commit()
+    flash('Szenario gelöscht.', 'success')
+    return redirect(url_for('admin.admin_dashboard'))
+
+@bp.route('/admin/bpr/node/add/<int:scenario_id>', methods=['POST'])
+@admin_required
+def add_bpr_node(scenario_id):
+    """Fügt einen neuen Knotenpunkt (Node) zum Szenario hinzu"""
+    s = Scenario.query.get_or_404(scenario_id)
+    n = ScenarioNode(
+        scenario_id=s.id,
+        situation_text=request.form.get('situation_text'),
+        status_badge=request.form.get('status_badge', 'Unklare Diagnose'),
+        is_endpoint='is_endpoint' in request.form,
+        is_success='is_success' in request.form
+    )
+    db.session.add(n)
+    db.session.commit()
+    
+    # Wenn es der erste Knoten überhaupt ist, mache ihn direkt zum Startpunkt
+    if not s.first_node_id:
+        s.first_node_id = n.id
+        db.session.commit()
+        
+    flash('Knotenpunkt (Schritt) erfolgreich hinzugefügt.', 'success')
+    return redirect(url_for('admin.edit_bpr_scenario', scenario_id=s.id))
+
+@bp.route('/admin/bpr/choice/add/<int:node_id>', methods=['POST'])
+@admin_required
+def add_bpr_choice(node_id):
+    """Fügt einem Knotenpunkt einen Klick-Button (Choice) hinzu"""
+    n = ScenarioNode.query.get_or_404(node_id)
+    c = ScenarioChoice(
+        node_id=n.id, 
+        action_text=request.form.get('action_text')
+    )
+    db.session.add(c)
+    db.session.commit()
+    flash('Auswahlmöglichkeit hinzugefügt.', 'success')
+    return redirect(url_for('admin.edit_bpr_scenario', scenario_id=n.scenario_id))
+
+@bp.route('/admin/bpr/outcome/add/<int:choice_id>', methods=['POST'])
+@admin_required
+def add_bpr_outcome(choice_id):
+    """Fügt einem Button ein Ergebnis (Outcome) hinzu"""
+    c = ScenarioChoice.query.get_or_404(choice_id)
+    
+    # Sicherstellen, dass JSON Eingaben valid sind
+    req_flags = request.form.get('required_flags')
+    set_flags = request.form.get('set_flags')
+    
+    try:
+        r_json = json.loads(req_flags) if req_flags else None
+        s_json = json.loads(set_flags) if set_flags else None
+    except:
+        flash('Fehler: Die Flags müssen valides JSON Format haben (z.B. {"zugang": true}).', 'danger')
+        return redirect(url_for('admin.edit_bpr_scenario', scenario_id=c.node.scenario_id))
+
+    o = ChoiceOutcome(
+        choice_id=c.id,
+        next_node_id=request.form.get('next_node_id', type=int) or None,
+        probability_weight=request.form.get('probability', type=int, default=100),
+        required_flags=r_json,
+        set_flags=s_json,
+        is_fatal_error='is_fatal' in request.form,
+        error_feedback=request.form.get('error_feedback')
+    )
+    db.session.add(o)
+    db.session.commit()
+    flash('Ergebnis (Outcome) hinzugefügt.', 'success')
+    return redirect(url_for('admin.edit_bpr_scenario', scenario_id=c.node.scenario_id))

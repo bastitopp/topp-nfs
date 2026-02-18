@@ -1,0 +1,218 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <div>
+            <h2 class="fw-bold mb-0">
+                <i class="bi bi-diagram-3-fill text-primary me-2"></i> {{ scenario.title }}
+            </h2>
+            <p class="text-muted mb-0">Einsatzstichwort: {{ scenario.dispatch_text }}</p>
+        </div>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Zurück zum Admin
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-bold m-0">Knotenpunkte (Nodes)</h4>
+                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addNodeModal">
+                    <i class="bi bi-plus-circle me-1"></i> Neuer Schritt
+                </button>
+            </div>
+
+            {% for node in scenario.nodes %}
+            <div class="card mb-4 border-{{ 'primary' if scenario.first_node_id == node.id else 'secondary' }} shadow-sm">
+                <div class="card-header bg-{{ 'primary text-white' if scenario.first_node_id == node.id else 'light' }} d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">
+                        #{{ node.id }} | Badge: {{ node.status_badge }}
+                        {% if scenario.first_node_id == node.id %} <span class="badge bg-warning text-dark ms-2">STARTPUNKT</span>{% endif %}
+                        {% if node.is_endpoint %} <span class="badge bg-danger ms-2">ENDE</span>{% endif %}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted fst-italic mb-3">"{{ node.situation_text }}"</p>
+                    
+                    <hr>
+                    <h6 class="fw-bold text-uppercase small text-muted">Auswahlmöglichkeiten (Buttons)</h6>
+                    
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for choice in node.choices %}
+                        <li class="list-group-item px-0">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold"><i class="bi bi-chevron-right text-primary me-1"></i> {{ choice.action_text }}</span>
+                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addOutcomeModal" data-choice-id="{{ choice.id }}">
+                                    + Outcome hinzufügen
+                                </button>
+                            </div>
+                            
+                            {% if choice.outcomes %}
+                            <div class="mt-2 ps-4 border-start border-2 border-primary">
+                                {% for outcome in choice.outcomes %}
+                                <div class="p-2 mb-1 bg-light rounded small">
+                                    <span class="badge bg-info">{{ outcome.probability_weight }}%</span> 
+                                    <i class="bi bi-arrow-right mx-1"></i> 
+                                    {% if outcome.is_fatal_error %}
+                                        <span class="text-danger fw-bold">FATAL ERROR:</span> {{ outcome.error_feedback }}
+                                    {% else %}
+                                        Gehe zu Node <strong>#{{ outcome.next_node_id }}</strong>
+                                    {% endif %}
+                                    
+                                    {% if outcome.required_flags %}
+                                    <br><span class="text-muted"><i class="bi bi-lock-fill"></i> Braucht: {{ outcome.required_flags }}</span>
+                                    {% endif %}
+                                    {% if outcome.set_flags %}
+                                    <br><span class="text-success"><i class="bi bi-plus-circle-fill"></i> Setzt: {{ outcome.set_flags }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-danger small ps-4 mt-1"><i class="bi bi-exclamation-triangle"></i> Dieser Button führt ins Nichts!</div>
+                            {% endif %}
+                        </li>
+                        {% else %}
+                        <li class="list-group-item px-0 text-muted small">Keine Buttons für diesen Knoten.</li>
+                        {% endfor %}
+                    </ul>
+
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addChoiceModal" data-node-id="{{ node.id }}">
+                        <i class="bi bi-plus"></i> Button hinzufügen
+                    </button>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">Noch keine Knotenpunkte vorhanden. Klicke oben auf "Neuer Schritt".</div>
+            {% endfor %}
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-3">Einstellungen</h5>
+                    <form action="{{ url_for('admin.set_bpr_start', scenario_id=scenario.id) }}" method="POST">
+                        <label class="form-label text-muted small">Start-Knoten festlegen</label>
+                        <select name="first_node_id" class="form-select mb-2">
+                            <option value="">-- Bitte wählen --</option>
+                            {% for node in scenario.nodes %}
+                            <option value="{{ node.id }}" {% if scenario.first_node_id == node.id %}selected{% endif %}>
+                                Node #{{ node.id }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-primary w-100">Startpunkt speichern</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="alert alert-warning small">
+                <strong><i class="bi bi-info-circle"></i> Kurzanleitung:</strong><br>
+                1. Erstelle die "Situation" (Node).<br>
+                2. Füge der Situation "Antwort-Buttons" (Choices) hinzu.<br>
+                3. Weise jedem Button "Ergebnisse" (Outcomes) zu, die festlegen, zu welcher nächsten Situation (Node) der Klick führt.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addNodeModal">
+    <div class="modal-dialog">
+        <form action="{{ url_for('admin.add_bpr_node', scenario_id=scenario.id) }}" method="POST" class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Neuer Knoten (Situation)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Status Badge (z.B. "Diagnostik" oder "SAA 1.1 ACS")</label>
+                    <input type="text" name="status_badge" class="form-control" value="Diagnostik">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Situations-Text (Was passiert gerade? Werte?)</label>
+                    <textarea name="situation_text" class="form-control" rows="4" required></textarea>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" name="is_endpoint" id="ep">
+                    <label class="form-check-label text-danger" for="ep">Dies ist das Ende des Einsatzes</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="is_success" id="suc">
+                    <label class="form-check-label text-success" for="suc">Bei Erreichen dieses Endes ist die SAA bestanden (Erfolg)</label>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-success">Speichern</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="addChoiceModal">
+    <div class="modal-dialog">
+        <form id="addChoiceForm" method="POST" class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Neuer Button</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Text auf dem Button (z.B. "Zugang legen")</label>
+                    <input type="text" name="action_text" class="form-control" required>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">Button anlegen</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="addOutcomeModal">
+    <div class="modal-dialog">
+        <form id="addOutcomeForm" method="POST" class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Ergebnis (Outcome) verknüpfen</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Zu welchem Schritt (Node) führt das?</label>
+                    <select name="next_node_id" class="form-select">
+                        <option value="">-- Abbruch / Fatal Error --</option>
+                        {% for node in scenario.nodes %}
+                        <option value="{{ node.id }}">Node #{{ node.id }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Wahrscheinlichkeit (%)</label>
+                    <input type="number" name="probability" class="form-control" value="100" min="1" max="100">
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label text-info"><i class="bi bi-lock-fill"></i> Benötigte Bedingungen (JSON, Optional)</label>
+                    <input type="text" name="required_flags" class="form-control" placeholder='{"zugang_liegt": true}'>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-success"><i class="bi bi-plus-circle-fill"></i> Flag setzen (JSON, Optional)</label>
+                    <input type="text" name="set_flags" class="form-control" placeholder='{"zugang_liegt": true}'>
+                </div>
+                <hr>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" name="is_fatal" id="fatal">
+                    <label class="form-check-label text-danger" for="fatal">Das ist ein tödlicher Fehler (Bricht Einsatz sofort ab)</label>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Feedback bei Fehler</label>
+                    <textarea name="error_feedback" class="form-control" rows="2" placeholder="Falsch! Patient verträgt kein ASS!"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">Outcome speichern</button></div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // JS für dynamische Modals (Form Actions setzen)
+    document.getElementById('addChoiceModal').addEventListener('show.bs.modal', function (event) {
+        let button = event.relatedTarget;
+        let nodeId = button.getAttribute('data-node-id');
+        this.querySelector('#addChoiceForm').action = "/admin/bpr/choice/add/" + nodeId;
+    });
+    document.getElementById('addOutcomeModal').addEventListener('show.bs.modal', function (event) {
+        let button = event.relatedTarget;
+        let choiceId = button.getAttribute('data-choice-id');
+        this.querySelector('#addOutcomeForm').action = "/admin/bpr/outcome/add/" + choiceId;
+    });
+</script>
+{% endblock %}

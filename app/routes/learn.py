@@ -4,8 +4,10 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_required, current_user
 from sqlalchemy.sql.expression import func, or_
+from sqlalchemy.orm.attributes import flag_modified  # Wichtig für JSON Updates
 from ..extensions import db
-from ..models import Card, UserProgress, ExamAttempt, ExamDetail, CardReport
+
+from ..models import Card, UserProgress, ExamAttempt, ExamDetail, CardReport, Scenario, ScenarioNode, ScenarioChoice, ChoiceOutcome, UserScenarioSession
 from ..utils import (get_next_card, update_progress, award_badges, render_learn_card, 
                      get_mc_options, add_xp, fuzzy_match, build_category_tree)
 
@@ -43,7 +45,6 @@ def learn(category_path):
 @bp.route('/submit_quality/<int:card_id>', methods=['POST'])
 @login_required
 def submit_quality(card_id):
-    """Verarbeitet die Sicherheitsskala (Geraten vs. Sicher)"""
     quality = request.form.get('quality', type=int, default=4)
     origin = request.form.get('origin_path')
     card = Card.query.get_or_404(card_id)
@@ -133,7 +134,6 @@ def submit(card_id):
 @bp.route('/report/<int:card_id>', methods=['GET', 'POST'])
 @login_required
 def report_card(card_id):
-    """FIX: Meldet Fehler und leitet sauber zur nächsten Karte weiter (vermeidet 405)"""
     if request.method == 'POST':
         reason = request.form.get('reason')
         origin = request.form.get('origin_path', 'Alle') 
@@ -156,7 +156,6 @@ def learn_errors():
 @login_required
 def exam_index():
     valid_types = ['mc', 'anatomy', 'anatomy_multi', 'ordering', 'assignment', 'calculation']
-    # OPTIMIERT: Nutzt build_category_tree(current_user) ohne alle Karten zu laden
     tree = build_category_tree(current_user)
     max_count = Card.query.filter(Card.type.in_(valid_types)).count()
     return render_template('exam_setup.html', max_questions=max_count, tree=tree)
@@ -178,12 +177,8 @@ def exam_start():
     random.shuffle(questions); prepared = []; exam_vars = {}; total_s = 0
     for card in questions:
         total_s += 45 if card.type == 'mc' else 120
-        
-        # HIER WAR DER FEHLER: anatomy_multi Optionen wurden nicht als JSON geladen!
-        try:
-            opts = json.loads(card.options) if card.options else []
-        except:
-            opts = []
+        try: opts = json.loads(card.options) if card.options else []
+        except: opts = []
             
         calc_data = None
         if card.type == 'mc': opts = get_mc_options(card)
@@ -192,7 +187,6 @@ def exam_start():
             exam_vars[str(card.id)] = val
             calc_data = {'question': card.question.replace('{weight}', str(val)), 'unit': opts.get('unit','')}
             
-        # Wir übergeben jetzt explizit die geladenen (geparsten) 'opts' ans Template
         prepared.append({'card': card, 'options': opts, 'calc_data': calc_data})
     
     session['exam_vars'] = exam_vars
@@ -234,32 +228,26 @@ def exam_submit():
             all_c, u_list = True, []
             for i in card_opts:
                 rid = str(i.get('id'))
-                # HIER WAR DER FEHLER BEIM SUBMIT: In exam.html heißen die Felder q_{cid}_{rid}_de 
-                # und in learn.py wurde nach q_{cid}_de_{rid} gesucht!
                 ud = request.form.get(f"q_{cid}_{rid}_de", '')
                 ul = request.form.get(f"q_{cid}_{rid}_lat", '')
-                
-                if not fuzzy_match(ud, i.get('de')) or not fuzzy_match(ul, i.get('lat')): 
-                    all_c = False
+                if not fuzzy_match(ud, i.get('de')) or not fuzzy_match(ul, i.get('lat')): all_c = False
                 u_list.append({'id': rid, 'de': ud, 'lat': ul})
             is_c, u_sol, c_sol = all_c, json.dumps(u_list), card.options
         elif card.type == 'ordering':
             try:
-                u_list = json.loads(request.form.get(f'q_{cid}', '[]')) # In exam.html heißt das Hidden Feld nur q_{cid}
+                u_list = json.loads(request.form.get(f'q_{cid}', '[]'))
                 is_c = (u_list == json.loads(card.options))
                 u_sol, c_sol = json.dumps(u_list), card.options
-            except:
-                is_c = False
+            except: is_c = False
         elif card.type == 'assignment':
             try:
-                u_dict = json.loads(request.form.get(f'q_{cid}', '{}')) # In exam.html heißt das Hidden Feld nur q_{cid}
+                u_dict = json.loads(request.form.get(f'q_{cid}', '{}'))
                 card_opts = json.loads(card.options)
                 all_c = True
                 for g in card_opts:
                     if set(u_dict.get(g.get('name'), [])) != set(g.get('items', [])): all_c = False
                 is_c, u_sol, c_sol = all_c, json.dumps(u_dict), card.options
-            except:
-                is_c = False
+            except: is_c = False
             
         if is_c: score += 1
         db.session.add(ExamDetail(
@@ -293,3 +281,104 @@ def review_exam(attempt_id):
     percent = int((att.score / att.total_questions) * 100) if att.total_questions > 0 else 0
     return render_template('exam_result.html', score=att.score, total=att.total_questions, 
                            percent=percent, results=res, passed=att.passed, date=att.timestamp)
+
+
+# ==========================================
+# --- BPR / SOP Trainer Routen ---
+# ==========================================
+
+@bp.route('/bpr')
+@login_required
+def bpr_index():
+    """Übersichtsseite für den BPR/SOP Trainer"""
+    scenarios = Scenario.query.all()
+    return render_template('bpr_index.html', scenarios=scenarios)
+
+@bp.route('/bpr/play/<int:scenario_id>')
+@login_required
+def bpr_play(scenario_id):
+    """Startet ein neues BPR-Szenario"""
+    scenario = Scenario.query.get_or_404(scenario_id)
+    if not scenario.first_node_id:
+        flash("Szenario hat keinen Startpunkt.", "warning")
+        return redirect(url_for('learn.bpr_index'))
+        
+    session_db = UserScenarioSession.query.filter_by(user_id=current_user.id, scenario_id=scenario.id).first()
+    if not session_db:
+        session_db = UserScenarioSession(user_id=current_user.id, scenario_id=scenario.id)
+        db.session.add(session_db)
+        
+    session_db.current_node_id = scenario.first_node_id
+    session_db.state_flags = {}
+    session_db.history_nodes = []
+    session_db.completed = False
+    session_db.success = False
+    db.session.commit()
+    
+    current_node = ScenarioNode.query.get(scenario.first_node_id)
+    return render_template('bpr_play.html', scenario=scenario, current_node=current_node, flags=session_db.state_flags or {})
+
+@bp.route('/bpr/choice/<int:choice_id>', methods=['POST'])
+@login_required
+def bpr_choice(choice_id):
+    """Wird via HTMX aufgerufen, wenn der Nutzer einen Button klickt"""
+    choice = ScenarioChoice.query.get_or_404(choice_id)
+    node = choice.node
+    scenario = node.scenario
+    
+    session_db = UserScenarioSession.query.filter_by(user_id=current_user.id, scenario_id=scenario.id).first()
+    if not session_db or session_db.completed:
+        return "Szenario bereits beendet.", 400
+        
+    user_flags = session_db.state_flags or {}
+    valid_outcomes = []
+    
+    # Prüfen, welches Outcome zutrifft
+    for out in choice.outcomes:
+        req = out.required_flags or {}
+        is_valid = True
+        for k, v in req.items():
+            if user_flags.get(k) != v:
+                is_valid = False
+                break
+        if is_valid:
+            valid_outcomes.extend([out] * (out.probability_weight or 100))
+            
+    # Outcome auswählen
+    if valid_outcomes:
+        selected_outcome = random.choice(valid_outcomes)
+    else:
+        selected_outcome = ChoiceOutcome.query.filter_by(choice_id=choice.id, is_fatal_error=True).first()
+        
+    # Sicherheitsnetz
+    if not selected_outcome:
+        session_db.completed = True
+        db.session.commit()
+        return render_template('bpr_swap.html', old_node=node, choice=choice, error="Aktion nicht möglich (Vorbedingungen fehlen).", scenario_id=scenario.id, flags=session_db.state_flags or {})
+
+    # FATAL ERROR
+    if selected_outcome.is_fatal_error:
+        session_db.completed = True
+        session_db.success = False
+        db.session.commit()
+        return render_template('bpr_swap.html', old_node=node, choice=choice, error=selected_outcome.error_feedback, scenario_id=scenario.id, flags=session_db.state_flags or {})
+        
+    # ERFOLGS-PFAD
+    if selected_outcome.set_flags:
+        current_state = session_db.state_flags or {}
+        current_state.update(selected_outcome.set_flags)
+        session_db.state_flags = current_state
+        flag_modified(session_db, "state_flags")
+        
+    session_db.current_node_id = selected_outcome.next_node_id
+    next_node = ScenarioNode.query.get(selected_outcome.next_node_id)
+    
+    if next_node and next_node.is_endpoint:
+        session_db.completed = True
+        if next_node.is_success:
+            session_db.success = True
+            add_xp(current_user, 100)
+            
+    db.session.commit()
+    
+    return render_template('bpr_swap.html', old_node=node, choice=choice, next_node=next_node, scenario_id=scenario.id, flags=session_db.state_flags or {})
