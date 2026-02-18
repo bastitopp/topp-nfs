@@ -36,6 +36,17 @@
                 <div class="card-body">
                     <p class="text-muted fst-italic mb-3">"{{ node.situation_text }}"</p>
                     
+                    {% if node.vitals %}
+                    <div class="bg-dark text-white p-2 rounded small mb-3 d-flex gap-3">
+                        <span><strong class="text-success">HF:</strong> {{ node.vitals.hf or '-' }}</span>
+                        <span><strong class="text-danger">RR:</strong> {{ node.vitals.rr or '-' }}</span>
+                        <span><strong class="text-info">SpO2:</strong> {{ node.vitals.spo2 or '-' }}</span>
+                        <span><strong class="text-warning">AF:</strong> {{ node.vitals.af or '-' }}</span>
+                        <span><strong style="color:orange;">Temp:</strong> {{ node.vitals.temp or '-' }}</span>
+                        <span><strong style="color:violet;">BZ:</strong> {{ node.vitals.bz or '-' }}</span>
+                    </div>
+                    {% endif %}
+                    
                     <hr>
                     <h6 class="fw-bold text-uppercase small text-muted">Auswahlmöglichkeiten (Buttons)</h6>
                     
@@ -110,28 +121,42 @@
             
             <div class="alert alert-warning small">
                 <strong><i class="bi bi-info-circle"></i> Kurzanleitung:</strong><br>
-                1. Erstelle die "Situation" (Node).<br>
+                1. Erstelle die "Situation" (Node) inkl. Text und Monitor-Werten.<br>
                 2. Füge der Situation "Antwort-Buttons" (Choices) hinzu.<br>
-                3. Weise jedem Button "Ergebnisse" (Outcomes) zu, die festlegen, zu welcher nächsten Situation (Node) der Klick führt.
+                3. Weise jedem Button "Ergebnisse" (Outcomes) zu, die festlegen, zu welcher nächsten Situation der Klick führt.
             </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="addNodeModal">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <form action="{{ url_for('admin.add_bpr_node', scenario_id=scenario.id) }}" method="POST" class="modal-content">
             <div class="modal-header"><h5 class="modal-title">Neuer Knoten (Situation)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label">Status Badge (z.B. "Diagnostik" oder "SAA 1.1 ACS")</label>
-                    <input type="text" name="status_badge" class="form-control" value="Diagnostik">
+                    <label class="form-label fw-bold">Status Badge</label>
+                    <input type="text" name="status_badge" class="form-control" value="Diagnostik" placeholder="z.B. Diagnostik oder SAA 1.1">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Situations-Text (Was passiert gerade? Werte?)</label>
-                    <textarea name="situation_text" class="form-control" rows="4" required></textarea>
+                    <label class="form-label fw-bold">Situations-Text</label>
+                    <textarea name="situation_text" class="form-control" rows="4" placeholder="Beschreibe, was passiert (ohne die Vitalwerte, die kommen unten rein)..." required></textarea>
                 </div>
-                <div class="form-check form-switch mb-2">
+                
+                <div class="mb-3 p-3 bg-light rounded border">
+                    <label class="form-label fw-bold small text-primary mb-2"><i class="bi bi-activity"></i> Vitalparameter für Monitor</label>
+                    <div class="row g-2">
+                        <div class="col-md-4"><input type="text" name="vital_hf" class="form-control form-control-sm" placeholder="HF (z.B. 95)"></div>
+                        <div class="col-md-4"><input type="text" name="vital_rr" class="form-control form-control-sm" placeholder="RR (z.B. 120/80)"></div>
+                        <div class="col-md-4"><input type="text" name="vital_spo2" class="form-control form-control-sm" placeholder="SpO2 (z.B. 98)"></div>
+                        <div class="col-md-4"><input type="text" name="vital_af" class="form-control form-control-sm" placeholder="AF (z.B. 14)"></div>
+                        <div class="col-md-4"><input type="text" name="vital_temp" class="form-control form-control-sm" placeholder="Temp (z.B. 37.2)"></div>
+                        <div class="col-md-4"><input type="text" name="vital_bz" class="form-control form-control-sm" placeholder="BZ (z.B. 100)"></div>
+                    </div>
+                    <div class="form-text small mt-2">Die Werte werden live an den Monitor des Nutzers gesendet. Wenn das Feld leer ist, wird "---" angezeigt.</div>
+                </div>
+
+                <div class="form-check form-switch mb-2 mt-3">
                     <input class="form-check-input" type="checkbox" name="is_endpoint" id="ep">
                     <label class="form-check-label text-danger" for="ep">Dies ist das Ende des Einsatzes</label>
                 </div>
@@ -203,7 +228,6 @@
 </div>
 
 <script>
-    // JS für dynamische Modals (Form Actions setzen)
     document.getElementById('addChoiceModal').addEventListener('show.bs.modal', function (event) {
         let button = event.relatedTarget;
         let nodeId = button.getAttribute('data-node-id');

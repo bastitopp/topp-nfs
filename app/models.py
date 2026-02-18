@@ -119,64 +119,46 @@ class ExamDetail(db.Model):
     correct_solution = db.Column(db.Text, nullable=True)
 
 # ==========================================
-# --- NEU: BPR / SOP Szenario-Trainer ---
+# --- BPR / SOP Szenario-Trainer ---
 # ==========================================
 
 class Scenario(db.Model):
     """Das übergeordnete Fallbeispiel (Der Einsatz)"""
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255), nullable=False) # z.B. "Einsatz 042: Unklarer Thoraxschmerz"
-    dispatch_text = db.Column(db.String(255), nullable=False) # Einsatzstichwort: "Rett 1 - unklar intern"
-    
-    first_node_id = db.Column(db.Integer) # Welcher Schritt ist der Startpunkt?
-    
-    # Verknüpfung zu allen Knotenpunkten dieses Szenarios
+    title = db.Column(db.String(255), nullable=False)
+    dispatch_text = db.Column(db.String(255), nullable=False)
+    first_node_id = db.Column(db.Integer)
     nodes = db.relationship('ScenarioNode', backref='scenario', lazy=True, cascade="all, delete-orphan")
 
 class ScenarioNode(db.Model):
     """Ein einzelner Schritt / Zustand im Einsatz"""
     id = db.Column(db.Integer, primary_key=True)
     scenario_id = db.Column(db.Integer, db.ForeignKey('scenario.id'), nullable=False)
+    situation_text = db.Column(db.Text, nullable=False)
     
-    situation_text = db.Column(db.Text, nullable=False) # XABCDE Werte, Situation, etc.
+    # NEU: Eigene JSON-Spalte für Vitalparameter
+    vitals = db.Column(db.JSON, nullable=True) 
     
-    # Gamification & Status
-    is_endpoint = db.Column(db.Boolean, default=False) # Ist das Szenario hier vorbei?
-    is_success = db.Column(db.Boolean, default=False) # Hat der Nutzer bestanden?
-    status_badge = db.Column(db.String(100), default="Unklare Diagnose") # Badge oben rechts
-    
-    # Verknüpfung zu den Antwortmöglichkeiten
+    is_endpoint = db.Column(db.Boolean, default=False)
+    is_success = db.Column(db.Boolean, default=False)
+    status_badge = db.Column(db.String(100), default="Unklare Diagnose")
     choices = db.relationship('ScenarioChoice', backref='node', lazy=True, cascade="all, delete-orphan", foreign_keys='ScenarioChoice.node_id')
 
 class ScenarioChoice(db.Model):
     """Die Buttons / Entscheidungen, die der Nutzer in einem Schritt klicken kann"""
     id = db.Column(db.Integer, primary_key=True)
     node_id = db.Column(db.Integer, db.ForeignKey('scenario_node.id'), nullable=False)
-    
-    action_text = db.Column(db.String(255), nullable=False) # Aufschrift Button, z.B. "Zugang legen"
-    
-    # Verknüpfung zu den möglichen Ausgängen (Outcomes) nach dem Klick
+    action_text = db.Column(db.String(255), nullable=False)
     outcomes = db.relationship('ChoiceOutcome', backref='choice', lazy=True, cascade="all, delete-orphan")
 
 class ChoiceOutcome(db.Model):
     """Das Ergebnis eines Klicks (mit BPR-Bedingungen und Wahrscheinlichkeit)"""
     id = db.Column(db.Integer, primary_key=True)
     choice_id = db.Column(db.Integer, db.ForeignKey('scenario_choice.id'), nullable=False)
-    
-    # Zu welchem Schritt (Node) führt dieser Ausgang?
     next_node_id = db.Column(db.Integer, db.ForeignKey('scenario_node.id'), nullable=True)
-    
-    # Wahrscheinlichkeit in Prozent, dass dieses Outcome eintritt (Standard: 100%)
     probability_weight = db.Column(db.Integer, default=100) 
-    
-    # --- DAS BPR INVENTAR (State Machine) ---
-    # JSON Dictionary: Welche Flags MÜSSEN aktiv sein? (z.B. {"zugang_liegt": true})
     required_flags = db.Column(db.JSON, nullable=True) 
-    
-    # JSON Dictionary: Welche Flags WERDEN HINZUGEFÜGT/GEÄNDERT? (z.B. {"zugang_liegt": true})
     set_flags = db.Column(db.JSON, nullable=True) 
-    
-    # Was passiert, wenn man hier reinfällt (z.B. falsche Dosis oder Bedingung verfehlt)?
     is_fatal_error = db.Column(db.Boolean, default=False)
     error_feedback = db.Column(db.Text, nullable=True)
 
@@ -185,16 +167,9 @@ class UserScenarioSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     scenario_id = db.Column(db.Integer, db.ForeignKey('scenario.id'), nullable=False)
-    
-    # Wo im Baum befindet sich der Nutzer aktuell?
     current_node_id = db.Column(db.Integer, db.ForeignKey('scenario_node.id'), nullable=True)
-    
-    # Das dynamische "Inventar" (JSON), z.B. gesetzte Zugänge, Loops bei Reanimation
     state_flags = db.Column(db.JSON, default={}) 
-    
-    # Historie: IDs der bisher besuchten Nodes als Liste (hilft beim Aufbau der Baum-UI)
     history_nodes = db.Column(db.JSON, default=[]) 
-    
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed = db.Column(db.Boolean, default=False)
     success = db.Column(db.Boolean, default=False)

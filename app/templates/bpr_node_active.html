@@ -1,3 +1,12 @@
+<div id="current-vitals" class="d-none"
+     data-hf="{{ current_node.vitals.get('hf', '') if current_node.vitals else '' }}"
+     data-spo2="{{ current_node.vitals.get('spo2', '') if current_node.vitals else '' }}"
+     data-rr="{{ current_node.vitals.get('rr', '') if current_node.vitals else '' }}"
+     data-af="{{ current_node.vitals.get('af', '') if current_node.vitals else '' }}"
+     data-temp="{{ current_node.vitals.get('temp', '') if current_node.vitals else '' }}"
+     data-bz="{{ current_node.vitals.get('bz', '') if current_node.vitals else '' }}">
+</div>
+
 <div class="tree-node active-node mt-4" id="active-node-container">
     <div class="node-icon active"><i class="bi bi-arrow-down"></i></div>
     

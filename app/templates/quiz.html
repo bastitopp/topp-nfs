@@ -95,18 +95,42 @@
         <div class="ms-2 small text-muted">{{ current_user.xp }} XP</div>
     </div>
 
+    {% set active_reports = card.reports | selectattr('resolved', 'equalto', False) | list %}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm">← Exit</a>
         <div class="d-flex gap-2">
             {% if current_user.is_admin %}
                 <a href="{{ url_for('admin.edit_card', card_id=card.id, next=url_for('learn.learn', category_path=current_category)) }}" class="btn btn-sm btn-outline-primary border-0" title="Frage bearbeiten"><i class="bi bi-pencil-fill"></i></a>
             {% endif %}
-            {% if not feedback %}<a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3" title="Überspringen [S]">Überspringen</a>{% endif %}
-            <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal" title="Frage melden [R]"><i class="bi bi-flag-fill"></i></button>
+            
+            {% if not feedback %}
+                <a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3" title="Überspringen [S]">Überspringen</a>
+            {% endif %}
+            
+            {% if active_reports %}
+                <button class="btn btn-sm btn-warning border-0 rounded-pill px-3" disabled title="Diese Frage wird bereits geprüft.">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Gemeldet
+                </button>
+            {% else %}
+                <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal" title="Frage melden [R]">
+                    <i class="bi bi-flag-fill"></i>
+                </button>
+            {% endif %}
         </div>
     </div>
 
     <div class="card p-4 shadow mb-4 quiz-container border-0">
+        
+        {% if active_reports %}
+        <div class="alert alert-warning py-2 mb-3 small border-0 shadow-sm d-flex align-items-center">
+            <i class="bi bi-info-circle-fill me-2 fs-5 text-warning"></i> 
+            <div>
+                <strong>Hinweis:</strong> Ein anderer Nutzer hat bei dieser Frage bereits einen möglichen Fehler gemeldet. Wir prüfen das aktuell!
+            </div>
+        </div>
+        {% endif %}
+
         <div class="text-center mb-3">
             <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 text-wrap fs-6 px-3 py-2">{{ card.category }}</span>
         </div>

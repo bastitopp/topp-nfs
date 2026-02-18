@@ -8,8 +8,7 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 from sqlalchemy import or_
 from ..extensions import db
-# HIER NEU: BPR Modelle importiert
-from ..models import Card, User, Tag, DashboardMessage, CardReport, UserProgress, Scenario, ScenarioNode, ScenarioChoice, ChoiceOutcome
+from ..models import Card, User, Tag, DashboardMessage, CardReport, UserProgress, Scenario, ScenarioNode, ScenarioChoice, ChoiceOutcome, UserScenarioSession
 
 bp = Blueprint('admin', __name__)
 
@@ -141,7 +140,6 @@ def admin_dashboard():
         
     quality_warnings = check_question_quality(standard_cards_raw)
     
-    # NEU: Szenarien an das Template übergeben
     scenarios = Scenario.query.all()
     
     return render_template('admin.html', 
@@ -434,6 +432,7 @@ def import_confirm():
     except Exception as e: flash(f'Import Fehler: {e}', 'danger')
     return redirect(url_for('admin.admin_dashboard'))
 
+
 # ==========================================
 # --- BPR SZENARIO EDITOR ROUTEN ---
 # ==========================================
@@ -441,7 +440,6 @@ def import_confirm():
 @bp.route('/admin/bpr/add', methods=['POST'])
 @admin_required
 def add_bpr_scenario():
-    """Erstellt ein neues leeres Szenario"""
     title = request.form.get('title')
     dispatch = request.form.get('dispatch_text')
     
@@ -455,14 +453,12 @@ def add_bpr_scenario():
 @bp.route('/admin/bpr/edit/<int:scenario_id>', methods=['GET'])
 @admin_required
 def edit_bpr_scenario(scenario_id):
-    """Zeigt den Editor für ein bestimmtes Szenario an"""
     scenario = Scenario.query.get_or_404(scenario_id)
     return render_template('admin_bpr_editor.html', scenario=scenario)
 
 @bp.route('/admin/bpr/set_start/<int:scenario_id>', methods=['POST'])
 @admin_required
 def set_bpr_start(scenario_id):
-    """Legt fest, welcher Knotenpunkt der Startpunkt ist"""
     s = Scenario.query.get_or_404(scenario_id)
     s.first_node_id = request.form.get('first_node_id', type=int)
     db.session.commit()
@@ -472,29 +468,49 @@ def set_bpr_start(scenario_id):
 @bp.route('/admin/bpr/delete/<int:scenario_id>', methods=['POST'])
 @admin_required
 def delete_bpr_scenario(scenario_id):
-    """Löscht ein gesamtes Szenario mit allen Ästen"""
     s = Scenario.query.get_or_404(scenario_id)
+    
+    UserScenarioSession.query.filter_by(scenario_id=s.id).delete()
+    
+    for node in s.nodes:
+        for choice in node.choices:
+            ChoiceOutcome.query.filter_by(choice_id=choice.id).delete()
+        ScenarioChoice.query.filter_by(node_id=node.id).delete()
+        
+    ScenarioNode.query.filter_by(scenario_id=s.id).delete()
     db.session.delete(s)
     db.session.commit()
-    flash('Szenario gelöscht.', 'success')
+    
+    flash('Szenario erfolgreich gelöscht.', 'success')
     return redirect(url_for('admin.admin_dashboard'))
+
 
 @bp.route('/admin/bpr/node/add/<int:scenario_id>', methods=['POST'])
 @admin_required
 def add_bpr_node(scenario_id):
-    """Fügt einen neuen Knotenpunkt (Node) zum Szenario hinzu"""
     s = Scenario.query.get_or_404(scenario_id)
+    
+    # NEU: Vitalparameter aus dem Formular holen
+    vitals = {
+        "hf": request.form.get('vital_hf', ''),
+        "rr": request.form.get('vital_rr', ''),
+        "spo2": request.form.get('vital_spo2', ''),
+        "af": request.form.get('vital_af', ''),
+        "temp": request.form.get('vital_temp', ''),
+        "bz": request.form.get('vital_bz', '')
+    }
+    
     n = ScenarioNode(
         scenario_id=s.id,
         situation_text=request.form.get('situation_text'),
         status_badge=request.form.get('status_badge', 'Unklare Diagnose'),
+        vitals=vitals, # NEU: Wird hier in die Datenbank gespeichert
         is_endpoint='is_endpoint' in request.form,
         is_success='is_success' in request.form
     )
     db.session.add(n)
     db.session.commit()
     
-    # Wenn es der erste Knoten überhaupt ist, mache ihn direkt zum Startpunkt
     if not s.first_node_id:
         s.first_node_id = n.id
         db.session.commit()
@@ -505,7 +521,6 @@ def add_bpr_node(scenario_id):
 @bp.route('/admin/bpr/choice/add/<int:node_id>', methods=['POST'])
 @admin_required
 def add_bpr_choice(node_id):
-    """Fügt einem Knotenpunkt einen Klick-Button (Choice) hinzu"""
     n = ScenarioNode.query.get_or_404(node_id)
     c = ScenarioChoice(
         node_id=n.id, 
@@ -519,10 +534,8 @@ def add_bpr_choice(node_id):
 @bp.route('/admin/bpr/outcome/add/<int:choice_id>', methods=['POST'])
 @admin_required
 def add_bpr_outcome(choice_id):
-    """Fügt einem Button ein Ergebnis (Outcome) hinzu"""
     c = ScenarioChoice.query.get_or_404(choice_id)
     
-    # Sicherstellen, dass JSON Eingaben valid sind
     req_flags = request.form.get('required_flags')
     set_flags = request.form.get('set_flags')
     
@@ -546,3 +559,144 @@ def add_bpr_outcome(choice_id):
     db.session.commit()
     flash('Ergebnis (Outcome) hinzugefügt.', 'success')
     return redirect(url_for('admin.edit_bpr_scenario', scenario_id=c.node.scenario_id))
+
+# ==========================================
+# --- BPR IMPORT & EXPORT ---
+# ==========================================
+
+@bp.route('/admin/bpr/export')
+@admin_required
+def export_bpr():
+    scenarios = Scenario.query.all()
+    export_data = []
+    
+    for s in scenarios:
+        s_data = {
+            'title': s.title,
+            'dispatch_text': s.dispatch_text,
+            'first_node_id': s.first_node_id,
+            'nodes': []
+        }
+        for n in s.nodes:
+            n_data = {
+                'id': n.id,
+                'situation_text': n.situation_text,
+                'vitals': n.vitals, # NEU: Vitals exportieren
+                'is_endpoint': n.is_endpoint,
+                'is_success': n.is_success,
+                'status_badge': n.status_badge,
+                'choices': []
+            }
+            for c in n.choices:
+                c_data = {
+                    'id': c.id,
+                    'action_text': c.action_text,
+                    'outcomes': []
+                }
+                for o in c.outcomes:
+                    o_data = {
+                        'next_node_id': o.next_node_id,
+                        'probability_weight': o.probability_weight,
+                        'required_flags': o.required_flags,
+                        'set_flags': o.set_flags,
+                        'is_fatal_error': o.is_fatal_error,
+                        'error_feedback': o.error_feedback
+                    }
+                    c_data['outcomes'].append(o_data)
+                n_data['choices'].append(c_data)
+            s_data['nodes'].append(n_data)
+        export_data.append(s_data)
+
+    return Response(
+        json.dumps(export_data, indent=2), 
+        mimetype='application/json', 
+        headers={'Content-Disposition': 'attachment;filename=topp_bpr_scenarios.json'}
+    )
+
+@bp.route('/admin/bpr/import', methods=['POST'])
+@admin_required
+def import_bpr():
+    if 'file' not in request.files:
+        flash('Keine Datei hochgeladen.', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
+        
+    file = request.files['file']
+    if file.filename == '':
+        flash('Keine Datei ausgewählt.', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
+
+    try:
+        file_content = file.read().decode('utf-8')
+        data = json.loads(file_content)
+        
+        if not isinstance(data, list):
+            data = [data]
+            
+        for s_data in data:
+            new_s = Scenario(
+                title=s_data.get('title', 'Importiertes Szenario'),
+                dispatch_text=s_data.get('dispatch_text', 'Unbekanntes Stichwort')
+            )
+            db.session.add(new_s)
+            db.session.flush()
+
+            id_map = {}
+            
+            for n_data in s_data.get('nodes', []):
+                new_n = ScenarioNode(
+                    scenario_id=new_s.id,
+                    situation_text=n_data.get('situation_text', ''),
+                    vitals=n_data.get('vitals'), # NEU: Vitals importieren
+                    status_badge=n_data.get('status_badge', 'Unklar'),
+                    is_endpoint=n_data.get('is_endpoint', False),
+                    is_success=n_data.get('is_success', False)
+                )
+                db.session.add(new_n)
+                db.session.flush()
+                
+                if 'id' in n_data:
+                    id_map[n_data['id']] = new_n.id
+                    
+                n_data['_new_node'] = new_n
+            
+            for n_data in s_data.get('nodes', []):
+                new_n = n_data.get('_new_node')
+                if not new_n: continue
+                
+                for c_data in n_data.get('choices', []):
+                    new_c = ScenarioChoice(
+                        node_id=new_n.id,
+                        action_text=c_data.get('action_text', 'Fehlender Text')
+                    )
+                    db.session.add(new_c)
+                    db.session.flush()
+                    
+                    for o_data in c_data.get('outcomes', []):
+                        old_next_id = o_data.get('next_node_id')
+                        new_next_id = id_map.get(old_next_id) if old_next_id else None
+                        
+                        new_o = ChoiceOutcome(
+                            choice_id=new_c.id,
+                            next_node_id=new_next_id,
+                            probability_weight=o_data.get('probability_weight', 100),
+                            required_flags=o_data.get('required_flags'),
+                            set_flags=o_data.get('set_flags'),
+                            is_fatal_error=o_data.get('is_fatal_error', False),
+                            error_feedback=o_data.get('error_feedback')
+                        )
+                        db.session.add(new_o)
+            
+            old_first_id = s_data.get('first_node_id')
+            if old_first_id and old_first_id in id_map:
+                new_s.first_node_id = id_map[old_first_id]
+            elif s_data.get('nodes'):
+                new_s.first_node_id = id_map.get(s_data['nodes'][0].get('id'))
+                
+        db.session.commit()
+        flash(f'{len(data)} BPR Szenarien erfolgreich importiert.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Fehler beim Importieren der JSON: {str(e)}', 'danger')
+        
+    return redirect(url_for('admin.admin_dashboard'))
