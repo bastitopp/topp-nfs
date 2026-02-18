@@ -16,7 +16,6 @@
         white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; width: 100%;
     }
     
-    /* Fokus-Sichtbarkeit für Tastaturnavigation verbessern */
     .btn-answer:focus-visible {
         outline: 3px solid var(--bs-primary);
         outline-offset: 2px;
@@ -40,51 +39,64 @@
         display: block !important;
     }
 
-    .anatomy-number-badge {
-        width: 36px;
-        height: 36px;
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        border-radius: 50%;
-        background-color: var(--bs-primary);
-        color: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .anatomy-row {
-        background-color: var(--bs-body-bg);
-        border: 1px solid var(--bs-border-color);
-        border-radius: 12px;
-        padding: 10px;
-        margin-bottom: 12px;
-        transition: box-shadow 0.2s;
-    }
-    .anatomy-row:focus-within {
-        box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
-        border-color: var(--bs-primary);
-    }
     .anatomy-empty-slot {
         background-color: transparent !important;
         background-image: linear-gradient(45deg, rgba(128, 128, 128, 0.1) 25%, transparent 25%, transparent 50%, rgba(128, 128, 128, 0.1) 50%, rgba(128, 128, 128, 0.1) 75%, transparent 75%, transparent) !important;
-        background-size: 10px 10px !important;
-        border: 1px dashed var(--bs-border-color) !important;
-        color: var(--bs-secondary-color) !important;
-        opacity: 0.6;
-        cursor: not-allowed;
-        box-shadow: none !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        background-size: 10px 10px !important; border: 1px dashed var(--bs-border-color) !important;
+        color: var(--bs-secondary-color) !important; opacity: 0.6; cursor: not-allowed; box-shadow: none !important;
+        display: flex; align-items: center; justify-content: center;
     }
     [data-bs-theme="dark"] .anatomy-empty-slot {
         background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent) !important;
     }
 
+    /* NEU: Verbesserte Styles für die Anatomie-Dropzones */
+    .anatomy-dropzone {
+        position: absolute;
+        width: 32px; height: 32px;
+        background-color: rgba(255, 255, 255, 0.9);
+        border: 3px solid var(--bs-primary);
+        border-radius: 50%;
+        display: flex; justify-content: center; align-items: center;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy Effekt */
+        z-index: 10;
+        /* WICHTIG: Zentriert das Element exakt auf der Koordinate */
+        transform: translate(-50%, -50%); 
+    }
+
+    .anatomy-dropzone:hover {
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+
+    /* Style wenn gelöst */
+    .anatomy-dropzone.solved {
+        width: auto !important; height: auto !important;
+        border-radius: 12px !important;
+        padding: 6px 10px !important;
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        border-color: #198754 !important; /* Grün */
+        flex-direction: column !important;
+        gap: 4px;
+        align-items: stretch !important; /* Badges auf volle Breite */
+    }
+    
+    .anatomy-dropzone.solved .badge {
+        font-size: 0.85em !important;
+        white-space: normal !important; /* Textumbruch erlauben wenn nötig */
+        padding: 4px 8px;
+    }
+
     .cursor-grab { cursor: grab; }
     .cursor-grab:active { cursor: grabbing; }
     .bg-adaptive { background-color: var(--bs-tertiary-bg) !important; }
+    
+    .flash-error { animation: flashRed 0.6s ease-out; }
+    @keyframes flashRed {
+        0% { background-color: #dc3545; border-color: #dc3545; color: white; transform: translate(-50%, -50%) scale(1.1); }
+        100% { background-color: white; border-color: var(--bs-primary); color: var(--bs-primary); transform: translate(-50%, -50%) scale(1); }
+    }
 </style>
 
 <div class="container py-3" style="max-width: 800px;">
@@ -125,9 +137,7 @@
         {% if active_reports %}
         <div class="alert alert-warning py-2 mb-3 small border-0 shadow-sm d-flex align-items-center">
             <i class="bi bi-info-circle-fill me-2 fs-5 text-warning"></i> 
-            <div>
-                <strong>Hinweis:</strong> Ein anderer Nutzer hat bei dieser Frage bereits einen möglichen Fehler gemeldet. Wir prüfen das aktuell!
-            </div>
+            <div><strong>Hinweis:</strong> Ein anderer Nutzer hat bei dieser Frage bereits einen möglichen Fehler gemeldet. Wir prüfen das aktuell!</div>
         </div>
         {% endif %}
 
@@ -139,7 +149,7 @@
             {{ (calc_data.question if card.type == 'calculation' and calc_data else card.question) | markdown }}
         </div>
 
-        {% if card.image_url %}
+        {% if card.image_url and card.type != 'anatomy_multi' %}
             <div class="text-center mb-4">
                 <img src="{{ card.image_url }}" class="img-fluid rounded border shadow-sm" style="max-height: 400px; object-fit: contain;">
             </div>
@@ -147,10 +157,7 @@
 
         {% if card.audio_url %}
             <div class="mb-4 text-center">
-                <audio controls class="w-100" style="max-width: 400px;">
-                    <source src="{{ card.audio_url }}" type="audio/mpeg">
-                    Dein Browser unterstützt das Audio-Element nicht.
-                </audio>
+                <audio controls class="w-100" style="max-width: 400px;"><source src="{{ card.audio_url }}" type="audio/mpeg"></audio>
             </div>
         {% endif %}
 
@@ -178,26 +185,22 @@
                             {% for opt in options %}
                                 {% if opt == card.answer %}
                                     <div class="btn-answer p-3 rounded-4 w-100 shadow-sm" style="background-color: #198754 !important; border-color: #198754 !important; color: #ffffff !important;">
-                                        <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);"><i class="bi bi-check-lg"></i></span>
-                                        <div>{{ opt | markdown }}</div>
+                                        <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);"><i class="bi bi-check-lg"></i></span><div>{{ opt | markdown }}</div>
                                     </div>
                                 {% elif opt == user_answer %}
                                     <div class="btn-answer p-3 rounded-4 w-100 shadow-sm" style="background-color: #dc3545 !important; border-color: #dc3545 !important; color: #ffffff !important;">
-                                        <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);"><i class="bi bi-x-lg"></i></span>
-                                        <div>{{ opt | markdown }}</div>
+                                        <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);"><i class="bi bi-x-lg"></i></span><div>{{ opt | markdown }}</div>
                                     </div>
                                 {% else %}
                                     <div class="btn-answer p-3 rounded-4 w-100 bg-body-tertiary border-secondary border-opacity-25" style="color: var(--bs-body-color); opacity: 0.6;">
-                                        <span class="shortcut-badge">-</span>
-                                        <div>{{ opt | markdown }}</div>
+                                        <span class="shortcut-badge">-</span><div>{{ opt | markdown }}</div>
                                     </div>
                                 {% endif %}
                             {% endfor %}
                         {% else %}
                             {% for opt in options %}
                                 <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary btn-answer p-3 rounded-4 w-100">
-                                    <span class="shortcut-badge">{{ loop.index }}</span>
-                                    <div>{{ opt | markdown }}</div>
+                                    <span class="shortcut-badge">{{ loop.index }}</span><div>{{ opt | markdown }}</div>
                                 </button>
                             {% endfor %}
                         {% endif %}
@@ -225,13 +228,8 @@
                                 <div class="card border-{{ 'success' if result_de else 'danger' }} h-100">
                                     <div class="card-header bg-{{ 'success' if result_de else 'danger' }} text-white fw-bold">Deutsch</div>
                                     <div class="card-body">
-                                        <p class="mb-1 text-muted small">Deine Antwort:</p>
-                                        <h5 class="text-{{ 'success' if result_de else 'danger' }}">{{ user_de or '-' }}</h5>
-                                        {% if not result_de %}
-                                            <hr>
-                                            <p class="mb-1 text-muted small">Richtige Lösung:</p>
-                                            <h5 class="text-success">{{ card.answer }}</h5>
-                                        {% endif %}
+                                        <p class="mb-1 text-muted small">Deine Antwort:</p><h5 class="text-{{ 'success' if result_de else 'danger' }}">{{ user_de or '-' }}</h5>
+                                        {% if not result_de %}<hr><p class="mb-1 text-muted small">Richtige Lösung:</p><h5 class="text-success">{{ card.answer }}</h5>{% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -239,55 +237,125 @@
                                 <div class="card border-{{ 'success' if result_lat else 'danger' }} h-100">
                                     <div class="card-header bg-{{ 'success' if result_lat else 'danger' }} text-white fw-bold">Latein</div>
                                     <div class="card-body">
-                                        <p class="mb-1 text-muted small">Deine Antwort:</p>
-                                        <h5 class="text-{{ 'success' if result_lat else 'danger' }}">{{ user_lat or '-' }}</h5>
-                                        {% if not result_lat %}
-                                            <hr>
-                                            <p class="mb-1 text-muted small">Richtige Lösung:</p>
-                                            <h5 class="text-success">{{ card.answer_lat }}</h5>
-                                        {% endif %}
+                                        <p class="mb-1 text-muted small">Deine Antwort:</p><h5 class="text-{{ 'success' if result_lat else 'danger' }}">{{ user_lat or '-' }}</h5>
+                                        {% if not result_lat %}<hr><p class="mb-1 text-muted small">Richtige Lösung:</p><h5 class="text-success">{{ card.answer_lat }}</h5>{% endif %}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     {% else %}
+                        <div class="alert alert-info small text-center mb-4">
+                            <i class="bi bi-hand-index-thumb fw-bold me-1"></i> Tippe auf einen Begriff und platziere ihn im richtigen Kasten.
+                        </div>
+                        
                         <div class="row g-3 mb-4">
                             <div class="col-md-6">
                                 <label class="fw-bold mb-2 text-secondary">Deutsch</label>
-                                {% if not card.answer %}
-                                    <div class="form-control form-control-lg anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
+                                {% if card.answer and card.answer not in ['-', '%'] %}
+                                    <div class="anatomy-single-dropzone form-control form-control-lg bg-light text-center shadow-sm" style="min-height: 60px; display:flex; justify-content:center; align-items:center; cursor: pointer; border: 2px dashed #0d6efd;" data-type="de" data-answer="{{ card.answer | e }}">
+                                        <span class="text-muted small"><i class="bi bi-box-arrow-in-down"></i> Hier platzieren</span>
+                                    </div>
                                 {% else %}
-                                    <input type="text" name="input_de" class="form-control form-control-lg shadow-sm" placeholder="Deutscher Begriff" autocomplete="off" autofocus>
+                                    <div class="form-control form-control-lg anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
                                 {% endif %}
                             </div>
                             <div class="col-md-6">
                                 <label class="fw-bold mb-2 text-secondary">Latein</label>
-                                {% if not card.answer_lat %}
-                                    <div class="form-control form-control-lg anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
+                                {% if card.answer_lat and card.answer_lat not in ['-', '%'] %}
+                                    <div class="anatomy-single-dropzone form-control form-control-lg bg-light text-center shadow-sm" style="min-height: 60px; display:flex; justify-content:center; align-items:center; cursor: pointer; border: 2px dashed #6c757d;" data-type="lat" data-answer="{{ card.answer_lat | e }}">
+                                        <span class="text-muted small"><i class="bi bi-box-arrow-in-down"></i> Hier platzieren</span>
+                                    </div>
                                 {% else %}
-                                    <input type="text" name="input_lat" class="form-control form-control-lg shadow-sm" placeholder="Lateinischer Begriff" autocomplete="off">
+                                    <div class="form-control form-control-lg anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
                                 {% endif %}
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Lösung prüfen</button>
+                        
+                        <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
+                            {% set labels = [] %}
+                            {% if card.answer and card.answer not in ['-', '%'] %}
+                                {% set _ = labels.append({'val': card.answer, 'type': 'de'}) %}
+                            {% endif %}
+                            {% if card.answer_lat and card.answer_lat not in ['-', '%'] %}
+                                {% set _ = labels.append({'val': card.answer_lat, 'type': 'lat'}) %}
+                            {% endif %}
+                            
+                            {% for label in labels | shuffle %}
+                                <button type="button" class="btn btn-outline-{{ 'primary' if label.type == 'de' else 'secondary' }} rounded-pill anatomy-single-btn shadow-sm fw-bold fs-5" data-val="{{ label.val | e }}" data-type="{{ label.type }}">
+                                    {{ label.val }} <small class="fw-normal opacity-75">({{ 'DE' if label.type == 'de' else 'LAT' }})</small>
+                                </button>
+                            {% endfor %}
+                        </div>
+
+                        <input type="hidden" name="input_de" id="single_input_de" value="">
+                        <input type="hidden" name="input_lat" id="single_input_lat" value="">
+                        
+                        <button type="submit" id="submit-single-btn" class="btn btn-success w-100 rounded-pill py-3 shadow-sm fw-bold fs-5 d-none">
+                            Korrekt! Weiter <i class="bi bi-arrow-right ms-1"></i>
+                        </button>
+
+                        <script>
+                            let selectedSingleLabel = null;
+                            let correctSingleCount = 0;
+                            let totalSingleTargets = document.querySelectorAll('.anatomy-single-dropzone').length;
+
+                            document.querySelectorAll('.anatomy-single-btn').forEach(btn => {
+                                btn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    document.querySelectorAll('.anatomy-single-btn').forEach(b => {
+                                        b.classList.remove('btn-primary', 'btn-secondary', 'text-white');
+                                        let type = b.getAttribute('data-type');
+                                        b.classList.add(type === 'de' ? 'btn-outline-primary' : 'btn-outline-secondary');
+                                    });
+                                    let type = this.getAttribute('data-type');
+                                    this.classList.remove(type === 'de' ? 'btn-outline-primary' : 'btn-outline-secondary');
+                                    this.classList.add(type === 'de' ? 'btn-primary' : 'btn-secondary', 'text-white');
+                                    selectedSingleLabel = this;
+                                });
+                            });
+
+                            document.querySelectorAll('.anatomy-single-dropzone').forEach(zone => {
+                                zone.addEventListener('click', function() {
+                                    if(!selectedSingleLabel) return;
+                                    
+                                    let expectedType = this.getAttribute('data-type');
+                                    let expectedVal = this.getAttribute('data-answer');
+                                    let selectedVal = selectedSingleLabel.getAttribute('data-val');
+                                    
+                                    if(expectedVal === selectedVal) {
+                                        this.classList.remove('bg-light');
+                                        this.classList.add('bg-success', 'text-white', 'fw-bold', 'border-success', 'fs-5');
+                                        this.innerHTML = selectedVal;
+                                        this.style.borderStyle = 'solid';
+                                        
+                                        document.getElementById('single_input_' + expectedType).value = selectedVal;
+                                        
+                                        selectedSingleLabel.style.visibility = 'hidden';
+                                        selectedSingleLabel.classList.remove('anatomy-single-btn');
+                                        selectedSingleLabel = null;
+                                        
+                                        correctSingleCount++;
+                                        if(correctSingleCount === totalSingleTargets) {
+                                            document.getElementById('submit-single-btn').classList.remove('d-none');
+                                        }
+                                    } else {
+                                        this.classList.add('flash-error');
+                                        setTimeout(() => this.classList.remove('flash-error'), 600);
+                                    }
+                                });
+                            });
+                        </script>
                     {% endif %}
 
                 {% elif card.type == 'anatomy_multi' %}
                     {% if feedback %}
                         <div class="table-responsive">
-                            <table class="table table-bordered align-middle text-center mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Nr.</th>
-                                        <th>Deutsch (Dein / Richtig)</th>
-                                        <th>Latein (Dein / Richtig)</th>
-                                    </tr>
-                                </thead>
+                            <table class="table table-bordered align-middle text-center mb-0 shadow-sm rounded overflow-hidden">
+                                <thead class="table-light"><tr><th>Nr.</th><th>Deutsch (Dein / Richtig)</th><th>Latein (Dein / Richtig)</th></tr></thead>
                                 <tbody>
                                     {% for r in multi_results %}
                                     <tr>
                                         <td class="fw-bold fs-5 bg-light">{{ r.label }}</td>
-                                        
                                         {% if r.correct_de in ['-', '%'] or not r.correct_de %}
                                             <td class="text-muted"><i class="bi bi-dash"></i></td>
                                         {% else %}
@@ -311,30 +379,128 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="d-flex flex-column gap-2 mb-4">
-                            {% for part in options %}
-                            <div class="anatomy-row d-flex flex-column flex-sm-row align-items-sm-center gap-2">
-                                <div class="anatomy-number-badge shadow-sm">{{ part.id }}</div>
-                                <div class="row g-2 flex-grow-1 m-0 w-100">
-                                    <div class="col-12 col-sm-6 p-0 pe-sm-1">
-                                        {% if part.de in ['-', '%'] or not part.de %}
-                                            <div class="form-control anatomy-empty-slot" title="Feld entfällt"><i class="bi bi-slash-lg small"></i></div>
-                                        {% else %}
-                                            <input type="text" name="de_{{ part.id }}" class="form-control" placeholder="Deutsch" autocomplete="off" {% if loop.first %}autofocus{% endif %}>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-12 col-sm-6 p-0 ps-sm-1">
-                                        {% if part.lat in ['-', '%'] or not part.lat %}
-                                            <div class="form-control anatomy-empty-slot" title="Feld entfällt"><i class="bi bi-slash-lg small"></i></div>
-                                        {% else %}
-                                            <input type="text" name="lat_{{ part.id }}" class="form-control" placeholder="Latein" autocomplete="off">
-                                        {% endif %}
-                                    </div>
+                        {% set items = card.options | from_json %}
+                        
+                        <div class="alert alert-info small text-center mb-3 shadow-sm border-0">
+                            <i class="bi bi-hand-index-thumb fw-bold me-1 fs-5"></i> Tippe erst auf einen Begriff und platziere ihn dann auf dem passenden runden Zielpunkt im Bild.
+                        </div>
+
+                        <div class="text-center mb-4">
+                            <div class="position-relative d-inline-block">
+                                <img src="{{ card.image_url }}" class="rounded shadow-sm" style="max-width: 100%; max-height: 55vh; display: block;">
+                                
+                                {% for item in items %}
+                                <div class="anatomy-dropzone" 
+                                     style="left: {{ item.x }}%; top: {{ item.y }}%;"
+                                     data-id="{{ item.id }}" data-de="{{ item.de | e }}" data-lat="{{ item.lat | e }}">
+                                    <i class="bi bi-question fs-5 text-primary fw-bold"></i>
                                 </div>
+                                {% endfor %}
                             </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 justify-content-center mb-4" id="anatomy-labels">
+                            {% set labels = [] %}
+                            {% for item in items %}
+                                {% if item.de and item.de not in ['-', '%'] %}
+                                    {% set _ = labels.append({'val': item.de, 'type': 'de', 'id': item.id}) %}
+                                {% endif %}
+                                {% if item.lat and item.lat not in ['-', '%'] %}
+                                    {% set _ = labels.append({'val': item.lat, 'type': 'lat', 'id': item.id}) %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% for label in labels | shuffle %}
+                                <button type="button" class="btn btn-outline-{{ 'primary' if label.type == 'de' else 'secondary' }} rounded-pill anatomy-label-btn shadow-sm fw-bold" 
+                                        data-val="{{ label.val | e }}" data-type="{{ label.type }}">
+                                    {{ label.val }} <small class="fw-normal opacity-75">({{ 'DE' if label.type == 'de' else 'LAT' }})</small>
+                                </button>
                             {% endfor %}
                         </div>
-                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Lösung prüfen</button>
+                        
+                        <input type="hidden" name="dummy" value="1">
+                        
+                        <button type="submit" id="submit-btn" class="btn btn-success w-100 rounded-pill py-3 shadow-sm fw-bold fs-5 d-none">
+                            Alle korrekt! Weiter <i class="bi bi-arrow-right ms-1"></i>
+                        </button>
+
+                        <script>
+                            let selectedLabel = null;
+                            let correctCount = 0;
+                            
+                            let totalTargets = 0;
+                            document.querySelectorAll('.anatomy-dropzone').forEach(z => {
+                                let de = z.getAttribute('data-de');
+                                let lat = z.getAttribute('data-lat');
+                                if(de && de !== '-' && de !== '%') totalTargets++;
+                                if(lat && lat !== '-' && lat !== '%') totalTargets++;
+                            });
+
+                            document.querySelectorAll('.anatomy-label-btn').forEach(btn => {
+                                btn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    document.querySelectorAll('.anatomy-label-btn').forEach(b => {
+                                        b.classList.remove('btn-primary', 'btn-secondary', 'text-white');
+                                        let type = b.getAttribute('data-type');
+                                        b.classList.add(type === 'de' ? 'btn-outline-primary' : 'btn-outline-secondary');
+                                    });
+                                    let type = this.getAttribute('data-type');
+                                    this.classList.remove(type === 'de' ? 'btn-outline-primary' : 'btn-outline-secondary');
+                                    this.classList.add(type === 'de' ? 'btn-primary' : 'btn-secondary', 'text-white');
+                                    selectedLabel = this;
+                                });
+                            });
+
+                            document.querySelectorAll('.anatomy-dropzone').forEach(zone => {
+                                zone.addEventListener('click', function() {
+                                    if(!selectedLabel) return;
+                                    
+                                    let type = selectedLabel.getAttribute('data-type');
+                                    let expected = this.getAttribute('data-' + type);
+                                    let selectedVal = selectedLabel.getAttribute('data-val');
+                                    let id = this.getAttribute('data-id');
+                                    
+                                    let alreadySolved = this.getAttribute('data-solved-' + type) === '1';
+                                    
+                                    if(!alreadySolved && expected === selectedVal) {
+                                        // Richtig!
+                                        // WICHTIG: Wir fügen nur noch die Klasse 'solved' hinzu. Das CSS macht den Rest.
+                                        this.classList.add('solved');
+                                        
+                                        let icon = this.querySelector('i.bi-question');
+                                        if(icon) icon.remove();
+                                        
+                                        let badgeClass = type === 'de' ? 'bg-primary' : 'bg-secondary';
+                                        // Badges werden jetzt sauber untereinander gestapelt durch Flexbox im CSS
+                                        this.innerHTML += `<span class="badge ${badgeClass} shadow-sm">${selectedVal}</span>`;
+                                        
+                                        this.setAttribute('data-solved-' + type, '1');
+                                        
+                                        selectedLabel.style.visibility = 'hidden';
+                                        selectedLabel.classList.remove('anatomy-label-btn'); 
+                                        selectedLabel = null;
+                                        
+                                        let hiddenInp = document.createElement('input');
+                                        hiddenInp.type = 'hidden'; 
+                                        hiddenInp.name = type + '_' + id; 
+                                        hiddenInp.value = selectedVal;
+                                        document.getElementById('quizForm').appendChild(hiddenInp);
+                                        
+                                        correctCount++;
+                                        if(correctCount === totalTargets) {
+                                            // Wenn alles fertig ist, grünen Rand entfernen, sieht sonst doof aus
+                                             document.querySelectorAll('.anatomy-dropzone').forEach(z => {
+                                                z.style.borderColor = 'transparent';
+                                            });
+                                            document.getElementById('submit-btn').classList.remove('d-none');
+                                        }
+                                    } else {
+                                        this.classList.add('flash-error');
+                                        setTimeout(() => this.classList.remove('flash-error'), 600);
+                                    }
+                                });
+                            });
+                        </script>
                     {% endif %}
                 
                 {% elif card.type == 'ordering' %}
@@ -481,60 +647,36 @@
             <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg rounded-pill px-5 py-3 shadow fw-bold"><i class="bi bi-house-door-fill me-2"></i> Zurück zur Übersicht</a>
         </div>
         <script>
-            setTimeout(() => {
-                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#0d6efd', '#198754', '#ffc107', '#dc3545'] });
-            }, 300);
+            setTimeout(() => { confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#0d6efd', '#198754', '#ffc107', '#dc3545'] }); }, 300);
         </script>
     {% endif %}
 </div>
 
 {% if not feedback and not finished %}
 <script>
-    // Funktion für das Initialisieren von Sortable, die bei jedem HTMX Swap neu feuert
     function initQuizFeatures() {
         const sortList = document.getElementById('sortable_list');
         if (sortList) {
-            new Sortable(sortList, { 
-                animation: 150, 
-                ghostClass: 'bg-info', 
-                dragClass: 'shadow-lg',
-                delay: 100,             // Verhindert versehentliches Ziehen auf Smartphones
-                delayOnTouchOnly: true, 
-                fallbackTolerance: 3
-            });
+            new Sortable(sortList, { animation: 150, ghostClass: 'bg-info', dragClass: 'shadow-lg', delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3 });
         }
 
         const poolEl = document.getElementById('assignment_pool');
         if (poolEl) {
-            new Sortable(poolEl, { 
-                group: 'shared', 
-                animation: 150, 
-                ghostClass: 'opacity-50',
-                delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3
-            });
+            new Sortable(poolEl, { group: 'shared', animation: 150, ghostClass: 'opacity-50', delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3 });
             document.querySelectorAll('.assignment-dropzone').forEach(dz => {
-                new Sortable(dz, { 
-                    group: 'shared', 
-                    animation: 150, 
-                    ghostClass: 'bg-info',
-                    delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3
-                });
+                new Sortable(dz, { group: 'shared', animation: 150, ghostClass: 'bg-info', delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3 });
             });
         }
 
-        // Formular-Warnung Tracker aktivieren
         let formChanged = false;
         const quizForm = document.getElementById('quizForm');
         if (quizForm) {
             quizForm.addEventListener('input', () => formChanged = true);
-            quizForm.addEventListener('submit', function() {
-                this.setAttribute('data-submitting', 'true');
-            });
+            quizForm.addEventListener('submit', function() { this.setAttribute('data-submitting', 'true'); });
         }
         window.quizFormChanged = () => formChanged;
     }
 
-    // Beim allerersten Laden und nach HTMX Seitenwechseln aufrufen
     document.addEventListener("DOMContentLoaded", initQuizFeatures);
     document.addEventListener("htmx:afterSwap", initQuizFeatures);
 
@@ -557,22 +699,18 @@
         document.getElementById('assignment_json_input').value = JSON.stringify(result);
     }
 
-    // Unsaved Changes Warnung (Wird nur 1x pro Sitzung registriert)
     if (!window.unloadWarningInitialized) {
         window.addEventListener('beforeunload', function (e) {
             const form = document.getElementById('quizForm');
             if (window.quizFormChanged && window.quizFormChanged() && form && !form.hasAttribute('data-submitting')) {
-                e.preventDefault();
-                e.returnValue = '';
+                e.preventDefault(); e.returnValue = '';
             }
         });
         window.unloadWarningInitialized = true;
     }
 
-    // Tastatur-Navigation (Sicherstellen, dass Events nicht mehrfach gestapelt werden)
     if (!window.keyboardNavInitialized) {
         document.addEventListener('keydown', function(event) {
-            // Wenn in einem Textfeld getippt wird, blockieren
             if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
             
             if (event.key === 'Enter') {
@@ -581,18 +719,9 @@
                 if (nextBtn) nextBtn.click();
                 else if (safeBtn) safeBtn.click();
             }
-            if (event.key.toLowerCase() === 's') {
-                const skipBtn = document.getElementById('skipBtn');
-                if (skipBtn) skipBtn.click();
-            }
-            if (event.key.toLowerCase() === 'r') {
-                const modalTarget = document.querySelector('[data-bs-target="#reportModal"]');
-                if (modalTarget) modalTarget.click();
-            }
-            if (event.key.toLowerCase() === 'e') {
-                const editBtn = document.querySelector('a[title="Frage bearbeiten"]');
-                if (editBtn) editBtn.click();
-            }
+            if (event.key.toLowerCase() === 's') { const skipBtn = document.getElementById('skipBtn'); if (skipBtn) skipBtn.click(); }
+            if (event.key.toLowerCase() === 'r') { const modalTarget = document.querySelector('[data-bs-target="#reportModal"]'); if (modalTarget) modalTarget.click(); }
+            if (event.key.toLowerCase() === 'e') { const editBtn = document.querySelector('a[title="Frage bearbeiten"]'); if (editBtn) editBtn.click(); }
             
             {% if card.type == 'mc' %}
                 const mcBtns = document.querySelectorAll('button[name="mc_answer"]');

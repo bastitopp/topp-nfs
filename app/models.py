@@ -74,6 +74,13 @@ class User(UserMixin, db.Model):
         current_level_xp = (self.get_level() - 1) * 500
         xp_in_level = self.xp - current_level_xp
         return int((xp_in_level / 500) * 100)
+        
+    def is_online(self):
+        from datetime import datetime, timedelta
+        if not self.last_active:
+            return False
+        # Nutzer gilt als "online", wenn die letzte Aktion weniger als 10 Minuten her ist
+        return datetime.utcnow() - self.last_active < timedelta(minutes=10)
 
 class Card(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -136,7 +143,6 @@ class ScenarioNode(db.Model):
     scenario_id = db.Column(db.Integer, db.ForeignKey('scenario.id'), nullable=False)
     situation_text = db.Column(db.Text, nullable=False)
     
-    # NEU: Eigene JSON-Spalte für Vitalparameter
     vitals = db.Column(db.JSON, nullable=True) 
     
     is_endpoint = db.Column(db.Boolean, default=False)

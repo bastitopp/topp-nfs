@@ -148,7 +148,15 @@
                             </div>
                             
                             <div class="ms-3 d-flex gap-2">
-                                <a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                                {% if val._stats.total > 0 %}
+                                <form action="{{ url_for('main.reset_category', category_path=val._path) }}" method="POST" class="m-0" onsubmit="return confirm('Möchtest du den Lernfortschritt für die Kategorie \'{{ key }}\' und alle Unterkategorien wirklich unwiderruflich zurücksetzen?');">
+                                    <button type="submit" class="btn btn-light btn-sm rounded-circle text-danger shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;" title="Fortschritt zurücksetzen">
+                                        <i class="bi bi-arrow-counterclockwise fs-5"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+
+                                <a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;" title="Kategorie lernen">
                                     <i class="bi bi-play-fill fs-4"></i>
                                 </a>
                             </div>
@@ -171,7 +179,7 @@
 // Perfektes JavaScript zum Auf- und Zuklappen der Kategorien (Ignoriert Klicks auf Buttons/Checkboxen)
 if (!window.toggleCat) {
     window.toggleCat = function(id, el, event) {
-        if (event.target.closest('input, button, a')) return;
+        if (event.target.closest('input, button, a, form')) return;
         
         const target = document.getElementById(id);
         if (target) {

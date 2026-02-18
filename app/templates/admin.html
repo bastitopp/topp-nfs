@@ -14,51 +14,20 @@
 </div>
 
 <ul class="nav nav-pills mb-4 gap-2">
-    <li class="nav-item">
-        <a href="?tab=questions" class="nav-link {% if tab == 'questions' %}active{% endif %} rounded-pill px-4">Standard Fragen</a>
-    </li>
-    <li class="nav-item">
-        <a href="?tab=quality" class="nav-link {% if tab == 'quality' %}active{% endif %} rounded-pill px-4 position-relative border border-warning text-warning fw-bold">
-            <i class="bi bi-shield-check"></i> Fragen-TÜV
-        </a>
-    </li>
-    <li class="nav-item">
-        <a href="?tab=bpr" class="nav-link {% if tab == 'bpr' %}active bg-info text-white{% else %}bg-info bg-opacity-10{% endif %} rounded-pill px-4 fw-bold text-info border border-info">
-            <i class="bi bi-diagram-3-fill"></i> BPR-Trainer
-        </a>
-    </li>
-    <li class="nav-item">
-        <a href="?tab=meds" class="nav-link {% if tab == 'meds' %}active{% endif %} rounded-pill px-4"><i class="bi bi-capsule"></i> Medikamente</a>
-    </li>
-    <li class="nav-item">
-        <a href="?tab=cases" class="nav-link {% if tab == 'cases' %}active{% endif %} rounded-pill px-4"><i class="bi bi-journal-medical"></i> Fallbeispiele</a>
-    </li>
-    <li class="nav-item">
-        <a href="?tab=reports" class="nav-link {% if tab == 'reports' %}active{% endif %} rounded-pill px-4 position-relative">
-            Meldungen 
-            {% if reports_count > 0 %}
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ reports_count }}</span>
-            {% endif %}
-        </a>
-    </li>
-    <li class="nav-item">
-        <a href="?tab=messages" class="nav-link {% if tab == 'messages' %}active{% endif %} rounded-pill px-4">News</a>
-    </li>
-    <li class="nav-item ms-auto">
-        <a href="?tab=io" class="nav-link {% if tab == 'io' %}active{% endif %} rounded-pill px-4 border border-secondary"><i class="bi bi-arrow-left-right"></i> Import</a>
-    </li>
+    <li class="nav-item"><a href="?tab=questions" class="nav-link {% if tab == 'questions' %}active{% endif %} rounded-pill px-4">Standard Fragen</a></li>
+    <li class="nav-item"><a href="?tab=quality" class="nav-link {% if tab == 'quality' %}active{% endif %} rounded-pill px-4 position-relative border border-warning text-warning fw-bold"><i class="bi bi-shield-check"></i> Fragen-TÜV</a></li>
+    <li class="nav-item"><a href="?tab=bpr" class="nav-link {% if tab == 'bpr' %}active bg-info text-white{% else %}bg-info bg-opacity-10{% endif %} rounded-pill px-4 fw-bold text-info border border-info"><i class="bi bi-diagram-3-fill"></i> BPR-Trainer</a></li>
+    <li class="nav-item"><a href="?tab=meds" class="nav-link {% if tab == 'meds' %}active{% endif %} rounded-pill px-4"><i class="bi bi-capsule"></i> Medikamente</a></li>
+    <li class="nav-item"><a href="?tab=cases" class="nav-link {% if tab == 'cases' %}active{% endif %} rounded-pill px-4"><i class="bi bi-journal-medical"></i> Fallbeispiele</a></li>
+    <li class="nav-item"><a href="?tab=reports" class="nav-link {% if tab == 'reports' %}active{% endif %} rounded-pill px-4 position-relative">Meldungen {% if reports_count > 0 %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ reports_count }}</span>{% endif %}</a></li>
+    <li class="nav-item"><a href="?tab=messages" class="nav-link {% if tab == 'messages' %}active{% endif %} rounded-pill px-4">News</a></li>
+    <li class="nav-item ms-auto"><a href="?tab=io" class="nav-link {% if tab == 'io' %}active{% endif %} rounded-pill px-4 border border-secondary"><i class="bi bi-arrow-left-right"></i> Import</a></li>
 </ul>
 
 <div class="tab-content">
-    
     {% if tab == 'questions' %}
     <div class="tab-pane fade show active" id="questions">
-        <input type="text" id="adminSearchInput" class="form-control mb-3 shadow-sm border-0 py-2" 
-               placeholder="🔍 In allen Fragen suchen..." 
-               hx-get="{{ url_for('admin.admin_api_cards') }}" 
-               hx-trigger="keyup changed delay:400ms" 
-               hx-target="#globalSearchResults" 
-               name="q" autocomplete="off">
+        <input type="text" id="adminSearchInput" class="form-control mb-3 shadow-sm border-0 py-2" placeholder="🔍 In allen Fragen suchen..." hx-get="{{ url_for('admin.admin_api_cards') }}" hx-trigger="keyup changed delay:400ms" hx-target="#globalSearchResults" name="q" autocomplete="off">
 
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white border-bottom-0 py-3">
@@ -66,22 +35,18 @@
             </div>
             <div class="collapse" id="createForm">
                 <div class="card-body bg-light">
-                    <form method="POST" enctype="multipart/form-data" id="questionForm" onsubmit="prepareMultiJson()">
+                    <form method="POST" enctype="multipart/form-data" id="questionForm">
                         <input type="hidden" name="multi_json" id="multi_json_input">
                         
                         <div class="row g-3 mb-3">
-                            <div class="col-md-8">
-                                <label class="fw-bold small">Kategorie-Pfad</label>
-                                <input type="text" name="category_path" class="form-control" list="catList" required>
-                                <datalist id="catList">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
-                            </div>
+                            <div class="col-md-8"><label class="fw-bold small">Kategorie-Pfad</label><input type="text" name="category_path" class="form-control" list="catList" required><datalist id="catList">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist></div>
                             <div class="col-md-4">
                                 <label class="fw-bold small">Typ</label>
                                 <select name="type" id="typeSelect" class="form-select" onchange="updateFormFields()">
                                     <option value="flashcard">Karteikarte</option>
                                     <option value="mc">Multiple Choice</option>
                                     <option value="anatomy">Anatomie</option>
-                                    <option value="anatomy_multi">Anatomie Multi</option>
+                                    <option value="anatomy_multi">Anatomie Multi (Klick-Bild)</option>
                                     <option value="ordering">Sortieren</option>
                                     <option value="assignment">Zuordnung</option>
                                 </select>
@@ -92,32 +57,22 @@
                         <textarea name="question" class="form-control mb-3" rows="2" required></textarea>
                         
                         <label class="fw-bold small">Erklärung (Optional)</label>
-                        <textarea name="explanation" class="form-control mb-3" rows="2" placeholder="Zusätzliche Infos, die nach der Antwort angezeigt werden..."></textarea>
+                        <textarea name="explanation" class="form-control mb-3" rows="2"></textarea>
 
                         <div class="row g-3 mb-3">
-                            <div class="col-md-6"><label class="fw-bold small">Bild (Optional)</label><input type="file" name="image" class="form-control"></div>
+                            <div class="col-md-6"><label class="fw-bold small">Bild (WICHTIG für Anatomie!)</label><input type="file" name="image" id="imageInput" class="form-control" onchange="window.handleImageUpload(event)"></div>
                             <div class="col-md-6"><label class="fw-bold small">Audio (Optional)</label><input type="file" name="audio" class="form-control" accept="audio/*"></div>
                         </div>
 
-                        <div id="field_standard_answer" class="mb-3">
-                            <label class="fw-bold small">Richtige Antwort</label>
-                            <input name="answer" class="form-control">
-                        </div>
+                        <div id="field_standard_answer" class="mb-3"><label class="fw-bold small">Richtige Antwort</label><input name="answer" class="form-control"></div>
                         
                         <div id="field_mc_options" class="mb-3 d-none p-3 bg-white rounded border">
                             <label class="fw-bold small mb-2 text-secondary"><i class="bi bi-ui-radios me-1"></i> Falsche Antwort-Optionen (Multiple Choice)</label>
                             <div id="mcOptionsContainer">
-                                <div class="input-group mb-2 shadow-sm">
-                                    <input type="text" name="mc_options" class="form-control" placeholder="Falsche Antwort 1">
-                                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
-                                </div>
-                                <div class="input-group mb-2 shadow-sm">
-                                    <input type="text" name="mc_options" class="form-control" placeholder="Falsche Antwort 2">
-                                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
-                                </div>
+                                <div class="input-group mb-2 shadow-sm"><input type="text" name="mc_options" class="form-control" placeholder="Falsche Antwort 1"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button></div>
+                                <div class="input-group mb-2 shadow-sm"><input type="text" name="mc_options" class="form-control" placeholder="Falsche Antwort 2"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button></div>
                             </div>
                             <button type="button" class="btn btn-sm btn-outline-success mt-2 fw-bold" onclick="addMcOption()">+ Weitere Option</button>
-                            <div class="form-text small mt-2"><i class="bi bi-info-circle-fill text-info"></i> Die "Richtige Antwort" aus dem Feld darüber wird beim Lernen automatisch ergänzt.</div>
                         </div>
                         
                         <div id="field_anatomy" class="row g-3 mb-3 d-none">
@@ -125,20 +80,28 @@
                             <div class="col-md-6"><label class="fw-bold small">Latein</label><input name="answer_lat" class="form-control"></div>
                         </div>
                         
-                        <div id="field_anatomy_multi" class="mb-3 d-none p-3 bg-white rounded border">
-                            <label class="fw-bold small mb-2">Strukturen</label>
-                            <table class="table table-sm table-bordered">
-                                <tbody id="multiTableBody"></tbody>
-                            </table>
-                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addMultiRow()">+ Zeile</button>
+                        <div id="field_anatomy_multi" class="mb-3 d-none p-4 bg-white rounded-4 shadow-sm border">
+                            <h5 class="fw-bold text-primary mb-3"><i class="bi bi-pin-map-fill me-2"></i>Interaktives Bild erstellen</h5>
+                            
+                            <label class="fw-bold small mb-2 text-secondary">1. Bild hochladen & Zielpunkte setzen</label>
+                            <p class="small text-muted mb-3">Lade oben ein Bild hoch. Klicke dann direkt auf das Bild, um die roten Zielpunkte zu platzieren.</p>
+                            
+                            <div class="text-center bg-light rounded-4 border p-3 mb-4 shadow-inner">
+                                <div style="position: relative; display: inline-block; cursor: crosshair;" id="admin-img-container" onclick="window.addAnatomyMarker(event)">
+                                    <img id="admin-anatomy-img" src="" class="rounded shadow-sm" style="max-width: 100%; max-height: 55vh; display: none;">
+                                </div>
+                            </div>
+                            
+                            <label class="fw-bold small mb-3 text-secondary">2. Begriffe eintragen</label>
+                            <div id="anatomy-labels-list" class="mb-3"></div>
                         </div>
                         
                         <div id="field_json" class="mb-3 d-none">
                             <label class="fw-bold small">JSON (Sortieren / Zuordnung)</label>
-                            <textarea name="ordering_json" class="form-control" rows="3" placeholder='["A", "B", "C"] oder [{"name":"Gr1", "items":["A"]}]'></textarea>
+                            <textarea name="ordering_json" class="form-control" rows="3"></textarea>
                         </div>
                         
-                        <button class="btn btn-primary w-100 mt-4 rounded-pill">Speichern</button>
+                        <button class="btn btn-primary w-100 mt-4 rounded-pill fw-bold shadow-sm">Speichern</button>
                     </form>
                 </div>
             </div>
@@ -148,91 +111,32 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <form action="{{ url_for('admin.edit_category') }}" method="POST">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Kategorie bearbeiten</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
+                        <div class="modal-header"><h5 class="modal-title">Kategorie bearbeiten</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                         <div class="modal-body">
                             <input type="hidden" name="old_category_name" id="oldCategoryInput">
-                            <div class="mb-3">
-                                <label class="form-label">Neuer Name / Pfad</label>
-                                <input type="text" name="new_category_name" id="newCategoryInput" class="form-control" required>
-                                <div class="form-text small">Dies ändert den Namen für alle enthaltenen Fragen und Unterkategorien.</div>
-                            </div>
+                            <div class="mb-3"><label class="form-label">Neuer Name / Pfad</label><input type="text" name="new_category_name" id="newCategoryInput" class="form-control" required><div class="form-text small">Dies ändert den Namen für alle enthaltenen Fragen und Unterkategorien.</div></div>
                         </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                            <button type="submit" class="btn btn-primary">Speichern</button>
-                        </div>
+                        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button><button type="submit" class="btn btn-primary">Speichern</button></div>
                     </form>
                 </div>
             </div>
         </div>
 
         <form action="{{ url_for('admin.bulk_delete') }}" method="POST" id="bulkDeleteForm">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h5 class="fw-bold text-muted">Fragen nach Kategorie</h5>
-                <button class="btn btn-danger btn-sm rounded-pill" onclick="return confirm('Ausgewählte Fragen wirklich löschen?')"><i class="bi bi-trash"></i> Markierte löschen</button>
-            </div>
-            
-            <div id="searchContainer" class="d-none mb-4">
-                <div class="bg-light rounded p-2 border shadow-sm">
-                    <h6 class="fw-bold mb-2 px-2 pt-1 text-primary"><i class="bi bi-search"></i> Suchergebnisse</h6>
-                    <table class="table table-sm table-hover mb-0 bg-white">
-                        <tbody id="globalSearchResults"></tbody>
-                    </table>
-                </div>
-            </div>
-
+            <div class="d-flex justify-content-between align-items-center mb-2"><h5 class="fw-bold text-muted">Fragen nach Kategorie</h5><button class="btn btn-danger btn-sm rounded-pill" onclick="return confirm('Ausgewählte Fragen wirklich löschen?')"><i class="bi bi-trash"></i> Markierte löschen</button></div>
+            <div id="searchContainer" class="d-none mb-4"><div class="bg-light rounded p-2 border shadow-sm"><h6 class="fw-bold mb-2 px-2 pt-1 text-primary"><i class="bi bi-search"></i> Suchergebnisse</h6><table class="table table-sm table-hover mb-0 bg-white"><tbody id="globalSearchResults"></tbody></table></div></div>
             <div class="list-group" id="treeContainer">
                 {% macro render_admin_tree(nodes, level=0) %}
                     {% for key, val in nodes.items()|sort %}
                         {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') | replace('.', '_') | replace(',', '_') | replace('(', '_') | replace(')', '_') %}
-                        
                         <div class="list-group-item border-0 p-0 mb-1 bg-transparent">
-                            <div class="d-flex align-items-center p-2 bg-white rounded shadow-sm border position-relative admin-cat-row" 
-                                 {% if val._subs or val.card_count > 0 %}
-                                 onclick="window.toggleCat('collapse-{{ unique_id }}', this, event)" 
-                                 aria-expanded="false"
-                                 {% endif %}
-                                 {% if val.card_count > 0 %}
-                                 hx-get="{{ url_for('admin.admin_api_cards', category=val._path) }}"
-                                 hx-target="#tbody-{{ unique_id }}"
-                                 hx-trigger="click once"
-                                 {% endif %}
-                                 style="margin-left: {{ level * 20 }}px; cursor: pointer;">
-                                
-                                {% if val._subs or val.card_count > 0 %}
-                                    <i class="bi bi-chevron-right text-secondary me-2 transition-icon" style="font-size: 0.8rem;"></i>
-                                    <i class="bi bi-folder-fill text-primary me-2 fs-5"></i>
-                                {% else %}
-                                    <i class="bi bi-dash text-transparent me-2" style="font-size: 0.8rem; opacity: 0;"></i>
-                                    <i class="bi bi-folder text-muted me-2 fs-5"></i>
-                                {% endif %}
-                                
+                            <div class="d-flex align-items-center p-2 bg-white rounded shadow-sm border position-relative admin-cat-row" {% if val._subs or val.card_count > 0 %}onclick="window.toggleCat('collapse-{{ unique_id }}', this, event)" aria-expanded="false"{% endif %} {% if val.card_count > 0 %}hx-get="{{ url_for('admin.admin_api_cards', category=val._path) }}" hx-target="#tbody-{{ unique_id }}" hx-trigger="click once"{% endif %} style="margin-left: {{ level * 20 }}px; cursor: pointer;">
+                                {% if val._subs or val.card_count > 0 %}<i class="bi bi-chevron-right text-secondary me-2 transition-icon" style="font-size: 0.8rem;"></i><i class="bi bi-folder-fill text-primary me-2 fs-5"></i>{% else %}<i class="bi bi-dash text-transparent me-2" style="font-size: 0.8rem; opacity: 0;"></i><i class="bi bi-folder text-muted me-2 fs-5"></i>{% endif %}
                                 <span class="fw-bold flex-grow-1 user-select-none">{{ key }}</span>
                                 {% if val.card_count > 0 %}<span class="badge bg-secondary me-2">{{ val.card_count }} Fragen</span>{% endif %}
-                                
-                                <div class="z-2 d-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary border-0" onclick="openEditCategory('{{ val._path | trim('/') }}')" title="Kategorie umbenennen"><i class="bi bi-pencil"></i></button>
-                                    <button type="submit" form="delCatForm_{{ unique_id }}" class="btn btn-sm btn-outline-danger border-0" onclick="return confirm('ACHTUNG: Kategorie {{ key }} und ALLE Unterkategorien/Fragen unwiderruflich löschen?');" title="Ganze Kategorie löschen"><i class="bi bi-trash"></i></button>
-                                </div>
+                                <div class="z-2 d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-secondary border-0" onclick="openEditCategory('{{ val._path | trim('/') }}')" title="Kategorie umbenennen"><i class="bi bi-pencil"></i></button><button type="submit" form="delCatForm_{{ unique_id }}" class="btn btn-sm btn-outline-danger border-0" onclick="return confirm('ACHTUNG: Kategorie {{ key }} unwiderruflich löschen?');" title="Ganze Kategorie löschen"><i class="bi bi-trash"></i></button></div>
                             </div>
-                            
-                            <div class="collapse" id="collapse-{{ unique_id }}">
-                                <div class="pt-1">
-                                    {% if val.card_count > 0 %}
-                                    <div class="bg-light rounded p-2 mb-2 border shadow-sm" style="margin-left: {{ (level + 1) * 20 }}px;">
-                                        <table class="table table-sm table-hover mb-0 bg-white">
-                                            <tbody id="tbody-{{ unique_id }}">
-                                                <tr><td colspan="4" class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div> Lade Fragen...</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    {% endif %}
-                                    {% if val._subs %}{{ render_admin_tree(val._subs, level + 1) }}{% endif %}
-                                </div>
-                            </div>
+                            <div class="collapse" id="collapse-{{ unique_id }}"><div class="pt-1">{% if val.card_count > 0 %}<div class="bg-light rounded p-2 mb-2 border shadow-sm" style="margin-left: {{ (level + 1) * 20 }}px;"><table class="table table-sm table-hover mb-0 bg-white"><tbody id="tbody-{{ unique_id }}"><tr><td colspan="4" class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div> Lade Fragen...</td></tr></tbody></table></div>{% endif %} {% if val._subs %}{{ render_admin_tree(val._subs, level + 1) }}{% endif %}</div></div>
                         </div>
                     {% endfor %}
                 {% endmacro %}
@@ -251,240 +155,138 @@
     </div>
     {% endif %}
 
-    {% if tab == 'quality' %}
-    <div class="tab-pane fade show active" id="quality">
-        <div class="alert alert-warning border-0 shadow-sm mb-4">
-            <h5 class="fw-bold"><i class="bi bi-robot me-2"></i> Automatischer Fragen-TÜV</h5>
-            <p class="mb-0 text-dark">Dieser Check durchsucht deine Multiple-Choice Fragen nach typischen Fehlern (z.B. von KI-generierten Importen), die es den Nutzern zu leicht oder unmöglich machen, die Frage richtig zu beantworten.</p>
-        </div>
-
-        {% if quality_warnings %}
-            <div class="list-group shadow-sm">
-                {% for w in quality_warnings %}
-                <div class="list-group-item list-group-item-action">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <span class="badge bg-secondary mb-2">{{ w.card.category }}</span>
-                            <h6 class="fw-bold mb-1">{{ w.card.question }}</h6>
-                            <ul class="text-danger small mb-0 ps-3">
-                                {% for issue in w.issues %}
-                                    <li><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ issue }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        <a href="{{ url_for('admin.edit_card', card_id=w.card.id, next=url_for('admin.admin_dashboard', tab='quality')) }}" class="btn btn-sm btn-outline-primary ms-3">Korrigieren</a>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-5">
-                <div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
-                <h4 class="fw-bold">Alles perfekt!</h4>
-                <p class="text-muted">Es wurden keine verdächtigen Muster in deinen MC-Fragen gefunden.</p>
-            </div>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    {% if tab == 'bpr' %}
-    <div class="tab-pane fade show active" id="bpr">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4><i class="bi bi-diagram-3 text-info me-2"></i> BPR-Szenarien verwalten</h4>
-            <button class="btn btn-info text-white fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addScenarioModal">
-                <i class="bi bi-plus-lg me-1"></i> Neues Szenario
-            </button>
-        </div>
-
-        <div class="card mb-4 border-info">
-            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">BPR Szenarien importieren / exportieren</h5>
-                <a href="{{ url_for('admin.export_bpr') }}" class="btn btn-sm btn-light text-info fw-bold">
-                    <i class="bi bi-download"></i> Alle als JSON exportieren
-                </a>
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('admin.import_bpr') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center">
-                    <input type="file" name="file" class="form-control me-2" accept=".json" required>
-                    <button type="submit" class="btn btn-primary text-nowrap">
-                        <i class="bi bi-upload"></i> JSON Importieren
-                    </button>
-                </form>
-                <small class="text-muted mt-2 d-block">Lade eine exportierte <code>.json</code> Datei hoch, um ganze Szenarien mit all ihren Abhängigkeiten und Stationen automatisiert wiederherzustellen.</small>
-            </div>
-        </div>
-
-        <div class="list-group shadow-sm">
-            {% for s in scenarios %}
-            <div class="list-group-item d-flex justify-content-between align-items-center p-3">
-                <div>
-                    <h5 class="mb-1 fw-bold">{{ s.title }}</h5>
-                    <p class="mb-0 text-muted small"><i class="bi bi-info-circle me-1"></i> Stichwort: <strong>{{ s.dispatch_text }}</strong> | Knotenpunkte: {{ s.nodes|length }}</p>
-                </div>
-                <div>
-                    <a href="{{ url_for('admin.edit_bpr_scenario', scenario_id=s.id) }}" class="btn btn-outline-primary me-2">
-                        <i class="bi bi-pencil-square"></i> Editor öffnen
-                    </a>
-                    <form action="{{ url_for('admin.delete_bpr_scenario', scenario_id=s.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Szenario mit allen Knoten unwiderruflich löschen?');">
-                        <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
-                    </form>
-                </div>
-            </div>
-            {% else %}
-            <div class="text-muted text-center p-5 bg-white border rounded">
-                <i class="bi bi-diagram-3 display-4 text-muted opacity-25 mb-3 d-block"></i>
-                <h5>Keine Szenarien vorhanden</h5>
-                <p>Klicke oben auf "Neues Szenario", um den ersten interaktiven Behandlungspfad anzulegen.</p>
-            </div>
-            {% endfor %}
-        </div>
-
-        <div class="modal fade" id="addScenarioModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <form action="{{ url_for('admin.add_bpr_scenario') }}" method="POST">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Neues BPR-Szenario erstellen</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold small">Titel (z.B. SAA 1.1 - ACS)</label>
-                                <input type="text" name="title" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold small">Einsatzstichwort (z.B. RD1 unklarer Thoraxschmerz)</label>
-                                <input type="text" name="dispatch_text" class="form-control" required>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="submit" class="btn btn-info text-white fw-bold">Erstellen & zum Editor</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if tab == 'meds' %}
-    <div class="tab-pane fade show active" id="meds">
-        <div class="card shadow-sm border-0 mb-4 bg-primary bg-opacity-10">
-            <div class="card-body">
-                <h5 class="fw-bold text-primary mb-3"><i class="bi bi-calculator"></i> Neuer Medikamenten-Drill</h5>
-                <form action="{{ url_for('admin.add_med') }}" method="POST">
-                    <div class="row g-3">
-                        <div class="col-md-6"><label class="small fw-bold">Kategorie</label><input type="text" name="category" class="form-control" value="Medikamente/" required></div>
-                        <div class="col-md-6"><label class="small fw-bold">Medikament</label><input type="text" name="drug_name" class="form-control" placeholder="z.B. Adrenalin" required></div>
-                        <div class="col-md-3"><label class="small fw-bold">Gewicht Min (kg)</label><input type="number" name="weight_min" class="form-control" value="50"></div>
-                        <div class="col-md-3"><label class="small fw-bold">Gewicht Max (kg)</label><input type="number" name="weight_max" class="form-control" value="120"></div>
-                        <div class="col-md-3"><label class="small fw-bold">Schritte (kg)</label><input type="number" name="weight_step" class="form-control" value="5"></div>
-                        <div class="col-md-3"><label class="small fw-bold">Einheit Ergebnis</label><input type="text" name="unit" class="form-control" value="mg"></div>
-                        <div class="col-md-12"><label class="small fw-bold">Dosis-Bereich (Faktor pro kg)</label><input type="text" name="dosage_range" class="form-control" placeholder="z.B. 0.01 oder 0.125-0.25" required><small class="text-muted">Erlaubt: Einzelwert (z.B. 0.5) oder Bereich mit Bindestrich (z.B. 2-4)</small></div>
-                    </div>
-                    <button class="btn btn-primary w-100 mt-3 rounded-pill">Medikament anlegen</button>
-                </form>
-            </div>
-        </div>
-        <div class="card shadow-sm border-0"><div class="card-body p-0"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Kat</th><th>Frage (Template)</th><th>Faktor</th><th class="text-end"></th></tr></thead><tbody>{% for c in med_cards %}<tr><td>{{ c.category }}</td><td>{{ c.question }}</td><td>{{ c.answer }}</td><td class="text-end"><form action="{{ url_for('admin.delete_card', card_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button></form></td></tr>{% endfor %}</tbody></table></div></div>
-    </div>
-    {% endif %}
-
-    {% if tab == 'cases' %}
-    <div class="tab-pane fade show active" id="cases">
-        <div class="card shadow-sm border-0 mb-4 bg-warning bg-opacity-10">
-            <div class="card-body">
-                <h5 class="fw-bold text-dark mb-3"><i class="bi bi-file-earmark-medical"></i> Neues Fallbeispiel</h5>
-                <form action="{{ url_for('admin.add_case') }}" method="POST">
-                    <div class="row g-3">
-                        <div class="col-md-6"><label class="small fw-bold">Kategorie</label><input type="text" name="category" class="form-control" value="Fallbeispiele/" required></div>
-                        <div class="col-md-6"><label class="small fw-bold">Titel</label><input type="text" name="title" class="form-control" placeholder="z.B. ACS mit STEMI" required></div>
-                        <div class="col-12"><label class="small fw-bold">Einleitung (Sichtbar)</label><textarea name="intro" class="form-control" rows="3" placeholder="75j Patient, kaltschweißig..." required></textarea></div>
-                        <div class="col-12"><label class="small fw-bold">Verlauf / Lösung (Versteckt)</label><textarea name="solution" class="form-control" rows="5" placeholder="ABCDE-Schema: A: frei, B: SpO2 92%..." required></textarea><small class="text-muted">Du kannst Markdown nutzen (*kursiv*, **fett**, - Liste)</small></div>
-                    </div>
-                    <button class="btn btn-warning w-100 mt-3 rounded-pill">Fallbeispiel anlegen</button>
-                </form>
-            </div>
-        </div>
-        <div class="card shadow-sm border-0"><div class="card-body p-0"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Kat</th><th>Titel/Intro</th><th class="text-end"></th></tr></thead><tbody>{% for c in case_cards %}<tr><td>{{ c.category }}</td><td class="text-truncate" style="max-width: 400px;">{{ c.question }}</td><td class="text-end"><form action="{{ url_for('admin.delete_card', card_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button></form></td></tr>{% endfor %}</tbody></table></div></div>
-    </div>
-    {% endif %}
-
-    {% if tab == 'reports' %}
-    <div class="tab-pane fade show active" id="reports">
-        {% if reports %}
-        <div class="list-group">
-            {% for r in reports %}
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div class="flex-grow-1">
-                    {% if r.card %}
-                        <div class="fw-bold">{{ r.card.category }} <span class="text-muted fw-normal">| {{ r.card.question|truncate(50) }}</span></div>
-                    {% else %}<div class="fw-bold text-muted">Karte gelöscht</div>{% endif %}
-			<div class="text-danger small">
-    				<i class="bi bi-exclamation-circle"></i> {{ r.reason }}
-    				<span class="text-muted ms-2">
-        			<i class="bi bi-person"></i> Gemeldet von: <strong>{% if r.user %}{{ r.user.username }}{% else %}Unbekannt{% endif %}</strong>
-			    </span>
-			</div>
-                </div>
-                <div class="d-flex gap-2">
-                    {% if r.card %}
-                        <a href="{{ url_for('admin.edit_card', card_id=r.card.id, next=url_for('admin.admin_dashboard', tab='reports')) }}" class="btn btn-sm btn-outline-primary">Bearbeiten</a>
-                    {% endif %}
-                    <form action="{{ url_for('admin.dismiss_report', rid=r.id) }}" method="POST"><button class="btn btn-sm btn-success">OK</button></form>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}Keine Meldungen.{% endif %}
-    </div>
-    {% endif %}
-    
-    {% if tab == 'messages' %}
-    <div class="tab-pane fade show active" id="messages">
-        <div class="card shadow-sm border-0 p-3">
-            <form action="{{ url_for('admin.add_message') }}" method="POST" class="mb-4 d-flex gap-2"><input name="content" class="form-control rounded-pill" placeholder="Nachricht..." required><button class="btn btn-warning rounded-circle"><i class="bi bi-send-fill"></i></button></form>
-            <div class="list-group">{% for m in messages %}<div class="list-group-item d-flex justify-content-between">{{ m.content }} <a href="{{ url_for('admin.delete_message', mid=m.id) }}" class="text-danger"><i class="bi bi-x-circle"></i></a></div>{% endfor %}</div>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if tab == 'io' %}
-    <div class="tab-pane fade show active" id="io">
-        <div class="alert alert-info shadow-sm mb-4 border-0">
-            <h5 class="alert-heading fw-bold"><i class="bi bi-info-circle-fill"></i> CSV Format</h5>
-            <p class="mb-0">Die CSV-Datei sollte folgendes Format haben (Trennzeichen: Semikolon):</p>
-            <code class="d-block mt-2 bg-white p-2 rounded">Kategorie;Typ;Frage;Antwort;Optionen;Erklärung</code>
-        </div>
-        <div class="row g-4">
-            <div class="col-md-6"><form action="{{ url_for('admin.import_preview') }}" method="POST" enctype="multipart/form-data" class="card p-3"><input type="file" name="file" class="form-control mb-3"><button class="btn btn-success w-100">Import</button></form></div>
-            <div class="col-md-6"><a href="{{ url_for('admin.export_data') }}" class="btn btn-primary w-100 p-4">Backup Download</a></div>
-        </div>
-    </div>
-    {% endif %}
-
+    {% if tab == 'quality' %}<div class="tab-pane fade show active" id="quality"><div class="alert alert-warning border-0 shadow-sm mb-4"><h5 class="fw-bold"><i class="bi bi-robot me-2"></i> Automatischer Fragen-TÜV</h5><p class="mb-0 text-dark">Dieser Check durchsucht deine Multiple-Choice Fragen nach typischen Fehlern.</p></div>{% if quality_warnings %}<div class="list-group shadow-sm">{% for w in quality_warnings %}<div class="list-group-item list-group-item-action"><div class="d-flex justify-content-between align-items-start"><div><span class="badge bg-secondary mb-2">{{ w.card.category }}</span><h6 class="fw-bold mb-1">{{ w.card.question }}</h6><ul class="text-danger small mb-0 ps-3">{% for issue in w.issues %}<li><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ issue }}</li>{% endfor %}</ul></div><a href="{{ url_for('admin.edit_card', card_id=w.card.id, next=url_for('admin.admin_dashboard', tab='quality')) }}" class="btn btn-sm btn-outline-primary ms-3">Korrigieren</a></div></div>{% endfor %}</div>{% else %}<div class="text-center py-5"><div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div><h4 class="fw-bold">Alles perfekt!</h4><p class="text-muted">Es wurden keine verdächtigen Muster in deinen MC-Fragen gefunden.</p></div>{% endif %}</div>{% endif %}
+    {% if tab == 'bpr' %}<div class="tab-pane fade show active" id="bpr"><div class="d-flex justify-content-between align-items-center mb-4"><h4><i class="bi bi-diagram-3 text-info me-2"></i> BPR-Szenarien verwalten</h4><button class="btn btn-info text-white fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addScenarioModal"><i class="bi bi-plus-lg me-1"></i> Neues Szenario</button></div><div class="card mb-4 border-info"><div class="card-header bg-info text-white d-flex justify-content-between align-items-center"><h5 class="mb-0">BPR Szenarien importieren / exportieren</h5><a href="{{ url_for('admin.export_bpr') }}" class="btn btn-sm btn-light text-info fw-bold"><i class="bi bi-download"></i> Alle als JSON exportieren</a></div><div class="card-body"><form action="{{ url_for('admin.import_bpr') }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center"><input type="file" name="file" class="form-control me-2" accept=".json" required><button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-upload"></i> JSON Importieren</button></form><small class="text-muted mt-2 d-block">Lade eine exportierte <code>.json</code> Datei hoch.</small></div></div><div class="list-group shadow-sm">{% for s in scenarios %}<div class="list-group-item d-flex justify-content-between align-items-center p-3"><div><h5 class="mb-1 fw-bold">{{ s.title }}</h5><p class="mb-0 text-muted small"><i class="bi bi-info-circle me-1"></i> Stichwort: <strong>{{ s.dispatch_text }}</strong> | Knotenpunkte: {{ s.nodes|length }}</p></div><div><a href="{{ url_for('admin.edit_bpr_scenario', scenario_id=s.id) }}" class="btn btn-outline-primary me-2"><i class="bi bi-pencil-square"></i> Editor öffnen</a><form action="{{ url_for('admin.delete_bpr_scenario', scenario_id=s.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Szenario mit allen Knoten unwiderruflich löschen?');"><button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button></form></div></div>{% else %}<div class="text-muted text-center p-5 bg-white border rounded"><i class="bi bi-diagram-3 display-4 text-muted opacity-25 mb-3 d-block"></i><h5>Keine Szenarien vorhanden</h5><p>Klicke oben auf "Neues Szenario".</p></div>{% endfor %}</div><div class="modal fade" id="addScenarioModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="{{ url_for('admin.add_bpr_scenario') }}" method="POST"><div class="modal-header"><h5 class="modal-title">Neues BPR-Szenario erstellen</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label fw-bold small">Titel (z.B. SAA 1.1 - ACS)</label><input type="text" name="title" class="form-control" required></div><div class="mb-3"><label class="form-label fw-bold small">Einsatzstichwort (z.B. RD1 unklarer Thoraxschmerz)</label><input type="text" name="dispatch_text" class="form-control" required></div></div><div class="modal-footer"><button type="submit" class="btn btn-info text-white fw-bold">Erstellen & zum Editor</button></div></form></div></div></div></div>{% endif %}
+    {% if tab == 'meds' %}<div class="tab-pane fade show active" id="meds"><div class="card shadow-sm border-0 mb-4 bg-primary bg-opacity-10"><div class="card-body"><h5 class="fw-bold text-primary mb-3"><i class="bi bi-calculator"></i> Neuer Medikamenten-Drill</h5><form action="{{ url_for('admin.add_med') }}" method="POST"><div class="row g-3"><div class="col-md-6"><label class="small fw-bold">Kategorie</label><input type="text" name="category" class="form-control" value="Medikamente/" required></div><div class="col-md-6"><label class="small fw-bold">Medikament</label><input type="text" name="drug_name" class="form-control" placeholder="z.B. Adrenalin" required></div><div class="col-md-3"><label class="small fw-bold">Gewicht Min (kg)</label><input type="number" name="weight_min" class="form-control" value="50"></div><div class="col-md-3"><label class="small fw-bold">Gewicht Max (kg)</label><input type="number" name="weight_max" class="form-control" value="120"></div><div class="col-md-3"><label class="small fw-bold">Schritte (kg)</label><input type="number" name="weight_step" class="form-control" value="5"></div><div class="col-md-3"><label class="small fw-bold">Einheit Ergebnis</label><input type="text" name="unit" class="form-control" value="mg"></div><div class="col-md-12"><label class="small fw-bold">Dosis-Bereich (Faktor pro kg)</label><input type="text" name="dosage_range" class="form-control" placeholder="z.B. 0.01 oder 0.125-0.25" required></div></div><button class="btn btn-primary w-100 mt-3 rounded-pill">Medikament anlegen</button></form></div></div><div class="card shadow-sm border-0"><div class="card-body p-0"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Kat</th><th>Frage (Template)</th><th>Faktor</th><th class="text-end"></th></tr></thead><tbody>{% for c in med_cards %}<tr><td>{{ c.category }}</td><td>{{ c.question }}</td><td>{{ c.answer }}</td><td class="text-end"><form action="{{ url_for('admin.delete_card', card_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button></form></td></tr>{% endfor %}</tbody></table></div></div></div>{% endif %}
+    {% if tab == 'cases' %}<div class="tab-pane fade show active" id="cases"><div class="card shadow-sm border-0 mb-4 bg-warning bg-opacity-10"><div class="card-body"><h5 class="fw-bold text-dark mb-3"><i class="bi bi-file-earmark-medical"></i> Neues Fallbeispiel</h5><form action="{{ url_for('admin.add_case') }}" method="POST"><div class="row g-3"><div class="col-md-6"><label class="small fw-bold">Kategorie</label><input type="text" name="category" class="form-control" value="Fallbeispiele/" required></div><div class="col-md-6"><label class="small fw-bold">Titel</label><input type="text" name="title" class="form-control" placeholder="z.B. ACS mit STEMI" required></div><div class="col-12"><label class="small fw-bold">Einleitung (Sichtbar)</label><textarea name="intro" class="form-control" rows="3" placeholder="75j Patient, kaltschweißig..." required></textarea></div><div class="col-12"><label class="small fw-bold">Verlauf / Lösung (Versteckt)</label><textarea name="solution" class="form-control" rows="5" placeholder="ABCDE-Schema..." required></textarea></div></div><button class="btn btn-warning w-100 mt-3 rounded-pill">Fallbeispiel anlegen</button></form></div></div><div class="card shadow-sm border-0"><div class="card-body p-0"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Kat</th><th>Titel/Intro</th><th class="text-end"></th></tr></thead><tbody>{% for c in case_cards %}<tr><td>{{ c.category }}</td><td class="text-truncate" style="max-width: 400px;">{{ c.question }}</td><td class="text-end"><form action="{{ url_for('admin.delete_card', card_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button></form></td></tr>{% endfor %}</tbody></table></div></div></div>{% endif %}
+    {% if tab == 'reports' %}<div class="tab-pane fade show active" id="reports">{% if reports %}<div class="list-group">{% for r in reports %}<div class="list-group-item d-flex justify-content-between align-items-center"><div class="flex-grow-1">{% if r.card %}<div class="fw-bold">{{ r.card.category }} <span class="text-muted fw-normal">| {{ r.card.question|truncate(50) }}</span></div>{% else %}<div class="fw-bold text-muted">Karte gelöscht</div>{% endif %}<div class="text-danger small"><i class="bi bi-exclamation-circle"></i> {{ r.reason }}<span class="text-muted ms-2"><i class="bi bi-person"></i> Gemeldet von: <strong>{% if r.user %}{{ r.user.username }}{% else %}Unbekannt{% endif %}</strong></span></div></div><div class="d-flex gap-2">{% if r.card %}<a href="{{ url_for('admin.edit_card', card_id=r.card.id, next=url_for('admin.admin_dashboard', tab='reports')) }}" class="btn btn-sm btn-outline-primary">Bearbeiten</a>{% endif %}<form action="{{ url_for('admin.dismiss_report', rid=r.id) }}" method="POST"><button class="btn btn-sm btn-success">OK</button></form></div></div>{% endfor %}</div>{% else %}Keine Meldungen.{% endif %}</div>{% endif %}
+    {% if tab == 'messages' %}<div class="tab-pane fade show active" id="messages"><div class="card shadow-sm border-0 p-3"><form action="{{ url_for('admin.add_message') }}" method="POST" class="mb-4 d-flex gap-2"><input name="content" class="form-control rounded-pill" placeholder="Nachricht..." required><button class="btn btn-warning rounded-circle"><i class="bi bi-send-fill"></i></button></form><div class="list-group">{% for m in messages %}<div class="list-group-item d-flex justify-content-between">{{ m.content }} <a href="{{ url_for('admin.delete_message', mid=m.id) }}" class="text-danger"><i class="bi bi-x-circle"></i></a></div>{% endfor %}</div></div></div>{% endif %}
+    {% if tab == 'io' %}<div class="tab-pane fade show active" id="io"><div class="alert alert-info shadow-sm mb-4 border-0"><h5 class="alert-heading fw-bold"><i class="bi bi-info-circle-fill"></i> CSV Format</h5><p class="mb-0">Die CSV-Datei sollte folgendes Format haben (Trennzeichen: Semikolon):</p><code class="d-block mt-2 bg-white p-2 rounded">Kategorie;Typ;Frage;Antwort;Optionen;Erklärung</code></div><div class="row g-4"><div class="col-md-6"><form action="{{ url_for('admin.import_preview') }}" method="POST" enctype="multipart/form-data" class="card p-3"><input type="file" name="file" class="form-control mb-3"><button class="btn btn-success w-100">Import</button></form></div><div class="col-md-6"><a href="{{ url_for('admin.export_data') }}" class="btn btn-primary w-100 p-4">Backup Download</a></div></div></div>{% endif %}
 </div>
 
 {% if tab == 'questions' %}
 <script>
-// Perfektes JavaScript zum Auf- und Zuklappen der Kategorien
 if (!window.toggleCat) {
     window.toggleCat = function(id, el, event) {
         if (event.target.closest('input, button, a')) return;
-        
         const target = document.getElementById(id);
         if (target) {
-            const bsCollapse = bootstrap.Collapse.getOrCreateInstance(target, { toggle: false });
-            bsCollapse.toggle();
-            
-            const isExpanded = el.getAttribute('aria-expanded') === 'true';
-            el.setAttribute('aria-expanded', !isExpanded);
+            bootstrap.Collapse.getOrCreateInstance(target, { toggle: false }).toggle();
+            el.setAttribute('aria-expanded', el.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');
         }
     };
 }
 
-let nextId = 1;
+// ---------------------------------------------------------
+// GLOBALE FUNKTIONEN FÜR DEN ANATOMIE-EDITOR (MODERN)
+// ---------------------------------------------------------
+window.anatomyMarkers = [];
+window.anatomyNextId = 1;
 
+window.updateMarkerText = function(index, lang, value) {
+    if(lang === 'de') window.anatomyMarkers[index].de = value;
+    if(lang === 'lat') window.anatomyMarkers[index].lat = value;
+    const jsonOut = document.getElementById('multi_json_input');
+    if(jsonOut) jsonOut.value = JSON.stringify(window.anatomyMarkers);
+};
+
+window.removeAnatomyMarker = function(index) {
+    window.anatomyMarkers.splice(index, 1);
+    window.updateAnatomyView();
+};
+
+window.updateAnatomyView = function() {
+    document.querySelectorAll('.admin-marker').forEach(el => el.remove());
+    const labelsList = document.getElementById('anatomy-labels-list');
+    const imgContainer = document.getElementById('admin-img-container');
+    if(labelsList) labelsList.innerHTML = '';
+
+    window.anatomyMarkers.forEach((marker, index) => {
+        let dot = document.createElement('div');
+        dot.className = 'admin-marker bg-danger rounded-circle position-absolute border border-white border-2 shadow';
+        dot.style.width = '28px'; dot.style.height = '28px';
+        dot.style.left = `calc(${marker.x}% - 14px)`;
+        dot.style.top = `calc(${marker.y}% - 14px)`;
+        dot.style.pointerEvents = 'none'; // Erlaubt Klicks hindurch
+        dot.style.zIndex = '10';
+        dot.innerHTML = `<span class="text-white small fw-bold d-flex justify-content-center align-items-center h-100">${index + 1}</span>`;
+        if(imgContainer) imgContainer.appendChild(dot);
+
+        let li = document.createElement('div');
+        li.className = 'd-flex align-items-center gap-3 p-3 mb-3 bg-white border rounded-4 shadow-sm';
+        
+        let safeDe = (marker.de || '').replace(/"/g, '&quot;');
+        let safeLat = (marker.lat || '').replace(/"/g, '&quot;');
+        
+        li.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center bg-danger text-white rounded-circle shadow-sm" style="width: 38px; height: 38px; flex-shrink: 0; font-size: 1.1rem; font-weight: bold;">
+                ${index + 1}
+            </div>
+            <div class="row g-2 flex-grow-1">
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input type="text" class="form-control fw-bold text-primary border-primary border-opacity-25 shadow-sm" id="de_${index}" placeholder="Deutsch" value="${safeDe}" oninput="window.updateMarkerText(${index}, 'de', this.value)">
+                        <label for="de_${index}" class="text-muted"><i class="bi bi-translate"></i> Begriff (Deutsch)</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <input type="text" class="form-control text-secondary border-secondary border-opacity-25" id="lat_${index}" placeholder="Latein" value="${safeLat}" oninput="window.updateMarkerText(${index}, 'lat', this.value)">
+                        <label for="lat_${index}" class="text-muted"><i class="bi bi-journal-medical"></i> Latein (Optional)</label>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline-danger border-0 rounded-circle" style="width: 44px; height: 44px; flex-shrink: 0;" onclick="window.removeAnatomyMarker(${index})" title="Punkt entfernen">
+                <i class="bi bi-trash-fill fs-5"></i>
+            </button>
+        `;
+        if(labelsList) labelsList.appendChild(li);
+    });
+    
+    const jsonOut = document.getElementById('multi_json_input');
+    if(jsonOut) jsonOut.value = JSON.stringify(window.anatomyMarkers);
+};
+
+window.addAnatomyMarker = function(e) {
+    if(e.target.closest('button')) return; 
+    
+    const anatomyImg = document.getElementById('admin-anatomy-img');
+    if(!anatomyImg || anatomyImg.style.display === 'none') {
+        alert("Bitte lade zuerst ein Bild hoch, bevor du Punkte setzt!");
+        return;
+    }
+    
+    const rect = anatomyImg.getBoundingClientRect();
+    let clickX = e.clientX - rect.left;
+    let clickY = e.clientY - rect.top;
+    
+    if(clickX < 0) clickX = 0; if(clickY < 0) clickY = 0;
+    if(clickX > rect.width) clickX = rect.width; if(clickY > rect.height) clickY = rect.height;
+
+    const x = (clickX / rect.width) * 100;
+    const y = (clickY / rect.height) * 100;
+    
+    window.anatomyMarkers.push({ id: window.anatomyNextId++, de: "", lat: "", x: x.toFixed(2), y: y.toFixed(2) });
+    window.updateAnatomyView();
+};
+
+window.handleImageUpload = function(event) {
+    if (event.target.files && event.target.files[0]) {
+        const anatomyImg = document.getElementById('admin-anatomy-img');
+        if(anatomyImg) {
+            anatomyImg.onload = function() {
+                anatomyImg.style.display = 'block';
+                window.anatomyMarkers = []; 
+                window.updateAnatomyView();
+            };
+            anatomyImg.src = URL.createObjectURL(event.target.files[0]);
+        }
+    }
+};
+
+// ---------------------------------------------------------
+// RESTLICHE ADMIN LOGIK
+// ---------------------------------------------------------
 function updateFormFields() {
     const type = document.getElementById('typeSelect').value;
     ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id=>document.getElementById(id).classList.add('d-none'));
@@ -494,60 +296,26 @@ function updateFormFields() {
         if(type==='mc') document.getElementById('field_mc_options').classList.remove('d-none'); 
     }
     else if(type==='anatomy') document.getElementById('field_anatomy').classList.remove('d-none');
-    else if(type==='anatomy_multi') { 
-        document.getElementById('field_anatomy_multi').classList.remove('d-none'); 
-        if(nextId===1 && document.getElementById('multiTableBody').children.length === 0) addMultiRow(); 
-    }
+    else if(type==='anatomy_multi') document.getElementById('field_anatomy_multi').classList.remove('d-none');
     else if(type==='ordering'||type==='assignment') document.getElementById('field_json').classList.remove('d-none');
 }
 
 function addMcOption() {
-    const row = `<div class="input-group mb-2 shadow-sm">
-                    <input type="text" name="mc_options" class="form-control" placeholder="Weitere falsche Antwort">
-                    <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
-                </div>`;
+    const row = `<div class="input-group mb-2 shadow-sm"><input type="text" name="mc_options" class="form-control" placeholder="Weitere falsche Antwort"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button></div>`;
     document.getElementById('mcOptionsContainer').insertAdjacentHTML('beforeend', row);
 }
 
-function addMultiRow() { 
-    const row = `<tr><td><input class="form-control form-control-sm row-id" value="${nextId++}"></td><td><input class="form-control form-control-sm row-de" placeholder="DE"></td><td><input class="form-control form-control-sm row-lat" placeholder="LAT"></td><td><button type="button" class="btn btn-sm text-danger" onclick="this.closest('tr').remove()">X</button></td></tr>`;
-    document.getElementById('multiTableBody').insertAdjacentHTML('beforeend', row);
-}
-
-function prepareMultiJson() {
-    if(document.getElementById('typeSelect').value === 'anatomy_multi') {
-        const rows = [];
-        document.querySelectorAll('#multiTableBody tr').forEach(tr => { 
-            rows.push({
-                id: tr.querySelector('.row-id').value, 
-                de: tr.querySelector('.row-de').value, 
-                lat: tr.querySelector('.row-lat').value
-            }); 
-        });
-        document.getElementById('multi_json_input').value = JSON.stringify(rows);
-    }
-}
-
-// Suchlogik toggelt nur noch die Container (Suche selbst passiert über HTMX auf dem Server)
 document.getElementById('adminSearchInput').addEventListener('input', function(e) {
-    if(this.value.trim().length > 0) {
-        document.getElementById('treeContainer').classList.add('d-none');
-        document.getElementById('searchContainer').classList.remove('d-none');
-    } else {
-        document.getElementById('treeContainer').classList.remove('d-none');
-        document.getElementById('searchContainer').classList.add('d-none');
-    }
+    if(this.value.trim().length > 0) { document.getElementById('treeContainer').classList.add('d-none'); document.getElementById('searchContainer').classList.remove('d-none'); }
+    else { document.getElementById('treeContainer').classList.remove('d-none'); document.getElementById('searchContainer').classList.add('d-none'); }
 });
 
 function openEditCategory(name) {
-    document.getElementById('oldCategoryInput').value = name;
-    document.getElementById('newCategoryInput').value = name;
+    document.getElementById('oldCategoryInput').value = name; document.getElementById('newCategoryInput').value = name;
     new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
 }
 
-(function() {
-    updateFormFields();
-})();
+updateFormFields();
 </script>
 {% endif %}
 {% endblock %}

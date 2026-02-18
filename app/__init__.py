@@ -1,5 +1,6 @@
 import os
-import json  # Import für den Filter hinzugefügt
+import json
+import random  # Import für den Shuffle-Filter
 from datetime import datetime
 import markdown
 from markupsafe import Markup
@@ -49,13 +50,22 @@ def create_app():
 
     # --- TEMPLATE FILTER ---
     
-    # FIX: from_json Filter registrieren, um TemplateRuntimeError zu beheben
     @app.template_filter('from_json')
     def from_json_filter(value):
         try:
             return json.loads(value)
         except (ValueError, TypeError):
             return []
+
+    # NEU: Filter zum zufälligen Mischen der Buttons im Anatomie-Quiz
+    @app.template_filter('shuffle')
+    def shuffle_filter(seq):
+        try:
+            result = list(seq)
+            random.shuffle(result)
+            return result
+        except:
+            return seq
 
     @app.template_filter('markdown')
     def render_markdown(text):

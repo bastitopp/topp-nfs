@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -9,6 +10,14 @@ from ..models import Card, UserProgress, DashboardMessage, ExamAttempt, User
 from ..utils import check_gamification, build_category_tree, get_learning_stats
 
 bp = Blueprint('main', __name__)
+
+@bp.before_app_request
+def update_last_active():
+    if current_user.is_authenticated:
+        # Performance-Tipp: Wir aktualisieren die Datenbank nur alle 5 Minuten
+        if current_user.last_active is None or current_user.last_active < datetime.utcnow() - timedelta(minutes=5):
+            current_user.last_active = datetime.utcnow()
+            db.session.commit()
 
 @bp.route('/')
 def index():
