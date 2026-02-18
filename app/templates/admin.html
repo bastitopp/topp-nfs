@@ -2,7 +2,6 @@
 
 {% block content %}
 <style>
-    /* Sanfte Hover-Effekte und Pfeil-Animation für die Kategorien */
     .admin-cat-row { transition: background-color 0.2s ease; }
     .admin-cat-row:hover { background-color: #f8f9fa !important; }
     .admin-cat-row[aria-expanded="true"] .transition-icon { transform: rotate(90deg); }
@@ -14,32 +13,52 @@
     <a href="{{ url_for('admin.admin_users') }}" class="btn btn-outline-primary rounded-pill"><i class="bi bi-people-fill"></i> Benutzer verwalten</a>
 </div>
 
-<ul class="nav nav-pills mb-4 gap-2" id="adminTab" role="tablist">
-    <li class="nav-item"><button class="nav-link active rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#questions">Standard Fragen</button></li>
+<ul class="nav nav-pills mb-4 gap-2">
     <li class="nav-item">
-        <button class="nav-link rounded-pill px-4 position-relative border border-warning text-warning fw-bold" data-bs-toggle="tab" data-bs-target="#quality">
+        <a href="?tab=questions" class="nav-link {% if tab == 'questions' %}active{% endif %} rounded-pill px-4">Standard Fragen</a>
+    </li>
+    <li class="nav-item">
+        <a href="?tab=quality" class="nav-link {% if tab == 'quality' %}active{% endif %} rounded-pill px-4 position-relative border border-warning text-warning fw-bold">
             <i class="bi bi-shield-check"></i> Fragen-TÜV
-            {% if quality_warnings|length > 0 %}
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ quality_warnings|length }}</span>
-            {% endif %}
-        </button>
+        </a>
     </li>
     <li class="nav-item">
-        <button class="nav-link rounded-pill px-4 fw-bold text-info border border-info bg-info bg-opacity-10" data-bs-toggle="tab" data-bs-target="#bpr">
+        <a href="?tab=bpr" class="nav-link {% if tab == 'bpr' %}active bg-info text-white{% else %}bg-info bg-opacity-10{% endif %} rounded-pill px-4 fw-bold text-info border border-info">
             <i class="bi bi-diagram-3-fill"></i> BPR-Trainer
-        </button>
+        </a>
     </li>
-    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#meds"><i class="bi bi-capsule"></i> Medikamente</button></li>
-    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#cases"><i class="bi bi-journal-medical"></i> Fallbeispiele</button></li>
-    <li class="nav-item"><button class="nav-link rounded-pill px-4 position-relative" data-bs-toggle="tab" data-bs-target="#reports">Meldungen {% if reports|length > 0 %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ reports|length }}</span>{% endif %}</button></li>
-    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab" data-bs-target="#messages">News</button></li>
-    <li class="nav-item ms-auto"><button class="nav-link rounded-pill px-4 border border-secondary" data-bs-toggle="tab" data-bs-target="#io"><i class="bi bi-arrow-left-right"></i> Import</button></li>
+    <li class="nav-item">
+        <a href="?tab=meds" class="nav-link {% if tab == 'meds' %}active{% endif %} rounded-pill px-4"><i class="bi bi-capsule"></i> Medikamente</a>
+    </li>
+    <li class="nav-item">
+        <a href="?tab=cases" class="nav-link {% if tab == 'cases' %}active{% endif %} rounded-pill px-4"><i class="bi bi-journal-medical"></i> Fallbeispiele</a>
+    </li>
+    <li class="nav-item">
+        <a href="?tab=reports" class="nav-link {% if tab == 'reports' %}active{% endif %} rounded-pill px-4 position-relative">
+            Meldungen 
+            {% if reports_count > 0 %}
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ reports_count }}</span>
+            {% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="?tab=messages" class="nav-link {% if tab == 'messages' %}active{% endif %} rounded-pill px-4">News</a>
+    </li>
+    <li class="nav-item ms-auto">
+        <a href="?tab=io" class="nav-link {% if tab == 'io' %}active{% endif %} rounded-pill px-4 border border-secondary"><i class="bi bi-arrow-left-right"></i> Import</a>
+    </li>
 </ul>
 
 <div class="tab-content">
     
+    {% if tab == 'questions' %}
     <div class="tab-pane fade show active" id="questions">
-        <input type="text" id="adminSearchInput" class="form-control mb-3" placeholder="🔍 In allen Fragen suchen..." onkeyup="filterQuestions()">
+        <input type="text" id="adminSearchInput" class="form-control mb-3 shadow-sm border-0 py-2" 
+               placeholder="🔍 In allen Fragen suchen..." 
+               hx-get="{{ url_for('admin.admin_api_cards') }}" 
+               hx-trigger="keyup changed delay:400ms" 
+               hx-target="#globalSearchResults" 
+               name="q" autocomplete="off">
 
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white border-bottom-0 py-3">
@@ -156,22 +175,34 @@
                 <button class="btn btn-danger btn-sm rounded-pill" onclick="return confirm('Ausgewählte Fragen wirklich löschen?')"><i class="bi bi-trash"></i> Markierte löschen</button>
             </div>
             
-            <div class="list-group">
+            <div id="searchContainer" class="d-none mb-4">
+                <div class="bg-light rounded p-2 border shadow-sm">
+                    <h6 class="fw-bold mb-2 px-2 pt-1 text-primary"><i class="bi bi-search"></i> Suchergebnisse</h6>
+                    <table class="table table-sm table-hover mb-0 bg-white">
+                        <tbody id="globalSearchResults"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="list-group" id="treeContainer">
                 {% macro render_admin_tree(nodes, level=0) %}
                     {% for key, val in nodes.items()|sort %}
                         {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') | replace('.', '_') | replace(',', '_') | replace('(', '_') | replace(')', '_') %}
                         
                         <div class="list-group-item border-0 p-0 mb-1 bg-transparent">
                             <div class="d-flex align-items-center p-2 bg-white rounded shadow-sm border position-relative admin-cat-row" 
-                                 {% if val._subs or val._cards %}
+                                 {% if val._subs or val.card_count > 0 %}
                                  onclick="window.toggleCat('collapse-{{ unique_id }}', this, event)" 
                                  aria-expanded="false"
-                                 style="margin-left: {{ level * 20 }}px; cursor: pointer;"
-                                 {% else %}
-                                 style="margin-left: {{ level * 20 }}px;"
-                                 {% endif %}>
+                                 {% endif %}
+                                 {% if val.card_count > 0 %}
+                                 hx-get="{{ url_for('admin.admin_api_cards', category=val._path) }}"
+                                 hx-target="#tbody-{{ unique_id }}"
+                                 hx-trigger="click once"
+                                 {% endif %}
+                                 style="margin-left: {{ level * 20 }}px; cursor: pointer;">
                                 
-                                {% if val._subs or val._cards %}
+                                {% if val._subs or val.card_count > 0 %}
                                     <i class="bi bi-chevron-right text-secondary me-2 transition-icon" style="font-size: 0.8rem;"></i>
                                     <i class="bi bi-folder-fill text-primary me-2 fs-5"></i>
                                 {% else %}
@@ -180,32 +211,21 @@
                                 {% endif %}
                                 
                                 <span class="fw-bold flex-grow-1 user-select-none">{{ key }}</span>
-                                {% if val._cards %}<span class="badge bg-secondary me-2">{{ val._cards|length }} Fragen</span>{% endif %}
+                                {% if val.card_count > 0 %}<span class="badge bg-secondary me-2">{{ val.card_count }} Fragen</span>{% endif %}
                                 
                                 <div class="z-2 d-flex gap-1">
                                     <button type="button" class="btn btn-sm btn-outline-secondary border-0" onclick="openEditCategory('{{ val._path | trim('/') }}')" title="Kategorie umbenennen"><i class="bi bi-pencil"></i></button>
-                                    
                                     <button type="submit" form="delCatForm_{{ unique_id }}" class="btn btn-sm btn-outline-danger border-0" onclick="return confirm('ACHTUNG: Kategorie {{ key }} und ALLE Unterkategorien/Fragen unwiderruflich löschen?');" title="Ganze Kategorie löschen"><i class="bi bi-trash"></i></button>
                                 </div>
                             </div>
                             
                             <div class="collapse" id="collapse-{{ unique_id }}">
                                 <div class="pt-1">
-                                    {% if val._cards %}
+                                    {% if val.card_count > 0 %}
                                     <div class="bg-light rounded p-2 mb-2 border shadow-sm" style="margin-left: {{ (level + 1) * 20 }}px;">
                                         <table class="table table-sm table-hover mb-0 bg-white">
-                                            <tbody>
-                                            {% for c in val._cards %}
-                                                <tr>
-                                                    <td style="width: 30px;"><input type="checkbox" name="selected_ids" value="{{ c.id }}" class="form-check-input"></td>
-                                                    <td style="width: 60px;"><small class="badge bg-light text-dark border">{{ c.type }}</small></td>
-                                                    <td class="text-truncate" style="max-width: 300px;">{{ c.question }}</td>
-                                                    <td class="text-end" style="width: 100px;">
-                                                        <a href="{{ url_for('admin.edit_card', card_id=c.id, next=url_for('admin.admin_dashboard')) }}" class="btn btn-sm btn-link text-primary p-0 me-2"><i class="bi bi-pencil-fill"></i></a>
-                                                        <button type="submit" formaction="{{ url_for('admin.delete_card', card_id=c.id) }}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Löschen?');"><i class="bi bi-trash-fill"></i></button>
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
+                                            <tbody id="tbody-{{ unique_id }}">
+                                                <tr><td colspan="4" class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div> Lade Fragen...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -229,8 +249,46 @@
         {% endmacro %}
         {{ render_del_forms(question_tree) }}
     </div>
+    {% endif %}
 
-    <div class="tab-pane fade" id="bpr" role="tabpanel">
+    {% if tab == 'quality' %}
+    <div class="tab-pane fade show active" id="quality">
+        <div class="alert alert-warning border-0 shadow-sm mb-4">
+            <h5 class="fw-bold"><i class="bi bi-robot me-2"></i> Automatischer Fragen-TÜV</h5>
+            <p class="mb-0 text-dark">Dieser Check durchsucht deine Multiple-Choice Fragen nach typischen Fehlern (z.B. von KI-generierten Importen), die es den Nutzern zu leicht oder unmöglich machen, die Frage richtig zu beantworten.</p>
+        </div>
+
+        {% if quality_warnings %}
+            <div class="list-group shadow-sm">
+                {% for w in quality_warnings %}
+                <div class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="badge bg-secondary mb-2">{{ w.card.category }}</span>
+                            <h6 class="fw-bold mb-1">{{ w.card.question }}</h6>
+                            <ul class="text-danger small mb-0 ps-3">
+                                {% for issue in w.issues %}
+                                    <li><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ issue }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <a href="{{ url_for('admin.edit_card', card_id=w.card.id, next=url_for('admin.admin_dashboard', tab='quality')) }}" class="btn btn-sm btn-outline-primary ms-3">Korrigieren</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
+                <h4 class="fw-bold">Alles perfekt!</h4>
+                <p class="text-muted">Es wurden keine verdächtigen Muster in deinen MC-Fragen gefunden.</p>
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if tab == 'bpr' %}
+    <div class="tab-pane fade show active" id="bpr">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4><i class="bi bi-diagram-3 text-info me-2"></i> BPR-Szenarien verwalten</h4>
             <button class="btn btn-info text-white fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addScenarioModal">
@@ -307,42 +365,10 @@
             </div>
         </div>
     </div>
-    
-    <div class="tab-pane fade" id="quality">
-        <div class="alert alert-warning border-0 shadow-sm mb-4">
-            <h5 class="fw-bold"><i class="bi bi-robot me-2"></i> Automatischer Fragen-TÜV</h5>
-            <p class="mb-0 text-dark">Dieser Check durchsucht deine Multiple-Choice Fragen nach typischen Fehlern (z.B. von KI-generierten Importen), die es den Nutzern zu leicht oder unmöglich machen, die Frage richtig zu beantworten.</p>
-        </div>
+    {% endif %}
 
-        {% if quality_warnings %}
-            <div class="list-group shadow-sm">
-                {% for w in quality_warnings %}
-                <div class="list-group-item list-group-item-action">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <span class="badge bg-secondary mb-2">{{ w.card.category }}</span>
-                            <h6 class="fw-bold mb-1">{{ w.card.question }}</h6>
-                            <ul class="text-danger small mb-0 ps-3">
-                                {% for issue in w.issues %}
-                                    <li><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ issue }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        <a href="{{ url_for('admin.edit_card', card_id=w.card.id) }}" class="btn btn-sm btn-outline-primary ms-3">Korrigieren</a>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-5">
-                <div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
-                <h4 class="fw-bold">Alles perfekt!</h4>
-                <p class="text-muted">Es wurden keine verdächtigen Muster in deinen MC-Fragen gefunden.</p>
-            </div>
-        {% endif %}
-    </div>
-
-    <div class="tab-pane fade" id="meds">
+    {% if tab == 'meds' %}
+    <div class="tab-pane fade show active" id="meds">
         <div class="card shadow-sm border-0 mb-4 bg-primary bg-opacity-10">
             <div class="card-body">
                 <h5 class="fw-bold text-primary mb-3"><i class="bi bi-calculator"></i> Neuer Medikamenten-Drill</h5>
@@ -362,8 +388,10 @@
         </div>
         <div class="card shadow-sm border-0"><div class="card-body p-0"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Kat</th><th>Frage (Template)</th><th>Faktor</th><th class="text-end"></th></tr></thead><tbody>{% for c in med_cards %}<tr><td>{{ c.category }}</td><td>{{ c.question }}</td><td>{{ c.answer }}</td><td class="text-end"><form action="{{ url_for('admin.delete_card', card_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button></form></td></tr>{% endfor %}</tbody></table></div></div>
     </div>
+    {% endif %}
 
-    <div class="tab-pane fade" id="cases">
+    {% if tab == 'cases' %}
+    <div class="tab-pane fade show active" id="cases">
         <div class="card shadow-sm border-0 mb-4 bg-warning bg-opacity-10">
             <div class="card-body">
                 <h5 class="fw-bold text-dark mb-3"><i class="bi bi-file-earmark-medical"></i> Neues Fallbeispiel</h5>
@@ -380,8 +408,10 @@
         </div>
         <div class="card shadow-sm border-0"><div class="card-body p-0"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Kat</th><th>Titel/Intro</th><th class="text-end"></th></tr></thead><tbody>{% for c in case_cards %}<tr><td>{{ c.category }}</td><td class="text-truncate" style="max-width: 400px;">{{ c.question }}</td><td class="text-end"><form action="{{ url_for('admin.delete_card', card_id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Löschen?');"><button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button></form></td></tr>{% endfor %}</tbody></table></div></div>
     </div>
+    {% endif %}
 
-    <div class="tab-pane fade" id="reports">
+    {% if tab == 'reports' %}
+    <div class="tab-pane fade show active" id="reports">
         {% if reports %}
         <div class="list-group">
             {% for r in reports %}
@@ -390,11 +420,16 @@
                     {% if r.card %}
                         <div class="fw-bold">{{ r.card.category }} <span class="text-muted fw-normal">| {{ r.card.question|truncate(50) }}</span></div>
                     {% else %}<div class="fw-bold text-muted">Karte gelöscht</div>{% endif %}
-                    <div class="text-danger small"><i class="bi bi-exclamation-circle"></i> {{ r.reason }}</div>
+			<div class="text-danger small">
+    				<i class="bi bi-exclamation-circle"></i> {{ r.reason }}
+    				<span class="text-muted ms-2">
+        			<i class="bi bi-person"></i> Gemeldet von: <strong>{% if r.user %}{{ r.user.username }}{% else %}Unbekannt{% endif %}</strong>
+			    </span>
+			</div>
                 </div>
                 <div class="d-flex gap-2">
                     {% if r.card %}
-                        <a href="{{ url_for('admin.edit_card', card_id=r.card.id, next=url_for('admin.admin_dashboard') ~ '#reports') }}" class="btn btn-sm btn-outline-primary">Bearbeiten</a>
+                        <a href="{{ url_for('admin.edit_card', card_id=r.card.id, next=url_for('admin.admin_dashboard', tab='reports')) }}" class="btn btn-sm btn-outline-primary">Bearbeiten</a>
                     {% endif %}
                     <form action="{{ url_for('admin.dismiss_report', rid=r.id) }}" method="POST"><button class="btn btn-sm btn-success">OK</button></form>
                 </div>
@@ -403,15 +438,19 @@
         </div>
         {% else %}Keine Meldungen.{% endif %}
     </div>
+    {% endif %}
     
-    <div class="tab-pane fade" id="messages">
+    {% if tab == 'messages' %}
+    <div class="tab-pane fade show active" id="messages">
         <div class="card shadow-sm border-0 p-3">
             <form action="{{ url_for('admin.add_message') }}" method="POST" class="mb-4 d-flex gap-2"><input name="content" class="form-control rounded-pill" placeholder="Nachricht..." required><button class="btn btn-warning rounded-circle"><i class="bi bi-send-fill"></i></button></form>
             <div class="list-group">{% for m in messages %}<div class="list-group-item d-flex justify-content-between">{{ m.content }} <a href="{{ url_for('admin.delete_message', mid=m.id) }}" class="text-danger"><i class="bi bi-x-circle"></i></a></div>{% endfor %}</div>
         </div>
     </div>
+    {% endif %}
 
-    <div class="tab-pane fade" id="io">
+    {% if tab == 'io' %}
+    <div class="tab-pane fade show active" id="io">
         <div class="alert alert-info shadow-sm mb-4 border-0">
             <h5 class="alert-heading fw-bold"><i class="bi bi-info-circle-fill"></i> CSV Format</h5>
             <p class="mb-0">Die CSV-Datei sollte folgendes Format haben (Trennzeichen: Semikolon):</p>
@@ -422,10 +461,13 @@
             <div class="col-md-6"><a href="{{ url_for('admin.export_data') }}" class="btn btn-primary w-100 p-4">Backup Download</a></div>
         </div>
     </div>
+    {% endif %}
+
 </div>
 
+{% if tab == 'questions' %}
 <script>
-// Perfektes JavaScript zum Auf- und Zuklappen der Kategorien (Ignoriert Klicks auf Buttons/Checkboxen)
+// Perfektes JavaScript zum Auf- und Zuklappen der Kategorien
 if (!window.toggleCat) {
     window.toggleCat = function(id, el, event) {
         if (event.target.closest('input, button, a')) return;
@@ -486,26 +528,16 @@ function prepareMultiJson() {
     }
 }
 
-function filterQuestions() {
-    const input = document.getElementById("adminSearchInput").value.toLowerCase();
-    if (!input) {
-        document.querySelectorAll('.list-group-item, tbody tr').forEach(el => el.style.display = "");
-        return;
+// Suchlogik toggelt nur noch die Container (Suche selbst passiert über HTMX auf dem Server)
+document.getElementById('adminSearchInput').addEventListener('input', function(e) {
+    if(this.value.trim().length > 0) {
+        document.getElementById('treeContainer').classList.add('d-none');
+        document.getElementById('searchContainer').classList.remove('d-none');
+    } else {
+        document.getElementById('treeContainer').classList.remove('d-none');
+        document.getElementById('searchContainer').classList.add('d-none');
     }
-    document.querySelectorAll('.list-group-item').forEach(el => el.style.display = "none");
-    document.querySelectorAll('tbody tr').forEach(tr => {
-        if (tr.innerText.toLowerCase().includes(input)) {
-            tr.style.display = "";
-            let parent = tr.closest('.list-group-item');
-            while (parent) {
-                parent.style.display = "";
-                const collapse = parent.querySelector('.collapse');
-                if(collapse) collapse.classList.add('show');
-                parent = parent.parentElement.closest('.list-group-item');
-            }
-        }
-    });
-}
+});
 
 function openEditCategory(name) {
     document.getElementById('oldCategoryInput').value = name;
@@ -513,18 +545,9 @@ function openEditCategory(name) {
     new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
 }
 
-function checkHashTab() {
-    if (window.location.hash) {
-        const triggerEl = document.querySelector(`button[data-bs-target="${window.location.hash}"]`);
-        if (triggerEl) {
-            new bootstrap.Tab(triggerEl).show();
-        }
-    }
-}
-
 (function() {
     updateFormFields();
-    checkHashTab();
 })();
 </script>
+{% endif %}
 {% endblock %}

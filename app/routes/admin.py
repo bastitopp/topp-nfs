@@ -2,6 +2,7 @@ import os
 import json
 import csv
 import io
+import html as pyhtml
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -24,19 +25,28 @@ def admin_required(f):
 def allowed_file(fn):
     return '.' in fn and fn.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'csv'}
 
-def build_admin_tree(cards):
+# NEU: Extrem effiziente Baum-Erstellung (Lädt keine Card-Objekte, sondern zählt nur auf der DB)
+def build_admin_tree():
+    stats = db.session.query(
+        Card.category,
+        db.func.count(Card.id)
+    ).filter(
+        ~Card.type.in_(['calculation', 'case_study'])
+    ).group_by(Card.category).all()
+    
     tree = {}
-    for card in cards:
-        cat_clean = card.category.strip('/')
+    for cat, count in stats:
+        if not cat: continue
+        cat_clean = cat.strip('/')
         parts = cat_clean.split('/')
         current = tree
         path_accum = ""
         for i, part in enumerate(parts):
             path_accum += part + "/"
             if part not in current:
-                current[part] = {'_path': path_accum, '_subs': {}, '_cards': []}
+                current[part] = {'_path': path_accum, '_subs': {}, 'card_count': 0}
             if i == len(parts) - 1:
-                current[part]['_cards'].append(card)
+                current[part]['card_count'] += count
             current = current[part]['_subs']
     return tree
 
@@ -93,14 +103,56 @@ def check_question_quality(cards):
             
     return warnings
 
+# NEU: HTMX API-Route für das schnelle Laden der Fragen in Ordnern & bei der Suche
+@bp.route('/admin/api/cards')
+@admin_required
+def admin_api_cards():
+    cat = request.args.get('category')
+    q = request.args.get('q')
+    
+    query = Card.query.filter(~Card.type.in_(['calculation', 'case_study']))
+    
+    if cat:
+        query = query.filter_by(category=cat.rstrip('/'))
+    if q:
+        query = query.filter(Card.question.ilike(f'%{q}%'))
+        
+    cards = query.limit(100).all() # Limit zum Schutz bei extrem großen Suchanfragen
+    
+    html = ""
+    for c in cards:
+        edit_url = url_for('admin.edit_card', card_id=c.id, next=url_for('admin.admin_dashboard', tab='questions'))
+        del_url = url_for('admin.delete_card', card_id=c.id)
+        ctype = c.type or 'unbekannt'
+        q_safe = pyhtml.escape(c.question)
+        
+        html += f"""
+        <tr>
+            <td style="width: 30px;"><input type="checkbox" name="selected_ids" value="{c.id}" class="form-check-input"></td>
+            <td style="width: 60px;"><small class="badge bg-light text-dark border">{ctype}</small></td>
+            <td class="text-truncate" style="max-width: 300px;">{q_safe}</td>
+            <td class="text-end" style="width: 100px;">
+                <a href="{edit_url}" class="btn btn-sm btn-link text-primary p-0 me-2"><i class="bi bi-pencil-fill"></i></a>
+                <button type="submit" formaction="{del_url}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Löschen?');"><i class="bi bi-trash-fill"></i></button>
+            </td>
+        </tr>
+        """
+    
+    if not cards:
+        html = '<tr><td colspan="4" class="text-muted text-center py-3">Keine Fragen gefunden</td></tr>'
+        
+    return Response(html, mimetype='text/html')
+
 @bp.route('/admin', methods=['GET','POST'])
 @admin_required
 def admin_dashboard():
+    tab = request.args.get('tab', 'questions')
+
     if request.method == 'POST':
         if 'tag_name' in request.form:
             db.session.add(Tag(name=request.form['tag_name']))
             db.session.commit()
-            return redirect(url_for('admin.admin_dashboard'))
+            return redirect(url_for('admin.admin_dashboard', tab=tab))
         
         if 'question' in request.form:
             cat = request.form.get('category_path') or request.form.get('category_new') or request.form.get('category_select')
@@ -128,27 +180,48 @@ def admin_dashboard():
             db.session.add(c)
             db.session.commit()
             flash('Gespeichert', 'success')
-            return redirect(url_for('admin.admin_dashboard'))
+            return redirect(url_for('admin.admin_dashboard', tab='questions'))
 
-    all_cards = Card.query.all()
-    standard_cards_raw = [c for c in all_cards if c.type not in ['calculation', 'case_study']]
-    question_tree = build_admin_tree(standard_cards_raw)
+    reports_count = CardReport.query.filter_by(resolved=False).count()
     
-    reports = CardReport.query.options(db.joinedload(CardReport.card))\
-        .filter_by(resolved=False)\
-        .order_by(CardReport.created_at.desc()).all()
-        
-    quality_warnings = check_question_quality(standard_cards_raw)
-    
-    scenarios = Scenario.query.all()
-    
+    question_tree = {}
+    quality_warnings = []
+    med_cards = []
+    case_cards = []
+    categories = []
+    tags = []
+    messages = []
+    reports = []
+    scenarios = []
+
+    if tab == 'questions':
+        question_tree = build_admin_tree()
+        categories = [c[0] for c in db.session.query(Card.category).distinct().all() if c[0]]
+        tags = Tag.query.all()
+    elif tab == 'quality':
+        all_cards = Card.query.all()
+        standard_cards_raw = [c for c in all_cards if c.type not in ['calculation', 'case_study']]
+        quality_warnings = check_question_quality(standard_cards_raw)
+    elif tab == 'bpr':
+        scenarios = Scenario.query.all()
+    elif tab == 'meds':
+        med_cards = Card.query.filter_by(type='calculation').all()
+    elif tab == 'cases':
+        case_cards = Card.query.filter_by(type='case_study').all()
+    elif tab == 'reports':
+        reports = CardReport.query.options(db.joinedload(CardReport.card)).filter_by(resolved=False).order_by(CardReport.created_at.desc()).all()
+    elif tab == 'messages':
+        messages = DashboardMessage.query.all()
+
     return render_template('admin.html', 
+                           tab=tab,
+                           reports_count=reports_count,
                            question_tree=question_tree,
-                           med_cards=[c for c in all_cards if c.type == 'calculation'], 
-                           case_cards=[c for c in all_cards if c.type == 'case_study'], 
-                           categories=[c[0] for c in db.session.query(Card.category).distinct().all()], 
-                           tags=Tag.query.all(), 
-                           messages=DashboardMessage.query.all(), 
+                           med_cards=med_cards, 
+                           case_cards=case_cards, 
+                           categories=categories, 
+                           tags=tags, 
+                           messages=messages, 
                            reports=reports,
                            quality_warnings=quality_warnings,
                            scenarios=scenarios)
@@ -159,7 +232,7 @@ def bulk_delete():
     ids = request.form.getlist('selected_ids')
     if not ids:
         flash('Keine Fragen ausgewählt', 'warning')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='questions'))
     count = 0
     for cid in ids:
         c = Card.query.get(int(cid))
@@ -170,7 +243,7 @@ def bulk_delete():
             count += 1
     db.session.commit()
     flash(f'{count} Fragen gelöscht.', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='questions'))
 
 @bp.route('/admin/category/edit', methods=['POST'])
 @admin_required
@@ -180,10 +253,10 @@ def edit_category():
     
     if not old_name or not new_name:
         flash('Ungültige Eingabe', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='questions'))
         
     if old_name == new_name:
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='questions'))
 
     exact_cards = Card.query.filter(Card.category == old_name).all()
     count = 0
@@ -198,13 +271,13 @@ def edit_category():
         
     db.session.commit()
     flash(f'Kategorie "{old_name}" zu "{new_name}" geändert ({count} Fragen aktualisiert).', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='questions'))
 
 @bp.route('/admin/category/delete', methods=['POST'])
 @admin_required
 def delete_category():
     cat_name = request.form.get('category_name')
-    if not cat_name: return redirect(url_for('admin.admin_dashboard'))
+    if not cat_name: return redirect(url_for('admin.admin_dashboard', tab='questions'))
     clean_name = cat_name.rstrip('/')
     cards = Card.query.filter(or_(Card.category == clean_name, Card.category.like(f"{clean_name}/%"))).all()
     count = 0
@@ -215,18 +288,23 @@ def delete_category():
         count += 1
     db.session.commit()
     flash(f'Kategorie "{clean_name}" und {count} Fragen gelöscht.', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='questions'))
 
 @bp.route('/admin/delete/<int:card_id>', methods=['POST'])
 @admin_required
 def delete_card(card_id):
     c = Card.query.get_or_404(card_id)
+    ctype = c.type
     UserProgress.query.filter_by(card_id=card_id).delete()
     CardReport.query.filter_by(card_id=card_id).delete()
     db.session.delete(c)
     db.session.commit()
     flash('Gelöscht', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    
+    tab = 'questions'
+    if ctype == 'calculation': tab = 'meds'
+    elif ctype == 'case_study': tab = 'cases'
+    return redirect(url_for('admin.admin_dashboard', tab=tab))
 
 @bp.route('/admin/edit/<int:card_id>', methods=['GET', 'POST'])
 @admin_required
@@ -267,7 +345,10 @@ def edit_card(card_id):
         if next_url:
             return redirect(next_url)
             
-        return redirect(url_for('admin.admin_dashboard'))
+        tab = 'questions'
+        if card.type == 'calculation': tab = 'meds'
+        elif card.type == 'case_study': tab = 'cases'
+        return redirect(url_for('admin.admin_dashboard', tab=tab))
     
     next_url = request.args.get('next')
     return render_template('edit_card.html', card=card, next_url=next_url)
@@ -279,7 +360,7 @@ def dismiss_report(rid):
     if r:
         r.resolved = True
         db.session.commit()
-    return redirect(url_for('admin.admin_dashboard') + '#reports')
+    return redirect(url_for('admin.admin_dashboard', tab='reports'))
 
 @bp.route('/admin/users')
 @admin_required
@@ -349,7 +430,7 @@ def add_med():
     c.options = json.dumps(config)
     c.answer = request.form.get('dosage_range', '0')
     db.session.add(c); db.session.commit()
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='meds'))
 
 @bp.route('/admin/add_case', methods=['POST'])
 @admin_required
@@ -357,21 +438,21 @@ def add_case():
     cat = request.form.get('category'); title = request.form.get('title')
     c = Card(category=cat, type='case_study', question=f"**{title}**\n\n{request.form.get('intro')}")
     c.answer = request.form.get('solution'); db.session.add(c); db.session.commit()
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='cases'))
 
 @bp.route('/admin/messages', methods=['POST'])
 @admin_required
 def add_message():
     db.session.add(DashboardMessage(content=request.form['content']))
     db.session.commit()
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='messages'))
 
 @bp.route('/admin/messages/delete/<int:mid>')
 @admin_required
 def delete_message(mid):
     DashboardMessage.query.filter_by(id=mid).delete()
     db.session.commit()
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='messages'))
 
 @bp.route('/admin/export')
 @admin_required
@@ -382,7 +463,7 @@ def export_data():
 @bp.route('/admin/import', methods=['POST'])
 @admin_required
 def import_preview():
-    if 'file' not in request.files: return redirect(url_for('admin.admin_dashboard'))
+    if 'file' not in request.files: return redirect(url_for('admin.admin_dashboard', tab='io'))
     file = request.files['file']
     try:
         stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
@@ -398,7 +479,7 @@ def import_preview():
         return render_template('admin_import_preview.html', data=preview_data, json_data=json.dumps(preview_data))
     except Exception as e:
         flash(f'Fehler: {e}','danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='io'))
 
 @bp.route('/admin/import/confirm', methods=['POST'])
 @admin_required
@@ -430,8 +511,7 @@ def import_confirm():
         db.session.commit()
         flash('Import erfolgreich.', 'success')
     except Exception as e: flash(f'Import Fehler: {e}', 'danger')
-    return redirect(url_for('admin.admin_dashboard'))
-
+    return redirect(url_for('admin.admin_dashboard', tab='io'))
 
 # ==========================================
 # --- BPR SZENARIO EDITOR ROUTEN ---
@@ -482,7 +562,7 @@ def delete_bpr_scenario(scenario_id):
     db.session.commit()
     
     flash('Szenario erfolgreich gelöscht.', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='bpr'))
 
 
 @bp.route('/admin/bpr/node/add/<int:scenario_id>', methods=['POST'])
@@ -490,7 +570,6 @@ def delete_bpr_scenario(scenario_id):
 def add_bpr_node(scenario_id):
     s = Scenario.query.get_or_404(scenario_id)
     
-    # NEU: Vitalparameter aus dem Formular holen
     vitals = {
         "hf": request.form.get('vital_hf', ''),
         "rr": request.form.get('vital_rr', ''),
@@ -504,7 +583,7 @@ def add_bpr_node(scenario_id):
         scenario_id=s.id,
         situation_text=request.form.get('situation_text'),
         status_badge=request.form.get('status_badge', 'Unklare Diagnose'),
-        vitals=vitals, # NEU: Wird hier in die Datenbank gespeichert
+        vitals=vitals, 
         is_endpoint='is_endpoint' in request.form,
         is_success='is_success' in request.form
     )
@@ -581,7 +660,7 @@ def export_bpr():
             n_data = {
                 'id': n.id,
                 'situation_text': n.situation_text,
-                'vitals': n.vitals, # NEU: Vitals exportieren
+                'vitals': n.vitals,
                 'is_endpoint': n.is_endpoint,
                 'is_success': n.is_success,
                 'status_badge': n.status_badge,
@@ -618,12 +697,12 @@ def export_bpr():
 def import_bpr():
     if 'file' not in request.files:
         flash('Keine Datei hochgeladen.', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='bpr'))
         
     file = request.files['file']
     if file.filename == '':
         flash('Keine Datei ausgewählt.', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='bpr'))
 
     try:
         file_content = file.read().decode('utf-8')
@@ -646,7 +725,7 @@ def import_bpr():
                 new_n = ScenarioNode(
                     scenario_id=new_s.id,
                     situation_text=n_data.get('situation_text', ''),
-                    vitals=n_data.get('vitals'), # NEU: Vitals importieren
+                    vitals=n_data.get('vitals'),
                     status_badge=n_data.get('status_badge', 'Unklar'),
                     is_endpoint=n_data.get('is_endpoint', False),
                     is_success=n_data.get('is_success', False)
@@ -699,4 +778,4 @@ def import_bpr():
         db.session.rollback()
         flash(f'Fehler beim Importieren der JSON: {str(e)}', 'danger')
         
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='bpr'))
