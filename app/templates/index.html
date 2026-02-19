@@ -4,12 +4,17 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
+    /* Globaler Schutz gegen horizontales Scrollen */
+    body, html { overflow-x: hidden; }
+
     /* Sanfte Hover-Effekte für die Kategorien */
     .index-cat-row { 
         transition: background-color 0.2s ease; 
         cursor: pointer; 
         touch-action: manipulation; 
         -webkit-tap-highlight-color: transparent;
+        /* Dynamische Einrückung basierend auf Jinja-Variable */
+        padding-left: calc(1rem + (var(--nest-level, 0) * 1.5rem)) !important; 
     }
     .index-cat-row:hover { background-color: rgba(0,0,0,0.03) !important; }
     
@@ -18,24 +23,35 @@
     .transition-icon { transition: transform 0.2s ease-in-out; }
     
     /* Das Untermenü System */
-    .custom-collapse {
-        display: none;
-        overflow: hidden;
-    }
-    .custom-collapse.show {
-        display: block;
-    }
+    .custom-collapse { display: none; overflow: hidden; }
+    .custom-collapse.show { display: block; }
 
     /* Darkmode Anpassungen */
     [data-bs-theme="dark"] .index-cat-row:hover { background-color: rgba(255,255,255,0.05) !important; }
     [data-bs-theme="dark"] .index-cat-title { color: #d1d5db !important; }
     [data-bs-theme="dark"] .badge-schwerpunkt { background-color: #2c0b0b !important; color: #ff8585 !important; border-color: #631c1c !important; }
+
+    /* --- MOBILE OPTIMIERUNGEN --- */
+    @media (max-width: 576px) {
+        .index-cat-row { 
+            /* Auf Handys viel weniger einrücken, aber zwingend in einer Zeile bleiben! */
+            padding-left: calc(0.5rem + (var(--nest-level, 0) * 0.75rem)) !important;
+            padding-right: 0.5rem !important;
+        }
+        .dashboard-wrapper h1 { font-size: 2rem; }
+        
+        /* Buttons und Icons etwas kleiner, damit der Text Platz hat */
+        .cat-action-btn { width: 32px !important; height: 32px !important; }
+        .cat-action-btn i { font-size: 1.1rem !important; }
+        .index-cat-icon { font-size: 1.2rem !important; }
+        .cat-checkbox { width: 1.2em !important; height: 1.2em !important; }
+    }
 </style>
 
 <div class="dashboard-wrapper animate__animated animate__fadeIn">
 
     <div class="mb-4">
-        <h1 class="fw-bold mb-1 display-5">Hallo, {{ current_user.real_name if current_user.real_name else current_user.username }}!</h1>
+        <h1 class="fw-bold mb-1 display-5 text-break">Hallo, {{ current_user.real_name if current_user.real_name else current_user.username }}!</h1>
         <div class="d-flex flex-wrap gap-2 mt-2">
             <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-2 small">
                 <i class="bi bi-fire me-1"></i> {{ current_user.streak }} Tage Streak
@@ -47,11 +63,11 @@
     </div>
 
     <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body p-4">
+        <div class="card-body p-3 p-sm-4">
             <h5 class="fw-bold mb-4"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Dein Fortschritt</h5>
 
             <div class="mb-4">
-                <div class="d-flex justify-content-between align-items-end mb-1">
+                <div class="d-flex flex-wrap justify-content-between align-items-end mb-1">
                     <span class="fw-bold text-secondary">Tagesziel heute</span>
                     <span class="small text-muted fw-bold">{{ global_stats.daily_done }} / {{ global_stats.daily_total }} Karten</span>
                 </div>
@@ -62,7 +78,7 @@
             </div>
 
             <div>
-                <div class="d-flex justify-content-between align-items-end mb-1">
+                <div class="d-flex flex-wrap justify-content-between align-items-end mb-1">
                     <span class="fw-bold text-secondary">Gesamtes Wissen (Sicher gelernt)</span>
                     <span class="small text-muted fw-bold">{{ global_stats.learned }} / {{ global_stats.total }} Fragen</span>
                 </div>
@@ -78,16 +94,16 @@
     <div class="row row-dashboard g-4 mb-4">
         <div class="col-lg-4 col-md-6">
             <div class="card border-0 shadow-sm h-100 overflow-hidden">
-                <div class="card-body p-4 d-flex flex-column">
+                <div class="card-body p-3 p-sm-4 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 45px; height: 45px;">
                             <i class="bi bi-arrow-repeat fs-4"></i>
                         </div>
-                        <span class="text-muted small fw-bold text-uppercase">Wiederholung</span>
+                        <span class="text-muted small fw-bold text-uppercase text-end">Wiederholung</span>
                     </div>
                     <div class="mt-auto">
-                        <div class="display-4 fw-bold {{ 'text-danger' if global_stats.due > 0 else 'text-success' }} mb-1">{{ global_stats.due }}</div>
-                        <div class="d-flex gap-2">
+                        <div class="display-4 fw-bold {{ 'text-danger' if global_stats.due > 0 else 'text-success' }} mb-2">{{ global_stats.due }}</div>
+                        <div class="d-flex flex-wrap gap-2">
                             <span class="badge bg-body text-body border border-opacity-10 small">+24h: {{ global_stats.f24 }}</span>
                             <span class="badge bg-body text-body border border-opacity-10 small">+48h: {{ global_stats.f48 }}</span>
                         </div>
@@ -98,12 +114,12 @@
 
         <div class="col-lg-4 col-md-6">
             <div class="card border-0 shadow-sm h-100 overflow-hidden">
-                <div class="card-body p-4 d-flex flex-column">
+                <div class="card-body p-3 p-sm-4 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 45px; height: 45px;">
                             <i class="bi bi-plus-circle fs-4"></i>
                         </div>
-                        <span class="text-muted small fw-bold text-uppercase">Neu & Unbekannt</span>
+                        <span class="text-muted small fw-bold text-uppercase text-end">Neu & Unbekannt</span>
                     </div>
                     <div class="mt-auto">
                         <div class="display-4 fw-bold text-primary mb-1">{{ global_stats.new }}</div>
@@ -115,16 +131,16 @@
 
         <div class="col-lg-4 col-md-12">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-body p-4 d-flex align-items-center">
-                    <div class="position-relative" style="width: 110px; height: 110px; flex-shrink: 0;">
+                <div class="card-body p-3 p-sm-4 d-flex align-items-center">
+                    <div class="position-relative" style="width: 100px; height: 100px; flex-shrink: 0;">
                         <canvas id="progressChart"></canvas>
                         <div class="position-absolute top-50 start-50 translate-middle text-center" style="width: 100%;">
-                            <span class="fw-bold d-block" style="font-size: 1.2rem;">{{ (global_stats.learned / global_stats.total * 100) | round | int if global_stats.total > 0 else 0 }}%</span>
+                            <span class="fw-bold d-block" style="font-size: 1.1rem;">{{ (global_stats.learned / global_stats.total * 100) | round | int if global_stats.total > 0 else 0 }}%</span>
                         </div>
                     </div>
-                    <div class="ms-4 flex-grow-1">
+                    <div class="ms-3 ms-sm-4 flex-grow-1" style="min-width: 0;">
                         <span class="text-muted small fw-bold text-uppercase d-block mb-1">Verteilung</span>
-                        <div class="text-muted small">Dein gesamtes Wissen im Überblick, unterteilt in neue, fällige und sicher gelernte Karten.</div>
+                        <div class="text-muted small text-wrap">Dein gesamtes Wissen im Überblick, unterteilt in neue, fällige und sicher gelernte Karten.</div>
                     </div>
                 </div>
             </div>
@@ -137,7 +153,7 @@
             <h6 class="fw-bold mb-2 text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Aktueller Schwerpunkt:</h6>
             <div class="d-flex flex-wrap gap-2">
                 {% for cat, count in global_stats.error_categories %}
-                    <span class="badge badge-schwerpunkt bg-white text-danger border border-danger border-opacity-25 px-3 py-2 shadow-sm">
+                    <span class="badge badge-schwerpunkt bg-white text-danger border border-danger border-opacity-25 px-3 py-2 shadow-sm text-wrap text-start">
                         {{ cat }} ({{ count }})
                     </span>
                 {% endfor %}
@@ -147,53 +163,53 @@
     {% endif %}
 
     <div class="d-grid gap-3 mb-5">
-        <a href="{{ url_for('learn.learn_errors') }}" class="btn btn-warning btn-lg rounded-pill shadow-sm fw-bold py-3 text-dark fs-5"><i class="bi bi-bandaid-fill me-2"></i> Fehler gezielt üben</a>
+        <a href="{{ url_for('learn.learn_errors') }}" class="btn btn-warning btn-lg rounded-pill shadow-sm fw-bold py-3 text-dark fs-5 text-wrap"><i class="bi bi-bandaid-fill me-2"></i> Fehler gezielt üben</a>
     </div>
 
     <form action="{{ url_for('learn.learn_custom') }}" method="POST" id="learnForm" class="mb-5">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4">
             <h4 class="fw-bold mb-0">Deine Themenbereiche</h4>
-            <button type="submit" class="btn btn-primary rounded-pill px-5 py-2 shadow-sm fw-bold">Auswahl lernen</button>
+            <button type="submit" class="btn btn-primary rounded-pill px-4 py-2 shadow-sm fw-bold w-100 w-sm-auto">Auswahl lernen</button>
         </div>
 
         <div class="list-group border-0 shadow-sm rounded-4 overflow-hidden">
             {% macro render_tree(nodes, level=0) %}
                 {% for key, val in nodes | dictsort %}
                     <div class="list-group-item border-0 p-0 bg-transparent border-bottom">
-                        <div class="d-flex align-items-center p-3 bg-body index-cat-row" 
-                             style="padding-left: {{ 1.5 + (level * 1.5) }}rem !important;"
+                        <div class="d-flex align-items-center p-2 py-sm-3 px-sm-3 bg-body index-cat-row" 
+                             style="--nest-level: {{ level }};"
                              onclick="window.manualToggle(this)">
                             
-                            <div class="me-3 no-collapse" onclick="event.stopPropagation();">
-                                <input class="form-check-input p-2 border-2" type="checkbox" name="categories" value="{{ val._path }}" style="width: 1.5em; height: 1.5em;">
+                            <div class="me-2 me-sm-3 no-collapse flex-shrink-0" onclick="event.stopPropagation();">
+                                <input class="form-check-input p-2 border-2 cat-checkbox" type="checkbox" name="categories" value="{{ val._path }}" style="width: 1.5em; height: 1.5em;">
                             </div>
                             
-                            <div class="flex-grow-1 d-flex align-items-center">
+                            <div class="flex-grow-1 d-flex align-items-center" style="min-width: 0; padding-right: 8px;">
                                 {% if val._subs %}
-                                    <i class="bi bi-chevron-right text-secondary me-2 transition-icon" style="font-size: 0.8rem;"></i>
-                                    <i class="bi bi-folder-fill text-warning me-3 fs-4"></i>
+                                    <i class="bi bi-chevron-right text-secondary me-2 transition-icon flex-shrink-0" style="font-size: 0.8rem;"></i>
+                                    <i class="bi bi-folder-fill text-warning me-2 me-sm-3 index-cat-icon flex-shrink-0 fs-4"></i>
                                 {% else %}
-                                    <i class="bi bi-dash text-transparent me-2" style="font-size: 0.8rem; opacity: 0;"></i>
-                                    <i class="bi bi-file-text text-secondary me-3 fs-4"></i>
+                                    <i class="bi bi-dash text-transparent me-2 flex-shrink-0" style="font-size: 0.8rem; opacity: 0;"></i>
+                                    <i class="bi bi-file-text text-secondary me-2 me-sm-3 index-cat-icon flex-shrink-0 fs-4"></i>
                                 {% endif %}
                                 
-                                <div class="flex-grow-1">
-                                    <h6 class="fw-bold mb-1 fs-5 index-cat-title">{{ key }}</h6>
-                                    <div class="progress shadow-sm" style="height: 6px; width: 120px; border-radius: 10px;">
+                                <div class="flex-grow-1" style="min-width: 0;">
+                                    <h6 class="fw-bold mb-1 fs-6 fs-sm-5 index-cat-title text-truncate">{{ key }}</h6>
+                                    <div class="progress shadow-sm" style="height: 5px; width: 100%; max-width: 120px; border-radius: 10px;">
                                         <div class="progress-bar bg-primary rounded-pill" style="width: {{ (val._stats.learned / val._stats.total * 100) if val._stats.total > 0 else 0 }}%"></div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="ms-3 d-flex gap-2 no-collapse" onclick="event.stopPropagation();">
+                            <div class="d-flex gap-1 gap-sm-2 no-collapse flex-shrink-0" onclick="event.stopPropagation();">
                                 {% if val._stats.total > 0 %}
                                 <form action="{{ url_for('main.reset_category', category_path=val._path) }}" method="POST" class="m-0" onsubmit="return confirm('Möchtest du den Lernfortschritt für die Kategorie \'{{ key }}\' wirklich zurücksetzen?');">
-                                    <button type="submit" class="btn btn-light btn-sm rounded-circle text-danger shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                                    <button type="submit" class="btn btn-light btn-sm rounded-circle text-danger shadow-sm d-flex align-items-center justify-content-center cat-action-btn" style="width: 40px; height: 40px;">
                                         <i class="bi bi-arrow-counterclockwise fs-5"></i>
                                     </button>
                                 </form>
                                 {% endif %}
-                                <a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                                <a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center cat-action-btn" style="width: 40px; height: 40px;">
                                     <i class="bi bi-play-fill fs-4"></i>
                                 </a>
                             </div>
@@ -213,7 +229,7 @@
 </div>
 
 <script>
-// Manuelles Toggle System (keine Bootstrap IDs nötig)
+// Manuelles Toggle System
 window.manualToggle = function(rowElement) {
     const content = rowElement.nextElementSibling;
     if (!content || !content.classList.contains('custom-collapse')) return;

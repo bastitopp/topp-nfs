@@ -6,6 +6,9 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 
 <style>
+    /* Globaler Schutz gegen horizontales Scrollen auf Handys */
+    body, html { overflow-x: hidden; }
+
     .quiz-container { min-height: 520px; display: flex; flex-direction: column; }
     .answer-section { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
     .mc-grid { display: grid; gap: 12px; grid-template-columns: 1fr; width: 100%; }
@@ -16,11 +19,7 @@
         white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; width: 100%;
     }
     
-    .btn-answer:focus-visible {
-        outline: 3px solid var(--bs-primary);
-        outline-offset: 2px;
-    }
-    
+    .btn-answer:focus-visible { outline: 3px solid var(--bs-primary); outline-offset: 2px; }
     .btn-answer div, .btn-answer p, .btn-answer span { color: inherit !important; margin-bottom: 0; }
     .btn-answer > div { flex: 1; min-width: 0; }
 
@@ -38,6 +37,10 @@
         background-color: rgba(13, 202, 240, 0.1); padding: 1rem; border-radius: 8px;
         display: block !important;
     }
+    
+    /* Markdown Tabellen & Bilder zähmen für Mobile */
+    .markdown-content table { display: block; overflow-x: auto; white-space: nowrap; max-width: 100%; }
+    .markdown-content img { max-width: 100%; height: auto; }
 
     .anatomy-empty-slot {
         background-color: transparent !important;
@@ -51,39 +54,20 @@
     }
 
     .anatomy-dropzone {
-        position: absolute;
-        width: 32px; height: 32px;
-        background-color: rgba(255, 255, 255, 0.9);
-        border: 3px solid var(--bs-primary);
-        border-radius: 50%;
-        display: flex; justify-content: center; align-items: center;
-        cursor: pointer;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-        z-index: 10;
-        transform: translate(-50%, -50%); 
+        position: absolute; width: 32px; height: 32px;
+        background-color: rgba(255, 255, 255, 0.9); border: 3px solid var(--bs-primary); border-radius: 50%;
+        display: flex; justify-content: center; align-items: center; cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        z-index: 10; transform: translate(-50%, -50%); 
     }
-
-    .anatomy-dropzone:hover {
-        transform: translate(-50%, -50%) scale(1.1);
-    }
+    .anatomy-dropzone:hover { transform: translate(-50%, -50%) scale(1.1); }
 
     .anatomy-dropzone.solved {
-        width: auto !important; height: auto !important;
-        border-radius: 12px !important;
-        padding: 6px 10px !important;
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        border-color: #198754 !important; 
-        flex-direction: column !important;
-        gap: 4px;
-        align-items: stretch !important; 
+        width: auto !important; height: auto !important; border-radius: 12px !important; padding: 6px 10px !important;
+        background-color: rgba(255, 255, 255, 0.95) !important; border-color: #198754 !important; 
+        flex-direction: column !important; gap: 4px; align-items: stretch !important; 
     }
-    
-    .anatomy-dropzone.solved .badge {
-        font-size: 0.85em !important;
-        white-space: normal !important; 
-        padding: 4px 8px;
-    }
+    .anatomy-dropzone.solved .badge { font-size: 0.85em !important; white-space: normal !important; padding: 4px 8px; }
 
     .cursor-grab { cursor: grab; }
     .cursor-grab:active { cursor: grabbing; }
@@ -96,30 +80,30 @@
     }
 </style>
 
-<div class="container py-3" style="max-width: 800px;">
+<div class="container py-2 py-sm-3" style="max-width: 800px;">
     {% if not finished %}
     <div class="d-flex align-items-center mb-3 bg-white p-2 rounded-pill shadow-sm border">
         <div class="badge bg-primary rounded-pill me-2">Lvl {{ current_user.get_level() }}</div>
         <div class="progress flex-grow-1" style="height: 8px;"><div class="progress-bar bg-warning" style="width: {{ current_user.get_level_progress() }}%"></div></div>
-        <div class="ms-2 small text-muted">{{ current_user.xp }} XP</div>
+        <div class="ms-2 small text-muted text-nowrap">{{ current_user.xp }} XP</div>
     </div>
 
     {% set active_reports = card.reports | selectattr('resolved', 'equalto', False) | list %}
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm">← Exit</a>
-        <div class="d-flex gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-3 mb-sm-4">
+        <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm text-nowrap">← Exit</a>
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
             {% if current_user.is_admin %}
                 <a href="{{ url_for('admin.edit_card', card_id=card.id, next=url_for('learn.learn', category_path=current_category)) }}" class="btn btn-sm btn-outline-primary border-0" title="Frage bearbeiten"><i class="bi bi-pencil-fill"></i></a>
             {% endif %}
             
             {% if not feedback %}
-                <a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3" title="Überspringen [S]">Überspringen</a>
+                <a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 px-sm-3" title="Überspringen [S]">Überspringen</a>
             {% endif %}
             
             {% if active_reports %}
-                <button class="btn btn-sm btn-warning border-0 rounded-pill px-3" disabled title="Diese Frage wird bereits geprüft.">
-                    <i class="bi bi-exclamation-triangle-fill"></i> Gemeldet
+                <button class="btn btn-sm btn-warning border-0 rounded-pill px-2 px-sm-3" disabled title="Diese Frage wird bereits geprüft.">
+                    <i class="bi bi-exclamation-triangle-fill"></i> <span class="d-none d-sm-inline">Gemeldet</span>
                 </button>
             {% else %}
                 <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#reportModal" title="Frage melden [R]">
@@ -129,11 +113,11 @@
         </div>
     </div>
 
-    <div class="card p-4 shadow mb-4 quiz-container border-0">
+    <div class="card p-3 p-sm-4 shadow mb-4 quiz-container border-0 w-100 overflow-hidden">
         
         {% if active_reports %}
         <div class="alert alert-warning py-2 mb-3 small border-0 shadow-sm d-flex align-items-center">
-            <i class="bi bi-info-circle-fill me-2 fs-5 text-warning"></i> 
+            <i class="bi bi-info-circle-fill me-2 fs-5 text-warning flex-shrink-0"></i> 
             <div><strong>Hinweis:</strong> Ein anderer Nutzer hat bei dieser Frage bereits einen möglichen Fehler gemeldet. Wir prüfen das aktuell!</div>
         </div>
         {% endif %}
@@ -142,7 +126,7 @@
             <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 text-wrap fs-6 px-3 py-2">{{ card.category }}</span>
         </div>
         
-        <div class="fw-bold mb-4 fs-4 question-text">
+        <div class="fw-bold mb-4 fs-5 fs-sm-4 question-text">
             {{ (calc_data.question if card.type == 'calculation' and calc_data else card.question) | markdown }}
         </div>
 
@@ -159,12 +143,12 @@
         {% endif %}
 
         {% if feedback %}
-            <div class="alert alert-{{ 'success' if is_correct else 'danger' }} d-flex align-items-center gap-3 mb-4 shadow-sm animate__animated {{ 'animate__fadeIn' if is_correct else 'animate__shakeX' }} border-0">
-                <i class="bi bi-{{ 'check-circle' if is_correct else 'x-circle' }}-fill fs-3"></i>
-                <div>
-                    <h5 class="alert-heading fw-bold mb-0">{{ 'Richtig!' if is_correct else 'Leider falsch' }}</h5>
+            <div class="alert alert-{{ 'success' if is_correct else 'danger' }} d-flex align-items-center gap-3 mb-4 shadow-sm animate__animated {{ 'animate__fadeIn' if is_correct else 'animate__shakeX' }} border-0 flex-wrap flex-sm-nowrap">
+                <i class="bi bi-{{ 'check-circle' if is_correct else 'x-circle' }}-fill fs-3 flex-shrink-0"></i>
+                <div style="min-width: 0;">
+                    <h5 class="alert-heading fw-bold mb-0 text-break">{{ 'Richtig!' if is_correct else 'Leider falsch' }}</h5>
                     {% if not is_correct and card.type in ['mc', 'calculation'] %}
-                        <small>Richtige Antwort: <strong>{{ result_text if card.type == 'calculation' else card.answer }}</strong></small>
+                        <small class="d-block text-break mt-1">Richtige Antwort: <strong>{{ result_text if card.type == 'calculation' else card.answer }}</strong></small>
                     {% endif %}
                 </div>
             </div>
@@ -181,22 +165,22 @@
                         {% if feedback %}
                             {% for opt in options %}
                                 {% if opt == card.answer %}
-                                    <div class="btn-answer p-3 rounded-4 w-100 shadow-sm" style="background-color: #198754 !important; border-color: #198754 !important; color: #ffffff !important;">
+                                    <div class="btn-answer p-2 p-sm-3 rounded-4 w-100 shadow-sm" style="background-color: #198754 !important; border-color: #198754 !important; color: #ffffff !important;">
                                         <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);"><i class="bi bi-check-lg"></i></span><div>{{ opt | markdown }}</div>
                                     </div>
                                 {% elif opt == user_answer %}
-                                    <div class="btn-answer p-3 rounded-4 w-100 shadow-sm" style="background-color: #dc3545 !important; border-color: #dc3545 !important; color: #ffffff !important;">
+                                    <div class="btn-answer p-2 p-sm-3 rounded-4 w-100 shadow-sm" style="background-color: #dc3545 !important; border-color: #dc3545 !important; color: #ffffff !important;">
                                         <span class="shortcut-badge" style="background: rgba(255,255,255,0.2);"><i class="bi bi-x-lg"></i></span><div>{{ opt | markdown }}</div>
                                     </div>
                                 {% else %}
-                                    <div class="btn-answer p-3 rounded-4 w-100 bg-body-tertiary border-secondary border-opacity-25" style="color: var(--bs-body-color); opacity: 0.6;">
+                                    <div class="btn-answer p-2 p-sm-3 rounded-4 w-100 bg-body-tertiary border-secondary border-opacity-25" style="color: var(--bs-body-color); opacity: 0.6;">
                                         <span class="shortcut-badge">-</span><div>{{ opt | markdown }}</div>
                                     </div>
                                 {% endif %}
                             {% endfor %}
                         {% else %}
                             {% for opt in options %}
-                                <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary btn-answer p-3 rounded-4 w-100">
+                                <button type="submit" name="mc_answer" value="{{ opt }}" class="btn btn-outline-primary btn-answer p-2 p-sm-3 rounded-4 w-100">
                                     <span class="shortcut-badge">{{ loop.index }}</span><div>{{ opt | markdown }}</div>
                                 </button>
                             {% endfor %}
@@ -205,15 +189,15 @@
 
                 {% elif card.type == 'calculation' %}
                     {% if feedback %}
-                        <div class="text-center py-4 bg-light rounded-4 shadow-sm border">
-                            <h2 class="display-5 fw-bold {{ 'text-success' if is_correct else 'text-danger' }} mb-2">{{ user_val }}</h2>
-                            <p class="text-muted mb-0 fs-5">Zielbereich: <strong>{{ result_text }}</strong></p>
+                        <div class="text-center py-4 bg-light rounded-4 shadow-sm border px-2">
+                            <h2 class="display-5 fw-bold {{ 'text-success' if is_correct else 'text-danger' }} mb-2 text-break">{{ user_val }}</h2>
+                            <p class="text-muted mb-0 fs-5 text-break">Zielbereich: <strong>{{ result_text }}</strong></p>
                         </div>
                     {% else %}
                         <input type="hidden" name="calc_var" value="{{ calc_data.val }}">
-                        <div class="input-group input-group-lg mb-3 shadow-sm">
+                        <div class="input-group input-group-lg mb-3 shadow-sm flex-nowrap">
                             <input type="number" step="any" name="calc_input" class="form-control text-center fw-bold" placeholder="Dein Ergebnis" required autofocus>
-                            {% if calc_data.unit %}<span class="input-group-text bg-light text-secondary fw-bold">{{ calc_data.unit }}</span>{% endif %}
+                            {% if calc_data.unit %}<span class="input-group-text bg-light text-secondary fw-bold text-wrap">{{ calc_data.unit }}</span>{% endif %}
                         </div>
                         <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Bestätigen</button>
                     {% endif %}
@@ -225,8 +209,8 @@
                                 <div class="card border-{{ 'success' if result_de else 'danger' }} h-100">
                                     <div class="card-header bg-{{ 'success' if result_de else 'danger' }} text-white fw-bold">Deutsch</div>
                                     <div class="card-body">
-                                        <p class="mb-1 text-muted small">Deine Antwort:</p><h5 class="text-{{ 'success' if result_de else 'danger' }}">{{ user_de or '-' }}</h5>
-                                        {% if not result_de %}<hr><p class="mb-1 text-muted small">Richtige Lösung:</p><h5 class="text-success">{{ card.answer }}</h5>{% endif %}
+                                        <p class="mb-1 text-muted small">Deine Antwort:</p><h5 class="text-{{ 'success' if result_de else 'danger' }} text-break">{{ user_de or '-' }}</h5>
+                                        {% if not result_de %}<hr><p class="mb-1 text-muted small">Richtige Lösung:</p><h5 class="text-success text-break">{{ card.answer }}</h5>{% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -234,14 +218,14 @@
                                 <div class="card border-{{ 'success' if result_lat else 'danger' }} h-100">
                                     <div class="card-header bg-{{ 'success' if result_lat else 'danger' }} text-white fw-bold">Latein</div>
                                     <div class="card-body">
-                                        <p class="mb-1 text-muted small">Deine Antwort:</p><h5 class="text-{{ 'success' if result_lat else 'danger' }}">{{ user_lat or '-' }}</h5>
-                                        {% if not result_lat %}<hr><p class="mb-1 text-muted small">Richtige Lösung:</p><h5 class="text-success">{{ card.answer_lat }}</h5>{% endif %}
+                                        <p class="mb-1 text-muted small">Deine Antwort:</p><h5 class="text-{{ 'success' if result_lat else 'danger' }} text-break">{{ user_lat or '-' }}</h5>
+                                        {% if not result_lat %}<hr><p class="mb-1 text-muted small">Richtige Lösung:</p><h5 class="text-success text-break">{{ card.answer_lat }}</h5>{% endif %}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     {% else %}
-                        <div class="alert alert-info small text-center mb-4">
+                        <div class="alert alert-info small text-center mb-4 border-0 shadow-sm">
                             <i class="bi bi-hand-index-thumb fw-bold me-1"></i> Tippe auf einen Begriff und platziere ihn im richtigen Kasten.
                         </div>
                         
@@ -249,7 +233,7 @@
                             <div class="col-md-6">
                                 <label class="fw-bold mb-2 text-secondary">Deutsch</label>
                                 {% if card.answer and card.answer not in ['-', '%'] %}
-                                    <div class="anatomy-single-dropzone form-control form-control-lg bg-light text-center shadow-sm" style="min-height: 60px; display:flex; justify-content:center; align-items:center; cursor: pointer; border: 2px dashed #0d6efd;" data-type="de" data-answer="{{ card.answer | e }}">
+                                    <div class="anatomy-single-dropzone form-control form-control-lg bg-light text-center shadow-sm text-break h-auto py-3" style="min-height: 60px; display:flex; justify-content:center; align-items:center; cursor: pointer; border: 2px dashed #0d6efd;" data-type="de" data-answer="{{ card.answer | e }}">
                                         <span class="text-muted small"><i class="bi bi-box-arrow-in-down"></i> Hier platzieren</span>
                                     </div>
                                 {% else %}
@@ -259,7 +243,7 @@
                             <div class="col-md-6">
                                 <label class="fw-bold mb-2 text-secondary">Latein</label>
                                 {% if card.answer_lat and card.answer_lat not in ['-', '%'] %}
-                                    <div class="anatomy-single-dropzone form-control form-control-lg bg-light text-center shadow-sm" style="min-height: 60px; display:flex; justify-content:center; align-items:center; cursor: pointer; border: 2px dashed #6c757d;" data-type="lat" data-answer="{{ card.answer_lat | e }}">
+                                    <div class="anatomy-single-dropzone form-control form-control-lg bg-light text-center shadow-sm text-break h-auto py-3" style="min-height: 60px; display:flex; justify-content:center; align-items:center; cursor: pointer; border: 2px dashed #6c757d;" data-type="lat" data-answer="{{ card.answer_lat | e }}">
                                         <span class="text-muted small"><i class="bi bi-box-arrow-in-down"></i> Hier platzieren</span>
                                     </div>
                                 {% else %}
@@ -278,8 +262,8 @@
                             {% endif %}
                             
                             {% for label in labels | shuffle %}
-                                <button type="button" class="btn btn-outline-{{ 'primary' if label.type == 'de' else 'secondary' }} rounded-pill anatomy-single-btn shadow-sm fw-bold fs-5" data-val="{{ label.val | e }}" data-type="{{ label.type }}">
-                                    {{ label.val }} <small class="fw-normal opacity-75">({{ 'DE' if label.type == 'de' else 'LAT' }})</small>
+                                <button type="button" class="btn btn-outline-{{ 'primary' if label.type == 'de' else 'secondary' }} rounded-pill anatomy-single-btn shadow-sm fw-bold text-wrap lh-sm py-2 px-3" data-val="{{ label.val | e }}" data-type="{{ label.type }}">
+                                    {{ label.val }} <small class="fw-normal opacity-75 d-block d-sm-inline">({{ 'DE' if label.type == 'de' else 'LAT' }})</small>
                                 </button>
                             {% endfor %}
                         </div>
@@ -352,13 +336,13 @@
                                 <tbody>
                                     {% for r in multi_results %}
                                     <tr>
-                                        <td class="fw-bold fs-5 bg-light">{{ r.label }}</td>
+                                        <td class="fw-bold fs-6 fs-sm-5 bg-light">{{ r.label }}</td>
                                         {% if r.correct_de in ['-', '%'] or not r.correct_de %}
                                             <td class="text-muted"><i class="bi bi-dash"></i></td>
                                         {% else %}
                                             <td class="{{ 'table-success' if r.is_de_ok else 'table-danger' }}">
-                                                <div class="fw-bold">{{ r.user_de or '-' }}</div>
-                                                {% if not r.is_de_ok %}<div class="text-success small mt-1 border-top pt-1 border-success"><i class="bi bi-arrow-return-right"></i> {{ r.correct_de }}</div>{% endif %}
+                                                <div class="fw-bold text-break">{{ r.user_de or '-' }}</div>
+                                                {% if not r.is_de_ok %}<div class="text-success small mt-1 border-top pt-1 border-success text-break"><i class="bi bi-arrow-return-right"></i> {{ r.correct_de }}</div>{% endif %}
                                             </td>
                                         {% endif %}
 
@@ -366,8 +350,8 @@
                                             <td class="text-muted"><i class="bi bi-dash"></i></td>
                                         {% else %}
                                             <td class="{{ 'table-success' if r.is_lat_ok else 'table-danger' }}">
-                                                <div class="fw-bold">{{ r.user_lat or '-' }}</div>
-                                                {% if not r.is_lat_ok %}<div class="text-success small mt-1 border-top pt-1 border-success"><i class="bi bi-arrow-return-right"></i> {{ r.correct_lat }}</div>{% endif %}
+                                                <div class="fw-bold text-break">{{ r.user_lat or '-' }}</div>
+                                                {% if not r.is_lat_ok %}<div class="text-success small mt-1 border-top pt-1 border-success text-break"><i class="bi bi-arrow-return-right"></i> {{ r.correct_lat }}</div>{% endif %}
                                             </td>
                                         {% endif %}
                                     </tr>
@@ -383,8 +367,8 @@
                         </div>
 
                         <div class="text-center mb-4">
-                            <div class="position-relative d-inline-block">
-                                <img src="{{ card.image_url }}" class="rounded shadow-sm" style="max-width: 100%; max-height: 55vh; display: block;">
+                            <div class="position-relative d-inline-block w-100" style="max-width: 100%;">
+                                <img src="{{ card.image_url }}" class="rounded shadow-sm img-fluid" style="max-height: 55vh; display: block; margin: 0 auto;">
                                 
                                 {% for item in items %}
                                 <div class="anatomy-dropzone" 
@@ -408,9 +392,9 @@
                             {% endfor %}
                             
                             {% for label in labels | shuffle %}
-                                <button type="button" class="btn btn-outline-{{ 'primary' if label.type == 'de' else 'secondary' }} rounded-pill anatomy-label-btn shadow-sm fw-bold" 
+                                <button type="button" class="btn btn-outline-{{ 'primary' if label.type == 'de' else 'secondary' }} rounded-pill anatomy-label-btn shadow-sm fw-bold text-wrap lh-sm py-2 px-3" 
                                         data-val="{{ label.val | e }}" data-type="{{ label.type }}">
-                                    {{ label.val }} <small class="fw-normal opacity-75">({{ 'DE' if label.type == 'de' else 'LAT' }})</small>
+                                    {{ label.val }} <small class="fw-normal opacity-75 d-block d-sm-inline">({{ 'DE' if label.type == 'de' else 'LAT' }})</small>
                                 </button>
                             {% endfor %}
                         </div>
@@ -466,7 +450,7 @@
                                         if(icon) icon.remove();
                                         
                                         let badgeClass = type === 'de' ? 'bg-primary' : 'bg-secondary';
-                                        this.innerHTML += `<span class="badge ${badgeClass} shadow-sm">${selectedVal}</span>`;
+                                        this.innerHTML += `<span class="badge ${badgeClass} shadow-sm text-break">${selectedVal}</span>`;
                                         
                                         this.setAttribute('data-solved-' + type, '1');
                                         
@@ -504,7 +488,7 @@
                                 <ol class="list-group list-group-numbered shadow-sm">
                                     {% set user_order = request.form.get('order_json') | from_json %}
                                     {% for item in user_order %}
-                                        <li class="list-group-item bg-light text-muted">{{ item }}</li>
+                                        <li class="list-group-item bg-light text-muted text-break">{{ item }}</li>
                                     {% endfor %}
                                 </ol>
                             </div>
@@ -512,7 +496,7 @@
                                 <h6 class="fw-bold text-success mb-3"><i class="bi bi-check-circle-fill me-2"></i>Richtige Reihenfolge</h6>
                                 <ol class="list-group list-group-numbered shadow-sm border-success">
                                     {% for item in correct_order %}
-                                        <li class="list-group-item list-group-item-success fw-bold border-success">{{ item }}</li>
+                                        <li class="list-group-item list-group-item-success fw-bold border-success text-break">{{ item }}</li>
                                     {% endfor %}
                                 </ol>
                             </div>
@@ -523,12 +507,12 @@
                         <ul class="list-group sortable-list shadow-sm mb-4" id="sortable_list">
                             {% set shuffled = options | list %}
                             {% for item in shuffled %}
-                            <li class="list-group-item cursor-grab bg-adaptive border d-flex align-items-center p-3 fs-5">
-                                <i class="bi bi-grip-vertical text-muted me-3"></i> <span>{{ item }}</span>
+                            <li class="list-group-item cursor-grab bg-adaptive border d-flex align-items-center p-2 p-sm-3 fs-6 fs-sm-5 text-break">
+                                <i class="bi bi-grip-vertical text-muted me-2 flex-shrink-0"></i> <span>{{ item }}</span>
                             </li>
                             {% endfor %}
                         </ul>
-                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5" onclick="submitOrdering()">Lösung prüfen</button>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Lösung prüfen</button>
                     {% endif %}
                 
                 {% elif card.type == 'assignment' %}
@@ -537,20 +521,20 @@
                             {% for gr in assignment_results %}
                             <div class="col-md-6">
                                 <div class="card h-100 shadow-sm border-{{ 'success' if gr.missing|length == 0 and (gr.group_items | selectattr('correct', 'equalto', false) | list | length == 0) else 'danger' }}">
-                                    <div class="card-header bg-{{ 'success' if gr.missing|length == 0 and (gr.group_items | selectattr('correct', 'equalto', false) | list | length == 0) else 'danger' }} text-white fw-bold">
+                                    <div class="card-header bg-{{ 'success' if gr.missing|length == 0 and (gr.group_items | selectattr('correct', 'equalto', false) | list | length == 0) else 'danger' }} text-white fw-bold text-break">
                                         {{ gr.name }}
                                     </div>
                                     <div class="card-body">
                                         <ul class="list-unstyled mb-0 d-flex flex-column gap-2">
                                             {% for item in gr.group_items %}
                                                 {% if item.correct %}
-                                                    <li class="text-success fw-bold"><i class="bi bi-check-lg me-2"></i>{{ item.text }}</li>
+                                                    <li class="text-success fw-bold text-break"><i class="bi bi-check-lg me-2"></i>{{ item.text }}</li>
                                                 {% else %}
-                                                    <li class="text-danger text-decoration-line-through"><i class="bi bi-x-lg me-2"></i>{{ item.text }}</li>
+                                                    <li class="text-danger text-decoration-line-through text-break"><i class="bi bi-x-lg me-2"></i>{{ item.text }}</li>
                                                 {% endif %}
                                             {% endfor %}
                                             {% for m in gr.missing %}
-                                                <li class="text-primary fw-bold bg-primary bg-opacity-10 p-1 rounded"><i class="bi bi-arrow-right-short me-1"></i>Fehlt: {{ m }}</li>
+                                                <li class="text-primary fw-bold bg-primary bg-opacity-10 p-2 rounded text-break"><i class="bi bi-arrow-right-short me-1"></i>Fehlt: {{ m }}</li>
                                             {% endfor %}
                                         </ul>
                                     </div>
@@ -562,11 +546,11 @@
                         <input type="hidden" name="assignment_json" id="assignment_json_input">
                         
                         <div class="card bg-light border-0 shadow-sm mb-4">
-                            <div class="card-body p-3">
+                            <div class="card-body p-2 p-sm-3">
                                 <div class="small fw-bold text-muted mb-2 text-uppercase letter-spacing-1">Begriffe (hierher ziehen)</div>
                                 <div id="assignment_pool" class="d-flex flex-wrap gap-2 p-2 min-vh-10 border border-dashed rounded bg-white" style="min-height: 80px;">
                                     {% for item in pool_items %}
-                                    <div class="badge bg-primary fs-6 fw-normal cursor-grab shadow-sm border p-2">{{ item.val }}</div>
+                                    <div class="badge bg-primary fs-6 fw-normal cursor-grab shadow-sm border p-2 text-wrap text-break lh-base text-start">{{ item.val }}</div>
                                     {% endfor %}
                                 </div>
                             </div>
@@ -576,7 +560,7 @@
                             {% for gr in options %}
                             <div class="col-md-6">
                                 <div class="card h-100 shadow-sm border">
-                                    <div class="card-header bg-white fw-bold text-center border-bottom-0 pt-3">{{ gr.name }}</div>
+                                    <div class="card-header bg-white fw-bold text-center border-bottom-0 pt-3 text-break">{{ gr.name }}</div>
                                     <div class="card-body px-2 pb-2 pt-0">
                                         <div class="assignment-dropzone p-2 rounded bg-adaptive h-100 d-flex flex-column gap-2" data-group="{{ gr.name }}" style="min-height: 120px; border: 2px dashed var(--bs-border-color);"></div>
                                     </div>
@@ -601,13 +585,19 @@
             <div class="mt-4 pt-4 border-top">
                 {% if is_correct %}
                     <p class="small text-muted text-center mb-3 fw-bold">Wie sicher warst du dir?</p>
-                    <form action="{{ url_for('learn.submit_quality', card_id=card.id) }}" method="POST" class="d-flex gap-3">
+                    <form action="{{ url_for('learn.submit_quality', card_id=card.id) }}" method="POST" class="d-flex flex-column flex-sm-row gap-2 gap-sm-3">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
-                        <button type="submit" name="quality" value="3" class="btn btn-outline-warning flex-grow-1 py-3 rounded-pill fw-bold fs-5">Geraten <span class="badge bg-warning text-dark ms-2">[1]</span></button>
-                        <button type="submit" name="quality" value="5" class="btn btn-primary btn-quality-safe flex-grow-1 py-3 rounded-pill fw-bold shadow-sm fs-5">Gewusst <span class="badge bg-white text-primary ms-2">[2]</span></button>
+                        <button type="submit" name="quality" value="3" class="btn btn-outline-warning flex-grow-1 py-3 rounded-pill fw-bold fs-5">
+                            Geraten <span class="badge bg-warning text-dark ms-2">[1]</span>
+                        </button>
+                        <button type="submit" name="quality" value="5" class="btn btn-primary btn-quality-safe flex-grow-1 py-3 rounded-pill fw-bold shadow-sm fs-5">
+                            Gewusst <span class="badge bg-white text-primary ms-2">[2]</span>
+                        </button>
                     </form>
                 {% else %}
-                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-next-question w-100 py-3 rounded-pill fw-bold shadow fs-5">Nächste Frage <span class="badge bg-white text-primary ms-2">[Enter]</span></a>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-next-question w-100 py-3 rounded-pill fw-bold shadow fs-5">
+                        Nächste Frage <span class="badge bg-white text-primary ms-2 d-none d-sm-inline">[Enter]</span>
+                    </a>
                 {% endif %}
             </div>
         {% endif %}
@@ -633,16 +623,15 @@
         </div>
     </div>
     {% else %}
-        <div class="text-center py-5 mt-5">
+        <div class="text-center py-5 mt-3 mt-sm-5">
             <div class="display-1 mb-4">🎉</div>
             <h1 class="fw-bold mb-3">Hervorragend!</h1>
             <p class="text-muted fs-5 mb-4">Du hast dein Tagesziel erreicht oder es ist aktuell nichts fällig.</p>
             
             <div class="d-flex flex-column flex-sm-row justify-content-center gap-3 mb-5">
-                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary btn-lg rounded-pill px-4 py-3 shadow-sm fw-bold"><i class="bi bi-house-door-fill me-2"></i> Zurück zur Übersicht</a>
-                
-                <a href="{{ url_for('learn.learn', category_path=category, ignore_limit='true') }}" class="btn btn-primary btn-lg rounded-pill px-4 py-3 shadow fw-bold">
-                    <i class="bi bi-fire me-2"></i> Tageslimit aufheben & Weiterlernen
+                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary btn-lg rounded-pill px-4 py-3 shadow-sm fw-bold w-100 w-sm-auto"><i class="bi bi-house-door-fill me-2"></i> Zurück</a>
+                <a href="{{ url_for('learn.learn', category_path=category, ignore_limit='true') }}" class="btn btn-primary btn-lg rounded-pill px-4 py-3 shadow fw-bold w-100 w-sm-auto">
+                    <i class="bi bi-fire me-2"></i> Weiterlernen
                 </a>
             </div>
         </div>
@@ -672,7 +661,13 @@
         const quizForm = document.getElementById('quizForm');
         if (quizForm) {
             quizForm.addEventListener('input', () => formChanged = true);
-            quizForm.addEventListener('submit', function() { this.setAttribute('data-submitting', 'true'); });
+            quizForm.addEventListener('submit', function(e) { 
+                this.setAttribute('data-submitting', 'true'); 
+                // Spezielle Logik für Ordering Form Submit abfangen
+                {% if card.type == 'ordering' %}
+                submitOrdering();
+                {% endif %}
+            });
         }
         window.quizFormChanged = () => formChanged;
     }
