@@ -4,14 +4,32 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    /* Sanfte Hover-Effekte und Pfeil-Animation für die Kategorien auf der Startseite */
-    .index-cat-row { transition: background-color 0.2s ease; cursor: pointer; }
+    /* Sanfte Hover-Effekte für die Kategorien */
+    .index-cat-row { 
+        transition: background-color 0.2s ease; 
+        cursor: pointer; 
+        touch-action: manipulation; 
+        -webkit-tap-highlight-color: transparent;
+    }
     .index-cat-row:hover { background-color: rgba(0,0,0,0.03) !important; }
-    .index-cat-row[aria-expanded="true"] .transition-icon { transform: rotate(90deg); }
+    
+    /* Der Pfeil dreht sich bei aktiver Klasse */
+    .index-cat-row.active .transition-icon { transform: rotate(90deg); }
     .transition-icon { transition: transform 0.2s ease-in-out; }
     
-    /* Darkmode Anpassung für den Hover */
+    /* Das Untermenü System */
+    .custom-collapse {
+        display: none;
+        overflow: hidden;
+    }
+    .custom-collapse.show {
+        display: block;
+    }
+
+    /* Darkmode Anpassungen */
     [data-bs-theme="dark"] .index-cat-row:hover { background-color: rgba(255,255,255,0.05) !important; }
+    [data-bs-theme="dark"] .index-cat-title { color: #d1d5db !important; }
+    [data-bs-theme="dark"] .badge-schwerpunkt { background-color: #2c0b0b !important; color: #ff8585 !important; border-color: #631c1c !important; }
 </style>
 
 <div class="dashboard-wrapper animate__animated animate__fadeIn">
@@ -94,7 +112,7 @@
             <h6 class="fw-bold mb-2 text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Aktueller Schwerpunkt:</h6>
             <div class="d-flex flex-wrap gap-2">
                 {% for cat, count in global_stats.error_categories %}
-                    <span class="badge badge-schwerpunkt bg-body text-danger border border-danger border-opacity-25 px-3 py-2 shadow-sm">
+                    <span class="badge badge-schwerpunkt bg-white text-danger border border-danger border-opacity-25 px-3 py-2 shadow-sm">
                         {{ cat }} ({{ count }})
                     </span>
                 {% endfor %}
@@ -108,25 +126,20 @@
     </div>
 
     <form action="{{ url_for('learn.learn_custom') }}" method="POST" id="learnForm" class="mb-5">
-        <div class="d-flex justify-content-between align-items-center flex-nowrap mb-4">
-            <h4 class="fw-bold mb-0 text-nowrap me-2 fs-5 fs-md-4">Deine Themenbereiche</h4>
-            <button type="submit" class="btn btn-primary rounded-pill px-3 px-md-5 py-2 shadow-sm text-nowrap fs-6 fs-md-5"><i class="bi bi-play-fill me-1"></i> Auswahl lernen</button>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold mb-0">Deine Themenbereiche</h4>
+            <button type="submit" class="btn btn-primary rounded-pill px-5 py-2 shadow-sm fw-bold">Auswahl lernen</button>
         </div>
 
         <div class="list-group border-0 shadow-sm rounded-4 overflow-hidden">
             {% macro render_tree(nodes, level=0) %}
                 {% for key, val in nodes | dictsort %}
-                    {% set unique_id = val._path | replace('/', '-') | replace(' ', '_') | replace('.', '_') | replace(',', '_') | replace('(', '_') | replace(')', '_') %}
-                    
                     <div class="list-group-item border-0 p-0 bg-transparent border-bottom">
                         <div class="d-flex align-items-center p-3 bg-body index-cat-row" 
                              style="padding-left: {{ 1.5 + (level * 1.5) }}rem !important;"
-                             {% if val._subs %}
-                             onclick="window.toggleCat('collapse-{{ unique_id }}', this, event)" 
-                             aria-expanded="false"
-                             {% endif %}>
+                             onclick="window.manualToggle(this)">
                             
-                            <div class="me-3">
+                            <div class="me-3 no-collapse" onclick="event.stopPropagation();">
                                 <input class="form-check-input p-2 border-2" type="checkbox" name="categories" value="{{ val._path }}" style="width: 1.5em; height: 1.5em;">
                             </div>
                             
@@ -139,31 +152,30 @@
                                     <i class="bi bi-file-text text-secondary me-3 fs-4"></i>
                                 {% endif %}
                                 
-                                <div class="flex-grow-1 user-select-none">
-                                    <h6 class="fw-bold mb-1 fs-5">{{ key }}</h6>
+                                <div class="flex-grow-1">
+                                    <h6 class="fw-bold mb-1 fs-5 index-cat-title">{{ key }}</h6>
                                     <div class="progress shadow-sm" style="height: 6px; width: 120px; border-radius: 10px;">
                                         <div class="progress-bar bg-primary rounded-pill" style="width: {{ (val._stats.learned / val._stats.total * 100) if val._stats.total > 0 else 0 }}%"></div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="ms-3 d-flex gap-2">
+                            <div class="ms-3 d-flex gap-2 no-collapse" onclick="event.stopPropagation();">
                                 {% if val._stats.total > 0 %}
-                                <form action="{{ url_for('main.reset_category', category_path=val._path) }}" method="POST" class="m-0" onsubmit="return confirm('Möchtest du den Lernfortschritt für die Kategorie \'{{ key }}\' und alle Unterkategorien wirklich unwiderruflich zurücksetzen?');">
-                                    <button type="submit" class="btn btn-light btn-sm rounded-circle text-danger shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;" title="Fortschritt zurücksetzen">
+                                <form action="{{ url_for('main.reset_category', category_path=val._path) }}" method="POST" class="m-0" onsubmit="return confirm('Möchtest du den Lernfortschritt für die Kategorie \'{{ key }}\' wirklich zurücksetzen?');">
+                                    <button type="submit" class="btn btn-light btn-sm rounded-circle text-danger shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
                                         <i class="bi bi-arrow-counterclockwise fs-5"></i>
                                     </button>
                                 </form>
                                 {% endif %}
-
-                                <a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;" title="Kategorie lernen">
+                                <a href="{{ url_for('learn.learn', category_path=val._path) }}" class="btn btn-light btn-sm rounded-circle text-primary shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
                                     <i class="bi bi-play-fill fs-4"></i>
                                 </a>
                             </div>
                         </div>
                         
                         {% if val._subs %}
-                        <div class="collapse" id="collapse-{{ unique_id }}">
+                        <div class="custom-collapse">
                             {{ render_tree(val._subs, level + 1) }}
                         </div>
                         {% endif %}
@@ -176,30 +188,28 @@
 </div>
 
 <script>
-// Perfektes JavaScript zum Auf- und Zuklappen der Kategorien (Ignoriert Klicks auf Buttons/Checkboxen)
-if (!window.toggleCat) {
-    window.toggleCat = function(id, el, event) {
-        if (event.target.closest('input, button, a, form')) return;
-        
-        const target = document.getElementById(id);
-        if (target) {
-            const bsCollapse = bootstrap.Collapse.getOrCreateInstance(target, { toggle: false });
-            bsCollapse.toggle();
-            
-            const isExpanded = el.getAttribute('aria-expanded') === 'true';
-            el.setAttribute('aria-expanded', !isExpanded);
-        }
-    };
-}
+// Manuelles Toggle System (keine Bootstrap IDs nötig)
+window.manualToggle = function(rowElement) {
+    const content = rowElement.nextElementSibling;
+    if (!content || !content.classList.contains('custom-collapse')) return;
 
-// Chart Render
+    const isOpen = content.classList.contains('show');
+    if (isOpen) {
+        content.classList.remove('show');
+        rowElement.classList.remove('active');
+        rowElement.setAttribute('aria-expanded', 'false');
+    } else {
+        content.classList.add('show');
+        rowElement.classList.add('active');
+        rowElement.setAttribute('aria-expanded', 'true');
+    }
+};
+
+// Chart Render Logik
 (function() {
     const ctx = document.getElementById('progressChart');
     if (ctx) {
-        if (window.dashboardProgressChart) {
-            window.dashboardProgressChart.destroy();
-        }
-        
+        if (window.dashboardProgressChart) { window.dashboardProgressChart.destroy(); }
         window.dashboardProgressChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
