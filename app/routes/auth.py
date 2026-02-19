@@ -70,7 +70,8 @@ def register():
         # Admin-Benachrichtigung senden
         try:
             admins = User.query.filter_by(is_admin=True).all()
-            admin_emails = [a.email for a in admins if a.email]
+            # NEU: Filtert ungültige E-Mails wie "None" heraus
+            admin_emails = [a.email for a in admins if a.email and '@' in a.email]
             if admin_emails:
                 msg = Message('Neue Registrierung - Freischaltung erforderlich', recipients=admin_emails)
                 msg.body = f'Hallo Admin,\n\nein neuer Benutzer "{username}" ({real_name}) hat sich soeben registriert.\nBitte logge dich in das Admin-Dashboard ein, um den Account freizuschalten:\n{url_for("admin.admin_users", _external=True)}'

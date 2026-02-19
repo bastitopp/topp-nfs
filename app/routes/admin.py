@@ -8,7 +8,8 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from functools import wraps
 from sqlalchemy import or_
-from ..extensions import db
+from flask_mail import Message
+from ..extensions import db, mail
 from ..models import Card, User, Tag, DashboardMessage, CardReport, UserProgress, Scenario, ScenarioNode, ScenarioChoice, ChoiceOutcome, UserScenarioSession
 
 bp = Blueprint('admin', __name__)
@@ -389,7 +390,19 @@ def approve_user(uid):
     u = User.query.get_or_404(uid)
     u.is_approved = True
     db.session.commit()
-    flash(f'Benutzer {u.username} wurde erfolgreich freigeschaltet!', 'success')
+    
+    # NEU: Bestätigungs-E-Mail an den Benutzer senden
+    if u.email:
+        try:
+            msg = Message('Dein Account wurde freigeschaltet', recipients=[u.email])
+            msg.body = f'Hallo {u.username},\n\ndein Account wurde soeben von einem Administrator freigeschaltet.\nDu kannst dich nun einloggen:\n{url_for("auth.login", _external=True)}'
+            mail.send(msg)
+        except Exception as e:
+            print(f"Fehler beim Senden der Bestätigungsmail an {u.email}: {e}")
+            flash(f'Benutzer {u.username} freigeschaltet, aber E-Mail konnte nicht gesendet werden.', 'warning')
+            return redirect(url_for('admin.admin_users'))
+
+    flash(f'Benutzer {u.username} wurde erfolgreich freigeschaltet und benachrichtigt!', 'success')
     return redirect(url_for('admin.admin_users'))
 
 @bp.route('/admin/users/edit/<int:uid>', methods=['POST'])
