@@ -25,7 +25,6 @@ def learn_custom():
 @bp.route('/learn/<path:category_path>', methods=['GET', 'POST'])
 @login_required
 def learn(category_path):
-    # NEU: Hat der Nutzer aktiv auf "Limit aufheben" geklickt?
     if request.args.get('ignore_limit') == 'true':
         session['ignore_limit_date'] = datetime.utcnow().strftime('%Y-%m-%d')
         
@@ -36,12 +35,16 @@ def learn(category_path):
     card, p = get_next_card(current_user, paths, force=force, exclude_id=skip_id)
     
     if not card: 
-        conds = [Card.category.like(f"{p}%") for p in paths]
-        w = UserProgress.query.join(Card).filter(
+        # NEU: "Alle" absichern, damit hier keine Filter-Fehler entstehen
+        w_query = UserProgress.query.join(Card).filter(
             UserProgress.user_id==current_user.id, 
-            or_(*conds), 
             UserProgress.next_review > datetime.utcnow()
-        ).count()
+        )
+        if "Alle" not in paths and paths != [""]:
+            conds = [Card.category.like(f"{p}%") for p in paths]
+            w_query = w_query.filter(or_(*conds))
+            
+        w = w_query.count()
         return render_template('quiz.html', finished=True, category=category_path, waiting_count=w)
     
     return render_learn_card(card, current_user, category_path)
@@ -295,14 +298,12 @@ def review_exam(attempt_id):
 @bp.route('/bpr')
 @login_required
 def bpr_index():
-    """Übersichtsseite für den BPR/SOP Trainer"""
     scenarios = Scenario.query.all()
     return render_template('bpr_index.html', scenarios=scenarios)
 
 @bp.route('/bpr/play/<int:scenario_id>')
 @login_required
 def bpr_play(scenario_id):
-    """Startet ein neues BPR-Szenario"""
     scenario = Scenario.query.get_or_404(scenario_id)
     if not scenario.first_node_id:
         flash("Szenario hat keinen Startpunkt.", "warning")
@@ -326,7 +327,6 @@ def bpr_play(scenario_id):
 @bp.route('/bpr/choice/<int:choice_id>', methods=['POST'])
 @login_required
 def bpr_choice(choice_id):
-    """Wird via HTMX aufgerufen, wenn der Nutzer einen Button klickt"""
     choice = ScenarioChoice.query.get_or_404(choice_id)
     node = choice.node
     scenario = node.scenario

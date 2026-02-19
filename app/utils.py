@@ -14,11 +14,9 @@ fsrs_scheduler = FSRS()
 
 def get_current_limits():
     """Gibt die aktiven Tageslimits zurück. Prüft, ob der Nutzer sie für heute aufgehoben hat."""
-    # Standardwerte
     max_rev = 50
     max_new = 20
     
-    # Wenn der Nutzer heute auf "Weiterlernen" geklickt hat, Limits quasi deaktivieren (auf 99999 setzen)
     if session.get('ignore_limit_date') == datetime.utcnow().strftime('%Y-%m-%d'):
         max_rev = 99999
         max_new = 99999
@@ -67,10 +65,18 @@ def award_badges(user):
 def get_next_card(user, paths, force=False, exclude_id=None):
     """Sucht die nächste fällige Karte basierend auf FSRS und Dringlichkeit mit dynamischen Tageslimits."""
     now = datetime.utcnow()
-    conditions = [Card.category.like(f"{p}%") for p in paths]
-    filter_cond = or_(*conditions)
     
-    due_query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id, filter_cond)
+    # NEU: Prüfen, ob der Nutzer über "Schnellstart" (Alle Kategorien) lernt. 
+    # Verhindert Monster-Queries in der Datenbank.
+    is_all = "Alle" in paths or not paths or paths == [""]
+    
+    due_query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id)
+    
+    if not is_all:
+        conditions = [Card.category.like(f"{p}%") for p in paths]
+        filter_cond = or_(*conditions)
+        due_query = due_query.filter(filter_cond)
+        
     if exclude_id: 
         due_query = due_query.filter(Card.id != exclude_id)
         
@@ -78,7 +84,6 @@ def get_next_card(user, paths, force=False, exclude_id=None):
     MAX_REVIEWS_PER_DAY, MAX_NEW_CARDS_PER_DAY = get_current_limits()
     
     if not force: 
-        # 1. PRÜFE WIEDERHOLUNGEN (Reviews)
         reviews_done_today = UserProgress.query.filter(
             UserProgress.user_id == user.id,
             UserProgress.last_review >= today_start,
@@ -91,7 +96,6 @@ def get_next_card(user, paths, force=False, exclude_id=None):
             if due: 
                 return due.card, due
 
-    # 2. PRÜFE NEUE KARTEN
     new_cards_learned_today = UserProgress.query.filter(
         UserProgress.user_id == user.id,
         UserProgress.reps == 1, 
@@ -100,7 +104,11 @@ def get_next_card(user, paths, force=False, exclude_id=None):
 
     if new_cards_learned_today < MAX_NEW_CARDS_PER_DAY:
         sub = db.session.query(UserProgress.card_id).filter(UserProgress.user_id==user.id)
-        new_query = Card.query.filter(filter_cond, ~Card.id.in_(sub))
+        new_query = Card.query.filter(~Card.id.in_(sub))
+        
+        if not is_all:
+            new_query = new_query.filter(filter_cond)
+            
         if exclude_id: 
             new_query = new_query.filter(Card.id != exclude_id)
             
@@ -108,7 +116,6 @@ def get_next_card(user, paths, force=False, exclude_id=None):
     else:
         new = None
     
-    # 3. FALLBACKS & ERZWUNGENES LERNEN
     if not new and force:
         res = due_query.order_by(func.random()).first()
         return (res.card, None) if res else (None, None)
@@ -212,7 +219,6 @@ def get_learning_stats(user):
         .order_by(func.count(Card.id).desc())\
         .limit(3).all()
         
-    # --- NEU: Tagesziel-Berechnung ---
     daily_done = reviews_done_today + new_done_today
     daily_total = daily_done + display_due + display_new
         
