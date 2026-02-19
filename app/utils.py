@@ -63,13 +63,10 @@ def award_badges(user):
     if new: db.session.commit(); flash(f"🏆 Neue Auszeichnung: {', '.join(new)}", "warning")
 
 def get_next_card(user, paths, force=False, exclude_id=None):
-    """Sucht die nächste fällige Karte basierend auf FSRS und Dringlichkeit mit dynamischen Tageslimits."""
+    """Sucht die nächste fällige Karte basierend auf FSRS und Dringlichkeit."""
     now = datetime.utcnow()
     
-    # NEU: Prüfen, ob der Nutzer über "Schnellstart" (Alle Kategorien) lernt. 
-    # Verhindert Monster-Queries in der Datenbank.
     is_all = "Alle" in paths or not paths or paths == [""]
-    
     due_query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id)
     
     if not is_all:
@@ -178,9 +175,9 @@ def update_progress(user, card, quality):
     db.session.commit()
 
 def get_learning_stats(user):
-    """Berechnet globale Statistiken inkl. angepasster Anzeige-Limits und Tagesziel."""
+    """Berechnet globale Statistiken inkl. neuen Metriken (Lernzeit, Erfolgsquote)."""
     if not user.is_authenticated: 
-        return {'total':0, 'learned':0, 'due':0, 'new':0, 'f24':0, 'f48':0, 'error_categories':[], 'daily_done':0, 'daily_total':0}
+        return {'total':0, 'learned':0, 'due':0, 'new':0, 'f24':0, 'f48':0, 'error_categories':[], 'daily_done':0, 'daily_total':0, 'accuracy': 0, 'time_str': "0m 0s"}
     
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -189,29 +186,40 @@ def get_learning_stats(user):
     total = Card.query.count()
     learned = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.box>0).count()
     
+    # ECHTE Werte für das Diagramm (Ungedeckelt)
     true_due = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review <= now).count()
+    true_new = total - UserProgress.query.filter_by(user_id=user.id).count()
+    
+    # GEDECKELTE Werte für das Tagesziel
     reviews_done_today = UserProgress.query.filter(
         UserProgress.user_id == user.id, 
         UserProgress.last_review >= today_start, 
         UserProgress.reps > 1
     ).count()
-    
     due_left_today = max(0, MAX_REVIEWS_PER_DAY - reviews_done_today)
     display_due = min(true_due, due_left_today)
     
-    true_new = total - UserProgress.query.filter_by(user_id=user.id).count()
     new_done_today = UserProgress.query.filter(
         UserProgress.user_id == user.id, 
         UserProgress.last_review >= today_start, 
         UserProgress.reps == 1
     ).count()
-    
     new_left_today = max(0, MAX_NEW_CARDS_PER_DAY - new_done_today)
     display_new = min(true_new, new_left_today)
     
-    f24 = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review > now, UserProgress.next_review <= now + timedelta(hours=24)).count()
-    f48 = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review > now, UserProgress.next_review <= now + timedelta(hours=48)).count()
+    # FIX: Erfolgsquote berechnen (kompatibel mit historischen Daten)
+    # Zählt einfach ALLES was der Nutzer je gelernt hat, statt nach "reps" zu filtern
+    total_active = UserProgress.query.filter_by(user_id=user.id).count()
+    correct_count = UserProgress.query.filter_by(user_id=user.id, last_correct=True).count()
+    accuracy = int((correct_count / total_active) * 100) if total_active > 0 else 0
     
+    # Lernzeit berechnen
+    total_seconds = user.total_learning_time or 0
+    m, s = divmod(total_seconds, 60)
+    h, m = divmod(m, 60)
+    time_str = f"{h}h {m}m" if h > 0 else f"{m}m {s}s"
+    
+    # Schwerpunkte (Fehler)
     error_cats = db.session.query(Card.category, func.count(Card.id))\
         .join(UserProgress)\
         .filter(UserProgress.user_id == user.id, or_(UserProgress.box == 0, UserProgress.last_correct == False))\
@@ -225,10 +233,10 @@ def get_learning_stats(user):
     return {
         'total': total, 
         'learned': learned, 
-        'due': display_due, 
-        'new': display_new, 
-        'f24': f24, 
-        'f48': f48, 
+        'true_due': true_due, 
+        'true_new': true_new, 
+        'accuracy': accuracy,
+        'time_str': time_str,
         'error_categories': error_cats,
         'daily_done': daily_done,
         'daily_total': daily_total
