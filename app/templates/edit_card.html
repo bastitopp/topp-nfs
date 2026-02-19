@@ -15,6 +15,9 @@
                 {% endif %}
                 
                 <input type="hidden" name="multi_json" id="multi_json_input">
+                <input type="hidden" name="options" id="fallback_options_input">
+                
+                <textarea id="safe_json_loader" class="d-none">{{ card.options }}</textarea>
                 
                 <div class="row g-3 mb-3">
                     <div class="col-md-8">
@@ -65,7 +68,7 @@
 
                 <div id="field_standard_answer" class="mb-3 {% if card.type not in ['flashcard', 'mc', 'calculation', 'case_study', 'anatomy'] %}d-none{% endif %}">
                     <label class="fw-bold small">Richtige Antwort / Lösung <span class="text-muted fw-normal">(bei Anatomie: Deutsch)</span></label>
-                    <input name="answer" class="form-control" value="{{ card.answer }}">
+                    <input name="answer" class="form-control" value="{{ card.answer | e if card.answer else '' }}">
                 </div>
 
                 <div id="field_mc_options" class="mb-3 p-3 bg-white rounded border {% if card.type != 'mc' %}d-none{% endif %}">
@@ -76,7 +79,7 @@
                             {% for opt in parsed_opts %}
                                 {% if opt != card.answer %}
                                     <div class="input-group mb-2 shadow-sm">
-                                        <input type="text" name="mc_options" class="form-control" value="{{ opt }}">
+                                        <input type="text" name="mc_options" class="form-control" value="{{ opt | e }}">
                                         <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
                                     </div>
                                 {% endif %}
@@ -94,19 +97,26 @@
                 <div id="field_anatomy" class="row g-3 mb-3 {% if card.type != 'anatomy' %}d-none{% endif %}">
                     <div class="col-md-12">
                         <label class="fw-bold small">Latein</label>
-                        <input name="answer_lat" class="form-control" value="{{ card.answer_lat }}">
+                        <input name="answer_lat" class="form-control" value="{{ card.answer_lat | e if card.answer_lat else '' }}">
                     </div>
                 </div>
 
                 <div id="field_anatomy_multi" class="mb-3 p-4 bg-white rounded-4 shadow-sm border {% if card.type != 'anatomy_multi' %}d-none{% endif %}">
                     <h5 class="fw-bold text-primary mb-3"><i class="bi bi-pin-map-fill me-2"></i>Interaktives Bild bearbeiten</h5>
                     
-                    <label class="fw-bold small mb-2 text-secondary">1. Zielpunkte platzieren</label>
-                    <p class="small text-muted mb-3">Lade ein Bild hoch. Klicke dann direkt auf das Bild, um die roten Zielpunkte zu platzieren.</p>
+                    <label class="fw-bold small mb-2 text-secondary">1. Zielpunkte platzieren & verschieben</label>
+                    <p class="small text-muted mb-3">Klicke ins Bild, um neue Zielpunkte zu setzen. <strong>Du kannst bestehende Punkte nun einfach mit der Maus (oder dem Finger) per Drag & Drop an die richtige Stelle ziehen!</strong></p>
                     
                     <div class="text-center bg-light rounded-4 border p-3 mb-4 shadow-inner">
-                        <div style="position: relative; display: inline-block; cursor: crosshair;" id="admin-img-container" onclick="window.addAnatomyMarker(event)">
-                            <img id="admin-anatomy-img" src="{{ card.image_url if card.image_url else '' }}" class="rounded shadow-sm" style="max-width: 100%; max-height: 55vh; display: {% if card.image_url %}block{% else %}none{% endif %};">
+                        <div style="position: relative; display: inline-block; cursor: crosshair; max-width: 100%; touch-action: none;" 
+                             id="admin-img-container" 
+                             onclick="window.addAnatomyMarker(event)"
+                             onmousemove="window.doDrag(event)"
+                             onmouseup="window.stopDrag(event)"
+                             onmouseleave="window.stopDrag(event)"
+                             ontouchmove="window.doTouchDrag(event)"
+                             ontouchend="window.stopDrag(event)">
+                            <img id="admin-anatomy-img" src="{{ card.image_url if card.image_url else '' }}" class="rounded shadow-sm img-fluid" style="max-height: 55vh; display: {% if card.image_url %}block{% else %}none{% endif %}; pointer-events: none;">
                         </div>
                     </div>
 
@@ -116,7 +126,7 @@
 
                 <div id="field_json" class="mb-3 {% if card.type not in ['ordering', 'assignment', 'calculation'] %}d-none{% endif %}">
                     <label class="fw-bold small">JSON Daten (Optionen)</label>
-                    <textarea name="ordering_json" class="form-control font-monospace" rows="5">{{ card.options }}</textarea>
+                    <textarea name="ordering_json" id="ordering_json_textarea" class="form-control font-monospace" rows="5">{{ card.options }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
@@ -134,15 +144,114 @@
 window.anatomyMarkers = [];
 window.anatomyNextId = 1;
 
+window.syncAnatomyJson = function() {
+    const jsonStr = JSON.stringify(window.anatomyMarkers);
+    const multi = document.getElementById('multi_json_input');
+    const ordering = document.getElementById('ordering_json_textarea');
+    const fallback = document.getElementById('fallback_options_input');
+    
+    if (multi) multi.value = jsonStr;
+    if (ordering) ordering.value = jsonStr;
+    if (fallback) fallback.value = jsonStr;
+};
+
 window.updateMarkerText = function(index, lang, value) {
     if(lang === 'de') window.anatomyMarkers[index].de = value;
     if(lang === 'lat') window.anatomyMarkers[index].lat = value;
-    const jsonOut = document.getElementById('multi_json_input');
-    if(jsonOut) jsonOut.value = JSON.stringify(window.anatomyMarkers);
+    window.syncAnatomyJson();
 };
 
 window.removeAnatomyMarker = function(index) {
     window.anatomyMarkers.splice(index, 1);
+    window.updateAnatomyView();
+};
+
+// FIX: Schutzfunktion gegen zerschossene HTML-Eingabefelder durch Sonderzeichen
+function escapeHtml(unsafe) {
+    return (unsafe||'').toString()
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
+// ---------------------------------------------------------
+// DRAG & DROP LOGIK FÜR DIE ZIELPUNKTE (NEU)
+// ---------------------------------------------------------
+let draggedMarkerIndex = -1;
+let hasDragged = false;
+
+window.startDrag = function(e, index) {
+    e.preventDefault();
+    e.stopPropagation();
+    draggedMarkerIndex = index;
+    hasDragged = false;
+};
+
+window.doDrag = function(e) {
+    if(draggedMarkerIndex === -1) return;
+    hasDragged = true;
+    
+    const imgContainer = document.getElementById('admin-img-container');
+    const rect = imgContainer.getBoundingClientRect();
+    let clickX = e.clientX - rect.left;
+    let clickY = e.clientY - rect.top;
+    
+    if(clickX < 0) clickX = 0; if(clickY < 0) clickY = 0;
+    if(clickX > rect.width) clickX = rect.width; if(clickY > rect.height) clickY = rect.height;
+
+    const x = (clickX / rect.width) * 100;
+    const y = (clickY / rect.height) * 100;
+    
+    window.anatomyMarkers[draggedMarkerIndex].x = x.toFixed(2);
+    window.anatomyMarkers[draggedMarkerIndex].y = y.toFixed(2);
+    
+    const dot = document.getElementById('marker_dot_' + draggedMarkerIndex);
+    if(dot) {
+        dot.style.left = `calc(${x.toFixed(2)}% - 14px)`;
+        dot.style.top = `calc(${y.toFixed(2)}% - 14px)`;
+    }
+};
+
+window.doTouchDrag = function(e) {
+    if(draggedMarkerIndex === -1) return;
+    e.preventDefault(); 
+    const touch = e.touches[0];
+    window.doDrag({clientX: touch.clientX, clientY: touch.clientY});
+};
+
+window.stopDrag = function(e) {
+    if(draggedMarkerIndex !== -1) {
+        draggedMarkerIndex = -1;
+        window.syncAnatomyJson();
+        setTimeout(() => hasDragged = false, 50); 
+    }
+};
+
+window.addAnatomyMarker = function(e) {
+    if(hasDragged) return; // Wenn wir gerade gezogen haben, keinen neuen Punkt erstellen
+    if(e.target.closest('button') || e.target.closest('.admin-marker')) return; 
+    
+    const imgContainer = document.getElementById('admin-img-container');
+    const anatomyImg = document.getElementById('admin-anatomy-img');
+    
+    if(!anatomyImg || anatomyImg.style.display === 'none') {
+        alert("Bitte lade zuerst ein Bild hoch, bevor du Punkte setzt!");
+        return;
+    }
+    
+    const rect = imgContainer.getBoundingClientRect();
+    let clickX = e.clientX - rect.left;
+    let clickY = e.clientY - rect.top;
+    
+    if(clickX < 0) clickX = 0; if(clickY < 0) clickY = 0;
+    if(clickX > rect.width) clickX = rect.width; if(clickY > rect.height) clickY = rect.height;
+
+    const x = (clickX / rect.width) * 100;
+    const y = (clickY / rect.height) * 100;
+    
+    window.anatomyMarkers.push({ id: window.anatomyNextId++, de: "", lat: "", x: x.toFixed(2), y: y.toFixed(2) });
     window.updateAnatomyView();
 };
 
@@ -153,23 +262,30 @@ window.updateAnatomyView = function() {
     if(labelsList) labelsList.innerHTML = '';
 
     window.anatomyMarkers.forEach((marker, index) => {
-        // Der rote Punkt auf dem Bild
         let dot = document.createElement('div');
+        dot.id = 'marker_dot_' + index;
         dot.className = 'admin-marker bg-danger rounded-circle position-absolute border border-white border-2 shadow';
         dot.style.width = '28px'; dot.style.height = '28px';
         dot.style.left = `calc(${marker.x}% - 14px)`;
         dot.style.top = `calc(${marker.y}% - 14px)`;
-        dot.style.pointerEvents = 'none'; // Erlaubt Klicks hindurch
+        dot.style.cursor = 'grab'; // Zeigt dem Nutzer, dass er ziehen kann
         dot.style.zIndex = '10';
-        dot.innerHTML = `<span class="text-white small fw-bold d-flex justify-content-center align-items-center h-100">${index + 1}</span>`;
+        dot.innerHTML = `<span class="text-white small fw-bold d-flex justify-content-center align-items-center h-100" style="pointer-events: none;">${index + 1}</span>`;
+        
+        // Drag Events an den Punkt binden
+        dot.onmousedown = (e) => window.startDrag(e, index);
+        dot.ontouchstart = (e) => {
+            const touch = e.touches[0];
+            window.startDrag({preventDefault: ()=>e.preventDefault(), stopPropagation: ()=>e.stopPropagation(), clientX: touch.clientX, clientY: touch.clientY}, index);
+        };
+
         if(imgContainer) imgContainer.appendChild(dot);
 
-        // Das moderne Floating-Label Eingabefeld (Kasten)
         let li = document.createElement('div');
         li.className = 'd-flex align-items-center gap-3 p-3 mb-3 bg-white border rounded-4 shadow-sm';
         
-        let safeDe = (marker.de || '').replace(/"/g, '&quot;');
-        let safeLat = (marker.lat || '').replace(/"/g, '&quot;');
+        let safeDe = escapeHtml(marker.de);
+        let safeLat = escapeHtml(marker.lat);
         
         li.innerHTML = `
             <div class="d-flex justify-content-center align-items-center bg-danger text-white rounded-circle shadow-sm" style="width: 38px; height: 38px; flex-shrink: 0; font-size: 1.1rem; font-weight: bold;">
@@ -196,31 +312,7 @@ window.updateAnatomyView = function() {
         if(labelsList) labelsList.appendChild(li);
     });
     
-    const jsonOut = document.getElementById('multi_json_input');
-    if(jsonOut) jsonOut.value = JSON.stringify(window.anatomyMarkers);
-};
-
-window.addAnatomyMarker = function(e) {
-    if(e.target.closest('button')) return; 
-    
-    const anatomyImg = document.getElementById('admin-anatomy-img');
-    if(!anatomyImg || anatomyImg.style.display === 'none') {
-        alert("Bitte lade zuerst ein Bild hoch, bevor du Punkte setzt!");
-        return;
-    }
-    
-    const rect = anatomyImg.getBoundingClientRect();
-    let clickX = e.clientX - rect.left;
-    let clickY = e.clientY - rect.top;
-    
-    if(clickX < 0) clickX = 0; if(clickY < 0) clickY = 0;
-    if(clickX > rect.width) clickX = rect.width; if(clickY > rect.height) clickY = rect.height;
-
-    const x = (clickX / rect.width) * 100;
-    const y = (clickY / rect.height) * 100;
-    
-    window.anatomyMarkers.push({ id: window.anatomyNextId++, de: "", lat: "", x: x.toFixed(2), y: y.toFixed(2) });
-    window.updateAnatomyView();
+    window.syncAnatomyJson();
 };
 
 window.handleImageUpload = function(event) {
@@ -229,7 +321,7 @@ window.handleImageUpload = function(event) {
         if(anatomyImg) {
             anatomyImg.onload = function() {
                 anatomyImg.style.display = 'block';
-                window.anatomyMarkers = []; // Reset bei neuem Bild
+                window.anatomyMarkers = []; 
                 window.updateAnatomyView();
             };
             anatomyImg.src = URL.createObjectURL(event.target.files[0]);
@@ -237,18 +329,13 @@ window.handleImageUpload = function(event) {
     }
 };
 
-// ---------------------------------------------------------
-// BEREITS GESPEICHERTE MARKER LADEN (SICHERER WEG)
-// ---------------------------------------------------------
 document.addEventListener('DOMContentLoaded', function() {
-    const jsonOut = document.getElementById('multi_json_input');
-    // Wir holen uns die JSON Daten absolut sauber aus dem Backend in eine JS-Variable
-    let rawData = `{{ card.options | safe if card.options else '' }}`;
+    const loader = document.getElementById('safe_json_loader');
     
-    if(rawData && rawData.trim() !== '') {
+    if(loader && loader.value.trim() !== '') {
         try {
-            window.anatomyMarkers = JSON.parse(rawData);
-            if(jsonOut) jsonOut.value = JSON.stringify(window.anatomyMarkers);
+            window.anatomyMarkers = JSON.parse(loader.value);
+            window.syncAnatomyJson();
 
             let maxId = 0;
             window.anatomyMarkers.forEach(m => { if (parseInt(m.id) > maxId) maxId = parseInt(m.id); });
@@ -256,7 +343,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const anatomyImg = document.getElementById('admin-anatomy-img');
             if (anatomyImg && anatomyImg.getAttribute('src')) {
-                // Warten bis das Bild geladen ist, falls es das noch nicht ist
                 if(anatomyImg.complete) {
                     window.updateAnatomyView();
                 } else {

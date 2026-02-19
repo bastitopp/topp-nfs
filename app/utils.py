@@ -63,7 +63,7 @@ def award_badges(user):
     if new: db.session.commit(); flash(f"🏆 Neue Auszeichnung: {', '.join(new)}", "warning")
 
 def get_next_card(user, paths, force=False, exclude_id=None):
-    """Sucht die nächste fällige Karte basierend auf FSRS und Dringlichkeit."""
+    """Sucht die nächste fällige Karte basierend auf FSRS und Dringlichkeit (Zufällig durchmischt)."""
     now = datetime.utcnow()
     
     is_all = "Alle" in paths or not paths or paths == [""]
@@ -89,7 +89,7 @@ def get_next_card(user, paths, force=False, exclude_id=None):
         
         if reviews_done_today < MAX_REVIEWS_PER_DAY:
             due = due_query.filter(UserProgress.next_review <= now)\
-                           .order_by(UserProgress.next_review.asc()).first()
+                           .order_by(func.random()).first()
             if due: 
                 return due.card, due
 
@@ -109,7 +109,7 @@ def get_next_card(user, paths, force=False, exclude_id=None):
         if exclude_id: 
             new_query = new_query.filter(Card.id != exclude_id)
             
-        new = new_query.order_by(Card.id.asc()).first()
+        new = new_query.order_by(func.random()).first()
     else:
         new = None
     
@@ -186,11 +186,9 @@ def get_learning_stats(user):
     total = Card.query.count()
     learned = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.box>0).count()
     
-    # ECHTE Werte für das Diagramm (Ungedeckelt)
     true_due = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review <= now).count()
     true_new = total - UserProgress.query.filter_by(user_id=user.id).count()
     
-    # GEDECKELTE Werte für das Tagesziel
     reviews_done_today = UserProgress.query.filter(
         UserProgress.user_id == user.id, 
         UserProgress.last_review >= today_start, 
@@ -207,19 +205,15 @@ def get_learning_stats(user):
     new_left_today = max(0, MAX_NEW_CARDS_PER_DAY - new_done_today)
     display_new = min(true_new, new_left_today)
     
-    # FIX: Erfolgsquote berechnen (kompatibel mit historischen Daten)
-    # Zählt einfach ALLES was der Nutzer je gelernt hat, statt nach "reps" zu filtern
     total_active = UserProgress.query.filter_by(user_id=user.id).count()
     correct_count = UserProgress.query.filter_by(user_id=user.id, last_correct=True).count()
     accuracy = int((correct_count / total_active) * 100) if total_active > 0 else 0
     
-    # Lernzeit berechnen
     total_seconds = user.total_learning_time or 0
     m, s = divmod(total_seconds, 60)
     h, m = divmod(m, 60)
     time_str = f"{h}h {m}m" if h > 0 else f"{m}m {s}s"
     
-    # Schwerpunkte (Fehler)
     error_cats = db.session.query(Card.category, func.count(Card.id))\
         .join(UserProgress)\
         .filter(UserProgress.user_id == user.id, or_(UserProgress.box == 0, UserProgress.last_correct == False))\
@@ -284,9 +278,15 @@ def prepare_calculation_card(card):
 
 def render_learn_card(card, user, context_path):
     """Rendert die Quiz-Ansicht."""
-    p = UserProgress.query.filter_by(user_id=user.id, card_id=card.id).first(); box = p.box if p else 0
-    opts = []
+    p = UserProgress.query.filter_by(user_id=user.id, card_id=card.id).first()
+    box = p.box if p else 0
     
+    # NEU: Historischen Status der Karte ermitteln
+    card_status = 'neu'
+    if p and p.reps and p.reps > 0:
+        card_status = 'richtig' if p.last_correct else 'falsch'
+        
+    opts = []
     if card.type == 'mc': opts = get_mc_options(card)
     elif card.type in ['ordering', 'assignment', 'anatomy_multi']: 
         try: opts = json.loads(card.options)
@@ -298,4 +298,5 @@ def render_learn_card(card, user, context_path):
         for g in opts:
             for i in g.get('items', []): pool.append({'val': i, 'group': g.get('name')})
         random.shuffle(pool)
-    return render_template('quiz.html', card=card, options=opts, pool_items=pool, finished=False, box=box, current_category=context_path, calc_data=calc_data)
+        
+    return render_template('quiz.html', card=card, options=opts, pool_items=pool, finished=False, box=box, current_category=context_path, calc_data=calc_data, card_status=card_status)
