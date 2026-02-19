@@ -2,7 +2,7 @@ import json
 import random
 import difflib
 from datetime import datetime, timedelta, timezone
-from flask import render_template, flash
+from flask import render_template, flash, session
 from sqlalchemy import func
 from sqlalchemy.sql.expression import or_
 from fsrs import FSRS, Card as FSRSCard, Rating, State
@@ -11,6 +11,19 @@ from .models import UserProgress, Card, Badge
 
 # Globale FSRS Instanz initialisieren
 fsrs_scheduler = FSRS()
+
+def get_current_limits():
+    """Gibt die aktiven Tageslimits zurück. Prüft, ob der Nutzer sie für heute aufgehoben hat."""
+    # Standardwerte
+    max_rev = 50
+    max_new = 20
+    
+    # Wenn der Nutzer heute auf "Weiterlernen" geklickt hat, Limits quasi deaktivieren (auf 99999 setzen)
+    if session.get('ignore_limit_date') == datetime.utcnow().strftime('%Y-%m-%d'):
+        max_rev = 99999
+        max_new = 99999
+        
+    return max_rev, max_new
 
 def fuzzy_match(user_input, correct_answer, threshold=0.85):
     """Prüft Übereinstimmung unter Berücksichtigung von Tippfehlern."""
@@ -52,7 +65,7 @@ def award_badges(user):
     if new: db.session.commit(); flash(f"🏆 Neue Auszeichnung: {', '.join(new)}", "warning")
 
 def get_next_card(user, paths, force=False, exclude_id=None):
-    """Sucht die nächste fällige Karte basierend auf FSRS und Dringlichkeit mit Tageslimits."""
+    """Sucht die nächste fällige Karte basierend auf FSRS und Dringlichkeit mit dynamischen Tageslimits."""
     now = datetime.utcnow()
     conditions = [Card.category.like(f"{p}%") for p in paths]
     filter_cond = or_(*conditions)
@@ -61,30 +74,24 @@ def get_next_card(user, paths, force=False, exclude_id=None):
     if exclude_id: 
         due_query = due_query.filter(Card.id != exclude_id)
         
-    # --- TAGESLIMITS DEFINIEREN ---
-    MAX_REVIEWS_PER_DAY = 100  # Maximal 100 alte Fragen pro Tag wiederholen
-    MAX_NEW_CARDS_PER_DAY = 30 # Maximal 30 komplett neue Fragen pro Tag lernen
-    
-    # Der Startpunkt des heutigen Tages für die Zählung (00:00 Uhr)
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    MAX_REVIEWS_PER_DAY, MAX_NEW_CARDS_PER_DAY = get_current_limits()
     
     if not force: 
         # 1. PRÜFE WIEDERHOLUNGEN (Reviews)
-        # Zähle alle Karten, die heute schon wiederholt wurden (reps > 1 schließt Erstkontakte aus)
         reviews_done_today = UserProgress.query.filter(
             UserProgress.user_id == user.id,
             UserProgress.last_review >= today_start,
             UserProgress.reps > 1  
         ).count()
         
-        # Nur wenn das Limit noch nicht erreicht ist, zeigen wir fällige Karten an
         if reviews_done_today < MAX_REVIEWS_PER_DAY:
             due = due_query.filter(UserProgress.next_review <= now)\
                            .order_by(UserProgress.next_review.asc()).first()
             if due: 
                 return due.card, due
 
-    # 2. PRÜFE NEUE KARTEN (Wird erreicht, wenn alle Reviews für heute fertig oder limitiert sind)
+    # 2. PRÜFE NEUE KARTEN
     new_cards_learned_today = UserProgress.query.filter(
         UserProgress.user_id == user.id,
         UserProgress.reps == 1, 
@@ -99,7 +106,7 @@ def get_next_card(user, paths, force=False, exclude_id=None):
             
         new = new_query.order_by(Card.id.asc()).first()
     else:
-        new = None # Beide Limits (Reviews und Neue) sind für heute erreicht
+        new = None
     
     # 3. FALLBACKS & ERZWUNGENES LERNEN
     if not new and force:
@@ -113,21 +120,17 @@ def get_next_card(user, paths, force=False, exclude_id=None):
 
 def update_progress(user, card, quality):
     """Berechnet das nächste Intervall (FSRS Algorithmus)."""
-    # 1. XP berechnen und vergeben
     xp_map = {0: 1, 3: 5, 4: 10, 5: 15}
     q_val = 4 if isinstance(quality, bool) and quality else (0 if isinstance(quality, bool) else quality)
     add_xp(user, xp_map.get(q_val, 0))
     
-    # 2. Progress laden oder neu anlegen
     p = UserProgress.query.filter_by(user_id=user.id, card_id=card.id).first()
     if not p: 
         p = UserProgress(user_id=user.id, card_id=card.id)
         db.session.add(p)
         
-    # 3. FSRS-Karte initialisieren
     fsrs_card = FSRSCard()
     
-    # FIX: "or 0" verhindert Abstürze bei alten Datenbankeinträgen, die noch auf NULL/None stehen
     reps = p.reps or 0
     if reps > 0:
         fsrs_card.state = State(p.state or 0)
@@ -140,18 +143,15 @@ def update_progress(user, card, quality):
         if p.last_review:
             fsrs_card.last_review = p.last_review.replace(tzinfo=timezone.utc)
         
-    # 4. Deine Quality-Buttons auf FSRS-Ratings mappen
     if q_val <= 2: rating = Rating.Again
     elif q_val == 3: rating = Rating.Hard
     elif q_val == 4: rating = Rating.Good
     else: rating = Rating.Easy
 
-    # 5. Nächstes Intervall berechnen lassen
     now = datetime.utcnow().replace(tzinfo=timezone.utc)
     scheduling_cards = fsrs_scheduler.repeat(fsrs_card, now)
     scheduled_card = scheduling_cards[rating].card
     
-    # 6. Ergebnisse zurück in die Datenbank schreiben
     p.state = int(scheduled_card.state)
     p.stability = scheduled_card.stability
     p.difficulty = scheduled_card.difficulty
@@ -162,33 +162,70 @@ def update_progress(user, card, quality):
     p.last_review = now.replace(tzinfo=None)
     p.next_review = scheduled_card.due.replace(tzinfo=None)
     
-    # UI-Box aktualisieren
     p.last_correct = (rating != Rating.Again)
     if rating != Rating.Again:
-        p.box = (p.box or 0) + 1 # Auch hier zur Sicherheit "or 0"
+        p.box = (p.box or 0) + 1 
     else:
         p.box = 0
         
     db.session.commit()
 
 def get_learning_stats(user):
-    """Berechnet globale Statistiken."""
-    if not user.is_authenticated: return {'total':0, 'learned':0, 'due':0, 'new':0, 'f24':0, 'f48':0, 'error_categories':[]}
+    """Berechnet globale Statistiken inkl. angepasster Anzeige-Limits und Tagesziel."""
+    if not user.is_authenticated: 
+        return {'total':0, 'learned':0, 'due':0, 'new':0, 'f24':0, 'f48':0, 'error_categories':[], 'daily_done':0, 'daily_total':0}
+    
     now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    MAX_REVIEWS_PER_DAY, MAX_NEW_CARDS_PER_DAY = get_current_limits()
+    
     total = Card.query.count()
     learned = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.box>0).count()
-    due = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review <= now).count()
+    
+    true_due = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review <= now).count()
+    reviews_done_today = UserProgress.query.filter(
+        UserProgress.user_id == user.id, 
+        UserProgress.last_review >= today_start, 
+        UserProgress.reps > 1
+    ).count()
+    
+    due_left_today = max(0, MAX_REVIEWS_PER_DAY - reviews_done_today)
+    display_due = min(true_due, due_left_today)
+    
+    true_new = total - UserProgress.query.filter_by(user_id=user.id).count()
+    new_done_today = UserProgress.query.filter(
+        UserProgress.user_id == user.id, 
+        UserProgress.last_review >= today_start, 
+        UserProgress.reps == 1
+    ).count()
+    
+    new_left_today = max(0, MAX_NEW_CARDS_PER_DAY - new_done_today)
+    display_new = min(true_new, new_left_today)
+    
     f24 = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review > now, UserProgress.next_review <= now + timedelta(hours=24)).count()
     f48 = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.next_review > now, UserProgress.next_review <= now + timedelta(hours=48)).count()
+    
     error_cats = db.session.query(Card.category, func.count(Card.id))\
         .join(UserProgress)\
         .filter(UserProgress.user_id == user.id, or_(UserProgress.box == 0, UserProgress.last_correct == False))\
         .group_by(Card.category)\
         .order_by(func.count(Card.id).desc())\
         .limit(3).all()
+        
+    # --- NEU: Tagesziel-Berechnung ---
+    daily_done = reviews_done_today + new_done_today
+    daily_total = daily_done + display_due + display_new
+        
     return {
-        'total': total, 'learned': learned, 'due': due, 'new': total - UserProgress.query.filter_by(user_id=user.id).count(),
-        'f24': f24, 'f48': f48, 'error_categories': error_cats
+        'total': total, 
+        'learned': learned, 
+        'due': display_due, 
+        'new': display_new, 
+        'f24': f24, 
+        'f48': f48, 
+        'error_categories': error_cats,
+        'daily_done': daily_done,
+        'daily_total': daily_total
     }
 
 def build_category_tree(user):

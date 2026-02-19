@@ -46,6 +46,35 @@
         </div>
     </div>
 
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <h5 class="fw-bold mb-4"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Dein Fortschritt</h5>
+
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-end mb-1">
+                    <span class="fw-bold text-secondary">Tagesziel heute</span>
+                    <span class="small text-muted fw-bold">{{ global_stats.daily_done }} / {{ global_stats.daily_total }} Karten</span>
+                </div>
+                <div class="progress shadow-sm" style="height: 14px; border-radius: 10px;">
+                    {% set daily_percent = (global_stats.daily_done / global_stats.daily_total * 100) if global_stats.daily_total > 0 else 100 %}
+                    <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" style="width: {{ daily_percent }}%"></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="d-flex justify-content-between align-items-end mb-1">
+                    <span class="fw-bold text-secondary">Gesamtes Wissen (Sicher gelernt)</span>
+                    <span class="small text-muted fw-bold">{{ global_stats.learned }} / {{ global_stats.total }} Fragen</span>
+                </div>
+                <div class="progress shadow-sm" style="height: 14px; border-radius: 10px;">
+                    {% set total_percent = (global_stats.learned / global_stats.total * 100) if global_stats.total > 0 else 0 %}
+                    <div class="progress-bar bg-success" style="width: {{ total_percent }}%"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
     <div class="row row-dashboard g-4 mb-4">
         <div class="col-lg-4 col-md-6">
             <div class="card border-0 shadow-sm h-100 overflow-hidden">
@@ -94,12 +123,8 @@
                         </div>
                     </div>
                     <div class="ms-4 flex-grow-1">
-                        <span class="text-muted small fw-bold text-uppercase d-block mb-1">Fortschritt</span>
-                        <div class="h3 fw-bold mb-0">{{ global_stats.learned }}</div>
-                        <div class="text-muted small mb-2">Fragen sicher gelernt</div>
-                        <div class="progress" style="height: 6px; border-radius: 10px;">
-                            <div class="progress-bar bg-success rounded-pill" style="width: {{ (global_stats.learned / global_stats.total * 100) if global_stats.total > 0 else 0 }}%"></div>
-                        </div>
+                        <span class="text-muted small fw-bold text-uppercase d-block mb-1">Verteilung</span>
+                        <div class="text-muted small">Dein gesamtes Wissen im Überblick, unterteilt in neue, fällige und sicher gelernte Karten.</div>
                     </div>
                 </div>
             </div>

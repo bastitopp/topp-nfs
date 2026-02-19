@@ -50,7 +50,6 @@
         background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent) !important;
     }
 
-    /* NEU: Verbesserte Styles für die Anatomie-Dropzones */
     .anatomy-dropzone {
         position: absolute;
         width: 32px; height: 32px;
@@ -60,9 +59,8 @@
         display: flex; justify-content: center; align-items: center;
         cursor: pointer;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy Effekt */
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
         z-index: 10;
-        /* WICHTIG: Zentriert das Element exakt auf der Koordinate */
         transform: translate(-50%, -50%); 
     }
 
@@ -70,21 +68,20 @@
         transform: translate(-50%, -50%) scale(1.1);
     }
 
-    /* Style wenn gelöst */
     .anatomy-dropzone.solved {
         width: auto !important; height: auto !important;
         border-radius: 12px !important;
         padding: 6px 10px !important;
         background-color: rgba(255, 255, 255, 0.95) !important;
-        border-color: #198754 !important; /* Grün */
+        border-color: #198754 !important; 
         flex-direction: column !important;
         gap: 4px;
-        align-items: stretch !important; /* Badges auf volle Breite */
+        align-items: stretch !important; 
     }
     
     .anatomy-dropzone.solved .badge {
         font-size: 0.85em !important;
-        white-space: normal !important; /* Textumbruch erlauben wenn nötig */
+        white-space: normal !important; 
         padding: 4px 8px;
     }
 
@@ -463,15 +460,12 @@
                                     let alreadySolved = this.getAttribute('data-solved-' + type) === '1';
                                     
                                     if(!alreadySolved && expected === selectedVal) {
-                                        // Richtig!
-                                        // WICHTIG: Wir fügen nur noch die Klasse 'solved' hinzu. Das CSS macht den Rest.
                                         this.classList.add('solved');
                                         
                                         let icon = this.querySelector('i.bi-question');
                                         if(icon) icon.remove();
                                         
                                         let badgeClass = type === 'de' ? 'bg-primary' : 'bg-secondary';
-                                        // Badges werden jetzt sauber untereinander gestapelt durch Flexbox im CSS
                                         this.innerHTML += `<span class="badge ${badgeClass} shadow-sm">${selectedVal}</span>`;
                                         
                                         this.setAttribute('data-solved-' + type, '1');
@@ -488,7 +482,6 @@
                                         
                                         correctCount++;
                                         if(correctCount === totalTargets) {
-                                            // Wenn alles fertig ist, grünen Rand entfernen, sieht sonst doof aus
                                              document.querySelectorAll('.anatomy-dropzone').forEach(z => {
                                                 z.style.borderColor = 'transparent';
                                             });
@@ -643,8 +636,15 @@
         <div class="text-center py-5 mt-5">
             <div class="display-1 mb-4">🎉</div>
             <h1 class="fw-bold mb-3">Hervorragend!</h1>
-            <p class="text-muted fs-5 mb-5">Du hast alle Fragen in diesem Bereich beantwortet oder für heute ist nichts mehr fällig.</p>
-            <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg rounded-pill px-5 py-3 shadow fw-bold"><i class="bi bi-house-door-fill me-2"></i> Zurück zur Übersicht</a>
+            <p class="text-muted fs-5 mb-4">Du hast dein Tagesziel erreicht oder es ist aktuell nichts fällig.</p>
+            
+            <div class="d-flex flex-column flex-sm-row justify-content-center gap-3 mb-5">
+                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary btn-lg rounded-pill px-4 py-3 shadow-sm fw-bold"><i class="bi bi-house-door-fill me-2"></i> Zurück zur Übersicht</a>
+                
+                <a href="{{ url_for('learn.learn', category_path=category, ignore_limit='true') }}" class="btn btn-primary btn-lg rounded-pill px-4 py-3 shadow fw-bold">
+                    <i class="bi bi-fire me-2"></i> Tageslimit aufheben & Weiterlernen
+                </a>
+            </div>
         </div>
         <script>
             setTimeout(() => { confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#0d6efd', '#198754', '#ffc107', '#dc3545'] }); }, 300);

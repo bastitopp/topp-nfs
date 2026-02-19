@@ -4,7 +4,7 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_required, current_user
 from sqlalchemy.sql.expression import func, or_
-from sqlalchemy.orm.attributes import flag_modified  # Wichtig für JSON Updates
+from sqlalchemy.orm.attributes import flag_modified  
 from ..extensions import db
 
 from ..models import Card, UserProgress, ExamAttempt, ExamDetail, CardReport, Scenario, ScenarioNode, ScenarioChoice, ChoiceOutcome, UserScenarioSession
@@ -22,12 +22,16 @@ def learn_custom():
         return redirect(url_for('main.index'))
     return redirect(url_for('learn.learn', category_path="|".join(cats)))
 
-@bp.route('/learn/<path:category_path>')
+@bp.route('/learn/<path:category_path>', methods=['GET', 'POST'])
 @login_required
 def learn(category_path):
+    # NEU: Hat der Nutzer aktiv auf "Limit aufheben" geklickt?
+    if request.args.get('ignore_limit') == 'true':
+        session['ignore_limit_date'] = datetime.utcnow().strftime('%Y-%m-%d')
+        
     paths = category_path.split('|')
-    force = request.args.get('force') == 'true'
-    skip_id = request.args.get('skip_id', type=int)
+    force = request.args.get('force') == 'true' or request.form.get('force') == 'true'
+    skip_id = request.args.get('skip_id', type=int) or request.form.get('skip_id', type=int)
     
     card, p = get_next_card(current_user, paths, force=force, exclude_id=skip_id)
     
@@ -145,7 +149,7 @@ def report_card(card_id):
         return redirect(url_for('learn.learn', category_path=origin, skip_id=card.id))
     return redirect(url_for('main.index'))
 
-@bp.route('/learn/errors')
+@bp.route('/learn/errors', methods=['GET', 'POST'])
 @login_required
 def learn_errors():
     sub = UserProgress.query.filter(UserProgress.user_id == current_user.id, or_(UserProgress.box == 0, UserProgress.last_correct == False)).with_entities(UserProgress.card_id)
@@ -334,7 +338,6 @@ def bpr_choice(choice_id):
     user_flags = session_db.state_flags or {}
     valid_outcomes = []
     
-    # Prüfen, welches Outcome zutrifft
     for out in choice.outcomes:
         req = out.required_flags or {}
         is_valid = True
@@ -345,26 +348,22 @@ def bpr_choice(choice_id):
         if is_valid:
             valid_outcomes.extend([out] * (out.probability_weight or 100))
             
-    # Outcome auswählen
     if valid_outcomes:
         selected_outcome = random.choice(valid_outcomes)
     else:
         selected_outcome = ChoiceOutcome.query.filter_by(choice_id=choice.id, is_fatal_error=True).first()
         
-    # Sicherheitsnetz
     if not selected_outcome:
         session_db.completed = True
         db.session.commit()
         return render_template('bpr_swap.html', old_node=node, choice=choice, error="Aktion nicht möglich (Vorbedingungen fehlen).", scenario_id=scenario.id, flags=session_db.state_flags or {})
 
-    # FATAL ERROR
     if selected_outcome.is_fatal_error:
         session_db.completed = True
         session_db.success = False
         db.session.commit()
         return render_template('bpr_swap.html', old_node=node, choice=choice, error=selected_outcome.error_feedback, scenario_id=scenario.id, flags=session_db.state_flags or {})
         
-    # ERFOLGS-PFAD
     if selected_outcome.set_flags:
         current_state = session_db.state_flags or {}
         current_state.update(selected_outcome.set_flags)
