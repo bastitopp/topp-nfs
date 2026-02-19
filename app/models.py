@@ -79,7 +79,6 @@ class User(UserMixin, db.Model):
         from datetime import datetime, timedelta
         if not self.last_active:
             return False
-        # Nutzer gilt als "online", wenn die letzte Aktion weniger als 10 Minuten her ist
         return datetime.utcnow() - self.last_active < timedelta(minutes=10)
 
 class Card(db.Model):
@@ -99,11 +98,26 @@ class UserProgress(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     card_id = db.Column(db.Integer, db.ForeignKey('card.id'), nullable=False)
-    box = db.Column(db.Integer, default=0)
-    last_correct = db.Column(db.Boolean, default=False)
+    
+    # --- NEUE FSRS Spalten ---
+    state = db.Column(db.Integer, default=0) # 0=New, 1=Learning, 2=Review, 3=Relearning
+    stability = db.Column(db.Float, default=0.0)
+    difficulty = db.Column(db.Float, default=0.0)
+    elapsed_days = db.Column(db.Integer, default=0)
+    scheduled_days = db.Column(db.Integer, default=0)
+    reps = db.Column(db.Integer, default=0)
+    lapses = db.Column(db.Integer, default=0)
+    last_review = db.Column(db.DateTime, nullable=True)
+    
+    # --- Behalten für Kompatibilität mit UI & Statistiken ---
     next_review = db.Column(db.DateTime, default=datetime.utcnow)
+    box = db.Column(db.Integer, default=0) 
+    last_correct = db.Column(db.Boolean, default=False)
+    
+    # --- Veraltet (können technisch entfernt werden, bleiben aber zur Sicherheit drin falls es DB Konflikte gibt) ---
     easiness_factor = db.Column(db.Float, default=2.5)
     interval = db.Column(db.Integer, default=0)
+
     card = db.relationship('Card', backref='progress_records')
     user = db.relationship('User', backref='progress_records')
 
@@ -130,7 +144,6 @@ class ExamDetail(db.Model):
 # ==========================================
 
 class Scenario(db.Model):
-    """Das übergeordnete Fallbeispiel (Der Einsatz)"""
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     dispatch_text = db.Column(db.String(255), nullable=False)
@@ -138,27 +151,22 @@ class Scenario(db.Model):
     nodes = db.relationship('ScenarioNode', backref='scenario', lazy=True, cascade="all, delete-orphan")
 
 class ScenarioNode(db.Model):
-    """Ein einzelner Schritt / Zustand im Einsatz"""
     id = db.Column(db.Integer, primary_key=True)
     scenario_id = db.Column(db.Integer, db.ForeignKey('scenario.id'), nullable=False)
     situation_text = db.Column(db.Text, nullable=False)
-    
     vitals = db.Column(db.JSON, nullable=True) 
-    
     is_endpoint = db.Column(db.Boolean, default=False)
     is_success = db.Column(db.Boolean, default=False)
     status_badge = db.Column(db.String(100), default="Unklare Diagnose")
     choices = db.relationship('ScenarioChoice', backref='node', lazy=True, cascade="all, delete-orphan", foreign_keys='ScenarioChoice.node_id')
 
 class ScenarioChoice(db.Model):
-    """Die Buttons / Entscheidungen, die der Nutzer in einem Schritt klicken kann"""
     id = db.Column(db.Integer, primary_key=True)
     node_id = db.Column(db.Integer, db.ForeignKey('scenario_node.id'), nullable=False)
     action_text = db.Column(db.String(255), nullable=False)
     outcomes = db.relationship('ChoiceOutcome', backref='choice', lazy=True, cascade="all, delete-orphan")
 
 class ChoiceOutcome(db.Model):
-    """Das Ergebnis eines Klicks (mit BPR-Bedingungen und Wahrscheinlichkeit)"""
     id = db.Column(db.Integer, primary_key=True)
     choice_id = db.Column(db.Integer, db.ForeignKey('scenario_choice.id'), nullable=False)
     next_node_id = db.Column(db.Integer, db.ForeignKey('scenario_node.id'), nullable=True)
@@ -169,7 +177,6 @@ class ChoiceOutcome(db.Model):
     error_feedback = db.Column(db.Text, nullable=True)
 
 class UserScenarioSession(db.Model):
-    """Speichert den aktuellen Durchlauf eines Nutzers (Sein 'Savegame')"""
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     scenario_id = db.Column(db.Integer, db.ForeignKey('scenario.id'), nullable=False)

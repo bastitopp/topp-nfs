@@ -1,12 +1,16 @@
 import json
 import random
 import difflib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import render_template, flash
 from sqlalchemy import func
 from sqlalchemy.sql.expression import or_
+from fsrs import FSRS, Card as FSRSCard, Rating, State
 from .extensions import db
 from .models import UserProgress, Card, Badge
+
+# Globale FSRS Instanz initialisieren
+fsrs_scheduler = FSRS()
 
 def fuzzy_match(user_input, correct_answer, threshold=0.85):
     """Prüft Übereinstimmung unter Berücksichtigung von Tippfehlern."""
@@ -48,45 +52,123 @@ def award_badges(user):
     if new: db.session.commit(); flash(f"🏆 Neue Auszeichnung: {', '.join(new)}", "warning")
 
 def get_next_card(user, paths, force=False, exclude_id=None):
-    """Sucht die nächste fällige Karte basierend auf Spaced Repetition."""
+    """Sucht die nächste fällige Karte basierend auf FSRS und Dringlichkeit mit Tageslimits."""
     now = datetime.utcnow()
     conditions = [Card.category.like(f"{p}%") for p in paths]
     filter_cond = or_(*conditions)
+    
     due_query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id, filter_cond)
-    if exclude_id: due_query = due_query.filter(Card.id != exclude_id)
+    if exclude_id: 
+        due_query = due_query.filter(Card.id != exclude_id)
+        
+    # --- TAGESLIMITS DEFINIEREN ---
+    MAX_REVIEWS_PER_DAY = 100  # Maximal 100 alte Fragen pro Tag wiederholen
+    MAX_NEW_CARDS_PER_DAY = 30 # Maximal 30 komplett neue Fragen pro Tag lernen
+    
+    # Der Startpunkt des heutigen Tages für die Zählung (00:00 Uhr)
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    
     if not force: 
-        due = due_query.filter(UserProgress.next_review <= now).order_by(func.random()).first()
-        if due: return due.card, due
-    sub = db.session.query(UserProgress.card_id).filter(UserProgress.user_id==user.id)
-    new_query = Card.query.filter(filter_cond, ~Card.id.in_(sub))
-    if exclude_id: new_query = new_query.filter(Card.id != exclude_id)
-    new = new_query.order_by(func.random()).first()
+        # 1. PRÜFE WIEDERHOLUNGEN (Reviews)
+        # Zähle alle Karten, die heute schon wiederholt wurden (reps > 1 schließt Erstkontakte aus)
+        reviews_done_today = UserProgress.query.filter(
+            UserProgress.user_id == user.id,
+            UserProgress.last_review >= today_start,
+            UserProgress.reps > 1  
+        ).count()
+        
+        # Nur wenn das Limit noch nicht erreicht ist, zeigen wir fällige Karten an
+        if reviews_done_today < MAX_REVIEWS_PER_DAY:
+            due = due_query.filter(UserProgress.next_review <= now)\
+                           .order_by(UserProgress.next_review.asc()).first()
+            if due: 
+                return due.card, due
+
+    # 2. PRÜFE NEUE KARTEN (Wird erreicht, wenn alle Reviews für heute fertig oder limitiert sind)
+    new_cards_learned_today = UserProgress.query.filter(
+        UserProgress.user_id == user.id,
+        UserProgress.reps == 1, 
+        UserProgress.last_review >= today_start
+    ).count()
+
+    if new_cards_learned_today < MAX_NEW_CARDS_PER_DAY:
+        sub = db.session.query(UserProgress.card_id).filter(UserProgress.user_id==user.id)
+        new_query = Card.query.filter(filter_cond, ~Card.id.in_(sub))
+        if exclude_id: 
+            new_query = new_query.filter(Card.id != exclude_id)
+            
+        new = new_query.order_by(Card.id.asc()).first()
+    else:
+        new = None # Beide Limits (Reviews und Neue) sind für heute erreicht
+    
+    # 3. FALLBACKS & ERZWUNGENES LERNEN
     if not new and force:
-        fallback_query = UserProgress.query.join(Card).filter(UserProgress.user_id==user.id, filter_cond)
-        res = fallback_query.filter(Card.id != exclude_id).order_by(func.random()).first() if exclude_id else fallback_query.order_by(func.random()).first()
+        res = due_query.order_by(func.random()).first()
         return (res.card, None) if res else (None, None)
-    if not new and exclude_id: return get_next_card(user, paths, force=force, exclude_id=None)
+        
+    if not new and exclude_id: 
+        return get_next_card(user, paths, force=force, exclude_id=None)
+        
     return new, None
 
 def update_progress(user, card, quality):
-    """Berechnet das nächste Intervall (SM-2 Algorithmus)."""
-    if isinstance(quality, bool): quality = 4 if quality else 0
+    """Berechnet das nächste Intervall (FSRS Algorithmus)."""
+    # 1. XP berechnen und vergeben
     xp_map = {0: 1, 3: 5, 4: 10, 5: 15}
-    add_xp(user, xp_map.get(quality, 0))
+    q_val = 4 if isinstance(quality, bool) and quality else (0 if isinstance(quality, bool) else quality)
+    add_xp(user, xp_map.get(q_val, 0))
+    
+    # 2. Progress laden oder neu anlegen
     p = UserProgress.query.filter_by(user_id=user.id, card_id=card.id).first()
-    if not p: p = UserProgress(user_id=user.id, card_id=card.id, box=0, easiness_factor=2.5, interval=0); db.session.add(p)
-    p.last_correct = (quality >= 3)
-    if quality >= 3:
-        if p.box == 0: p.interval = 1
-        elif p.box == 1: p.interval = 6
-        else: p.interval = int(p.interval * p.easiness_factor)
-        if p.interval > 3: p.interval = int(p.interval * random.uniform(0.9, 1.1))
-        p.box += 1
+    if not p: 
+        p = UserProgress(user_id=user.id, card_id=card.id)
+        db.session.add(p)
+        
+    # 3. FSRS-Karte initialisieren
+    fsrs_card = FSRSCard()
+    
+    # FIX: "or 0" verhindert Abstürze bei alten Datenbankeinträgen, die noch auf NULL/None stehen
+    reps = p.reps or 0
+    if reps > 0:
+        fsrs_card.state = State(p.state or 0)
+        fsrs_card.stability = p.stability or 0.0
+        fsrs_card.difficulty = p.difficulty or 0.0
+        fsrs_card.elapsed_days = p.elapsed_days or 0
+        fsrs_card.scheduled_days = p.scheduled_days or 0
+        fsrs_card.reps = reps
+        fsrs_card.lapses = p.lapses or 0
+        if p.last_review:
+            fsrs_card.last_review = p.last_review.replace(tzinfo=timezone.utc)
+        
+    # 4. Deine Quality-Buttons auf FSRS-Ratings mappen
+    if q_val <= 2: rating = Rating.Again
+    elif q_val == 3: rating = Rating.Hard
+    elif q_val == 4: rating = Rating.Good
+    else: rating = Rating.Easy
+
+    # 5. Nächstes Intervall berechnen lassen
+    now = datetime.utcnow().replace(tzinfo=timezone.utc)
+    scheduling_cards = fsrs_scheduler.repeat(fsrs_card, now)
+    scheduled_card = scheduling_cards[rating].card
+    
+    # 6. Ergebnisse zurück in die Datenbank schreiben
+    p.state = int(scheduled_card.state)
+    p.stability = scheduled_card.stability
+    p.difficulty = scheduled_card.difficulty
+    p.elapsed_days = scheduled_card.elapsed_days
+    p.scheduled_days = scheduled_card.scheduled_days
+    p.reps = scheduled_card.reps
+    p.lapses = scheduled_card.lapses
+    p.last_review = now.replace(tzinfo=None)
+    p.next_review = scheduled_card.due.replace(tzinfo=None)
+    
+    # UI-Box aktualisieren
+    p.last_correct = (rating != Rating.Again)
+    if rating != Rating.Again:
+        p.box = (p.box or 0) + 1 # Auch hier zur Sicherheit "or 0"
     else:
-        p.box = 0; p.interval = 0
-    p.easiness_factor = max(1.3, p.easiness_factor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)))
-    delta = timedelta(minutes=5) if p.interval == 0 else timedelta(days=p.interval)
-    p.next_review = datetime.utcnow() + delta
+        p.box = 0
+        
     db.session.commit()
 
 def get_learning_stats(user):
@@ -154,7 +236,6 @@ def render_learn_card(card, user, context_path):
     p = UserProgress.query.filter_by(user_id=user.id, card_id=card.id).first(); box = p.box if p else 0
     opts = []
     
-    # HIER FEHLTE 'anatomy_multi' -> Dadurch wurde [] ans Template geschickt!
     if card.type == 'mc': opts = get_mc_options(card)
     elif card.type in ['ordering', 'assignment', 'anatomy_multi']: 
         try: opts = json.loads(card.options)

@@ -5,7 +5,8 @@ from datetime import datetime
 import markdown
 from markupsafe import Markup
 from flask import Flask
-from .extensions import db, mail, login_manager, limiter
+# NEU: 'migrate' aus .extensions importiert
+from .extensions import db, mail, login_manager, limiter, migrate 
 from .models import User
 
 def create_app():
@@ -44,6 +45,7 @@ def create_app():
 
     # --- PLUGINS INITIALISIEREN ---
     db.init_app(app)
+    migrate.init_app(app, db)  # NEU: Flask-Migrate an die App und DB binden
     mail.init_app(app)
     login_manager.init_app(app)
     limiter.init_app(app)

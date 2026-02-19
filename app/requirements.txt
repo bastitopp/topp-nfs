@@ -3,9 +3,11 @@ flask-sqlalchemy
 flask-login
 flask-limiter
 flask-mail
+Flask-Migrate
 werkzeug
 email_validator
 gunicorn
 psycopg2-binary
 itsdangerous
 markdown
+fsrs

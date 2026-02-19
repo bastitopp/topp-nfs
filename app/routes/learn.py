@@ -134,14 +134,15 @@ def submit(card_id):
 @bp.route('/report/<int:card_id>', methods=['GET', 'POST'])
 @login_required
 def report_card(card_id):
+    card = Card.query.get_or_404(card_id)
     if request.method == 'POST':
         reason = request.form.get('reason')
-        origin = request.form.get('origin_path', 'Alle') 
+        origin = request.form.get('origin_path') or 'Alle' 
         if reason:
-            db.session.add(CardReport(card_id=card_id, user_id=current_user.id, reason=reason))
+            db.session.add(CardReport(card_id=card.id, user_id=current_user.id, reason=reason))
             db.session.commit()
             flash('Frage wurde gemeldet.', 'success')
-        return redirect(url_for('learn.learn', category_path=origin))
+        return redirect(url_for('learn.learn', category_path=origin, skip_id=card.id))
     return redirect(url_for('main.index'))
 
 @bp.route('/learn/errors')
