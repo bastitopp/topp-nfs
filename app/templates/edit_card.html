@@ -14,10 +14,8 @@
                 <input type="hidden" name="next" value="{{ next_url }}">
                 {% endif %}
                 
-                <input type="hidden" name="multi_json" id="multi_json_input">
-                <input type="hidden" name="options" id="fallback_options_input">
-                
-                <textarea id="safe_json_loader" class="d-none">{{ card.options }}</textarea>
+                <input type="hidden" name="multi_json" id="multi_json_input" value="{{ card.options | e if card.options else '[]' }}">
+                <input type="hidden" name="options" id="fallback_options_input" value="{{ card.options | e if card.options else '[]' }}">
                 
                 <div class="row g-3 mb-3">
                     <div class="col-md-8">
@@ -105,7 +103,7 @@
                     <h5 class="fw-bold text-primary mb-3"><i class="bi bi-pin-map-fill me-2"></i>Interaktives Bild bearbeiten</h5>
                     
                     <label class="fw-bold small mb-2 text-secondary">1. Zielpunkte platzieren & verschieben</label>
-                    <p class="small text-muted mb-3">Klicke ins Bild, um neue Zielpunkte zu setzen. <strong>Du kannst bestehende Punkte nun einfach mit der Maus (oder dem Finger) per Drag & Drop an die richtige Stelle ziehen!</strong></p>
+                    <p class="small text-muted mb-3">Klicke ins Bild, um neue Zielpunkte zu setzen. <strong>Du kannst bestehende Punkte nun einfach mit der Maus per Drag & Drop verschieben!</strong></p>
                     
                     <div class="text-center bg-light rounded-4 border p-3 mb-4 shadow-inner">
                         <div style="position: relative; display: inline-block; cursor: crosshair; max-width: 100%; touch-action: none;" 
@@ -126,7 +124,7 @@
 
                 <div id="field_json" class="mb-3 {% if card.type not in ['ordering', 'assignment', 'calculation'] %}d-none{% endif %}">
                     <label class="fw-bold small">JSON Daten (Optionen)</label>
-                    <textarea name="ordering_json" id="ordering_json_textarea" class="form-control font-monospace" rows="5">{{ card.options }}</textarea>
+                    <textarea name="ordering_json" id="ordering_json_textarea" class="form-control font-monospace" rows="5">{{ card.options if card.options else '[]' }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
@@ -138,10 +136,15 @@
 </div>
 
 <script>
-// ---------------------------------------------------------
-// GLOBALE FUNKTIONEN FÜR DEN ANATOMIE-EDITOR
-// ---------------------------------------------------------
-window.anatomyMarkers = [];
+// --- Direkter JSON Injektor, umgeht den fehleranfälligen Textarea-Workaround ---
+try {
+    window.anatomyMarkers = {{ (card.options or '[]') | safe }};
+    if (!Array.isArray(window.anatomyMarkers)) window.anatomyMarkers = [];
+} catch(e) {
+    console.error("JSON Parse Fehler:", e);
+    window.anatomyMarkers = [];
+}
+
 window.anatomyNextId = 1;
 
 window.syncAnatomyJson = function() {
@@ -166,7 +169,6 @@ window.removeAnatomyMarker = function(index) {
     window.updateAnatomyView();
 };
 
-// FIX: Schutzfunktion gegen zerschossene HTML-Eingabefelder durch Sonderzeichen
 function escapeHtml(unsafe) {
     return (unsafe||'').toString()
          .replace(/&/g, "&amp;")
@@ -176,9 +178,6 @@ function escapeHtml(unsafe) {
          .replace(/'/g, "&#039;");
 }
 
-// ---------------------------------------------------------
-// DRAG & DROP LOGIK FÜR DIE ZIELPUNKTE (NEU)
-// ---------------------------------------------------------
 let draggedMarkerIndex = -1;
 let hasDragged = false;
 
@@ -230,7 +229,7 @@ window.stopDrag = function(e) {
 };
 
 window.addAnatomyMarker = function(e) {
-    if(hasDragged) return; // Wenn wir gerade gezogen haben, keinen neuen Punkt erstellen
+    if(hasDragged) return;
     if(e.target.closest('button') || e.target.closest('.admin-marker')) return; 
     
     const imgContainer = document.getElementById('admin-img-container');
@@ -268,11 +267,10 @@ window.updateAnatomyView = function() {
         dot.style.width = '28px'; dot.style.height = '28px';
         dot.style.left = `calc(${marker.x}% - 14px)`;
         dot.style.top = `calc(${marker.y}% - 14px)`;
-        dot.style.cursor = 'grab'; // Zeigt dem Nutzer, dass er ziehen kann
+        dot.style.cursor = 'grab';
         dot.style.zIndex = '10';
         dot.innerHTML = `<span class="text-white small fw-bold d-flex justify-content-center align-items-center h-100" style="pointer-events: none;">${index + 1}</span>`;
         
-        // Drag Events an den Punkt binden
         dot.onmousedown = (e) => window.startDrag(e, index);
         dot.ontouchstart = (e) => {
             const touch = e.touches[0];
@@ -330,36 +328,14 @@ window.handleImageUpload = function(event) {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    const loader = document.getElementById('safe_json_loader');
+    let maxId = 0;
+    window.anatomyMarkers.forEach(m => { if (parseInt(m.id) > maxId) maxId = parseInt(m.id); });
+    window.anatomyNextId = maxId + 1;
     
-    if(loader && loader.value.trim() !== '') {
-        try {
-            window.anatomyMarkers = JSON.parse(loader.value);
-            window.syncAnatomyJson();
-
-            let maxId = 0;
-            window.anatomyMarkers.forEach(m => { if (parseInt(m.id) > maxId) maxId = parseInt(m.id); });
-            window.anatomyNextId = maxId + 1;
-            
-            const anatomyImg = document.getElementById('admin-anatomy-img');
-            if (anatomyImg && anatomyImg.getAttribute('src')) {
-                if(anatomyImg.complete) {
-                    window.updateAnatomyView();
-                } else {
-                    anatomyImg.onload = function() {
-                        window.updateAnatomyView();
-                    }
-                }
-            }
-        } catch(e) {
-            console.error("Fehler beim Laden der Anatomie-Daten:", e);
-        }
-    }
+    // Sofort laden, nicht mehr auf das Bild warten!
+    window.updateAnatomyView();
 });
 
-// ---------------------------------------------------------
-// RESTLICHE LOGIK
-// ---------------------------------------------------------
 function updateFormFields() {
     const typeSelect = document.getElementById('typeSelect');
     if(!typeSelect) return;

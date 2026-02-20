@@ -26,7 +26,6 @@ def admin_required(f):
 def allowed_file(fn):
     return '.' in fn and fn.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'csv'}
 
-# NEU: Extrem effiziente Baum-Erstellung (Lädt keine Card-Objekte, sondern zählt nur auf der DB)
 def build_admin_tree():
     stats = db.session.query(
         Card.category,
@@ -104,7 +103,6 @@ def check_question_quality(cards):
             
     return warnings
 
-# NEU: HTMX API-Route für das schnelle Laden der Fragen in Ordnern & bei der Suche
 @bp.route('/admin/api/cards')
 @admin_required
 def admin_api_cards():
@@ -118,7 +116,7 @@ def admin_api_cards():
     if q:
         query = query.filter(Card.question.ilike(f'%{q}%'))
         
-    cards = query.limit(100).all() # Limit zum Schutz bei extrem großen Suchanfragen
+    cards = query.limit(100).all() 
     
     html = ""
     for c in cards:
@@ -167,14 +165,21 @@ def admin_dashboard():
                 url = handle_upload(request.files['audio'])
                 if url: c.audio_url = url
             
-            c.answer = request.form.get('answer','')
+            if c.type == 'anatomy':
+                if request.form.get('answer_de_field'):
+                    c.answer = request.form.get('answer_de_field')
+                else:
+                    c.answer = request.form.get('answer', '')
+                c.answer_lat = request.form.get('answer_lat', '')
+            else:
+                c.answer = request.form.get('answer','')
             
             if c.type == 'mc':
                 opts = [x.strip() for x in request.form.getlist('mc_options') if x.strip()]
                 if c.answer and c.answer not in opts: opts.append(c.answer)
                 c.options = json.dumps(opts)
             elif c.type == 'anatomy_multi': 
-                c.options = request.form.get('multi_json')
+                c.options = request.form.get('multi_json') or '[]'
             elif c.type in ['ordering', 'assignment', 'calculation']: 
                 c.options = request.form.get('ordering_json')
             
@@ -324,7 +329,7 @@ def edit_card(card_id):
             if card.answer and card.answer not in opts: opts.append(card.answer)
             card.options = json.dumps(opts)
         elif card.type == 'anatomy_multi': 
-            card.options = request.form.get('multi_json')
+            card.options = request.form.get('multi_json') or '[]'
         elif card.type in ['ordering', 'assignment', 'calculation']: 
             card.options = request.form.get('ordering_json')
 
@@ -391,7 +396,6 @@ def approve_user(uid):
     u.is_approved = True
     db.session.commit()
     
-    # NEU: Bestätigungs-E-Mail an den Benutzer senden
     if u.email:
         try:
             msg = Message('Dein Account wurde freigeschaltet', recipients=[u.email])
@@ -526,10 +530,6 @@ def import_confirm():
     except Exception as e: flash(f'Import Fehler: {e}', 'danger')
     return redirect(url_for('admin.admin_dashboard', tab='io'))
 
-# ==========================================
-# --- BPR SZENARIO EDITOR ROUTEN ---
-# ==========================================
-
 @bp.route('/admin/bpr/add', methods=['POST'])
 @admin_required
 def add_bpr_scenario():
@@ -576,7 +576,6 @@ def delete_bpr_scenario(scenario_id):
     
     flash('Szenario erfolgreich gelöscht.', 'success')
     return redirect(url_for('admin.admin_dashboard', tab='bpr'))
-
 
 @bp.route('/admin/bpr/node/add/<int:scenario_id>', methods=['POST'])
 @admin_required
@@ -651,10 +650,6 @@ def add_bpr_outcome(choice_id):
     db.session.commit()
     flash('Ergebnis (Outcome) hinzugefügt.', 'success')
     return redirect(url_for('admin.edit_bpr_scenario', scenario_id=c.node.scenario_id))
-
-# ==========================================
-# --- BPR IMPORT & EXPORT ---
-# ==========================================
 
 @bp.route('/admin/bpr/export')
 @admin_required

@@ -284,9 +284,6 @@ window.handleImageUpload = function(event) {
     }
 };
 
-// ---------------------------------------------------------
-// RESTLICHE ADMIN LOGIK
-// ---------------------------------------------------------
 function updateFormFields() {
     const type = document.getElementById('typeSelect').value;
     ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id=>document.getElementById(id).classList.add('d-none'));

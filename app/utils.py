@@ -181,7 +181,10 @@ def get_learning_stats(user):
     
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    MAX_REVIEWS_PER_DAY, MAX_NEW_CARDS_PER_DAY = get_current_limits()
+    
+    # NEU: Feste Basis-Limits für das Dashboard definieren, anstatt get_current_limits() zu nutzen
+    BASE_MAX_REVIEWS = 50
+    BASE_MAX_NEW_CARDS = 20
     
     total = Card.query.count()
     learned = UserProgress.query.filter(UserProgress.user_id==user.id, UserProgress.box>0).count()
@@ -194,7 +197,7 @@ def get_learning_stats(user):
         UserProgress.last_review >= today_start, 
         UserProgress.reps > 1
     ).count()
-    due_left_today = max(0, MAX_REVIEWS_PER_DAY - reviews_done_today)
+    due_left_today = max(0, BASE_MAX_REVIEWS - reviews_done_today)
     display_due = min(true_due, due_left_today)
     
     new_done_today = UserProgress.query.filter(
@@ -202,7 +205,7 @@ def get_learning_stats(user):
         UserProgress.last_review >= today_start, 
         UserProgress.reps == 1
     ).count()
-    new_left_today = max(0, MAX_NEW_CARDS_PER_DAY - new_done_today)
+    new_left_today = max(0, BASE_MAX_NEW_CARDS - new_done_today)
     display_new = min(true_new, new_left_today)
     
     total_active = UserProgress.query.filter_by(user_id=user.id).count()
