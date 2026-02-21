@@ -35,7 +35,6 @@ def learn(category_path):
     card, p = get_next_card(current_user, paths, force=force, exclude_id=skip_id)
     
     if not card: 
-        # NEU: "Alle" absichern, damit hier keine Filter-Fehler entstehen
         w_query = UserProgress.query.join(Card).filter(
             UserProgress.user_id==current_user.id, 
             UserProgress.next_review > datetime.utcnow()
@@ -300,6 +299,20 @@ def review_exam(attempt_id):
 def bpr_index():
     scenarios = Scenario.query.all()
     return render_template('bpr_index.html', scenarios=scenarios)
+
+# NEUE ROUTE FÜR ZUFÄLLIGE AUSWAHL
+@bp.route('/bpr/random')
+@login_required
+def bpr_random():
+    # Zieht ein zufälliges Szenario aus der Datenbank
+    scenario = Scenario.query.order_by(func.random()).first()
+    
+    if not scenario:
+        flash("Aktuell sind keine BPR-Szenarien verfügbar.", "warning")
+        return redirect(url_for('learn.bpr_index'))
+        
+    # Leitet direkt zum Spiel-Modus des ausgewählten Szenarios weiter
+    return redirect(url_for('learn.bpr_play', scenario_id=scenario.id))
 
 @bp.route('/bpr/play/<int:scenario_id>')
 @login_required

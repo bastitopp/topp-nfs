@@ -1,242 +1,424 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container-fluid py-3">
-    
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+<style>
+    /* Spezifische Baustein-Editor Styles */
+    .editor-canvas {
+        background-color: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        border: 2px dashed #dee2e6;
+    }
+    .node-block {
+        border: 2px solid #ced4da;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+    }
+    .node-block:hover {
+        border-color: #0d6efd;
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+    }
+    .node-header {
+        background-color: #e9ecef;
+        border-bottom: 2px solid #ced4da;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+    .node-block.start-node {
+        border-color: #198754;
+    }
+    .node-block.start-node .node-header {
+        background-color: #d1e7dd;
+        border-color: #198754;
+    }
+    .choice-block {
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-left: 4px solid #0d6efd;
+        border-radius: 8px;
+    }
+    .outcome-block {
+        background-color: #f8f9fa;
+        border: 1px dashed #adb5bd;
+        border-radius: 8px;
+        position: relative;
+    }
+    .outcome-block::before {
+        content: '↳';
+        position: absolute;
+        left: -20px;
+        top: 10px;
+        color: #adb5bd;
+        font-weight: bold;
+    }
+    .fatal-outcome {
+        border-left: 4px solid #dc3545 !important;
+        background-color: #fff5f5;
+    }
+    .success-outcome {
+        border-left: 4px solid #198754 !important;
+        background-color: #f0fdf4;
+    }
+    .vital-badge {
+        font-size: 0.85rem;
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        color: #495057;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
         <div>
-            <h2 class="fw-bold mb-0">
-                <i class="bi bi-diagram-3-fill text-primary me-2"></i> {{ scenario.title }}
-            </h2>
-            <p class="text-muted mb-0">Einsatzstichwort: {{ scenario.dispatch_text }}</p>
+            <span class="badge bg-secondary mb-2">{{ scenario.category or 'Allgemein' }}</span>
+            <h2 class="fw-bold mb-0"><i class="bi bi-boxes text-primary me-2"></i>{{ scenario.title }}</h2>
+            <p class="text-muted mb-0 mt-1"><i class="bi bi-info-circle me-1"></i> Stichwort: <strong>{{ scenario.dispatch_text }}</strong></p>
         </div>
-        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i> Zurück zum Admin
-        </a>
+        <div>
+            <a href="{{ url_for('learn.bpr_play', scenario_id=scenario.id) }}" target="_blank" class="btn btn-success btn-lg me-2 shadow-sm">
+                <i class="bi bi-play-fill me-1"></i> Playtest
+            </a>
+            <a href="{{ url_for('admin.admin_dashboard', tab='bpr') }}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+        </div>
     </div>
 
-    <div class="row g-4">
+    <div class="row">
         <div class="col-lg-8">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="fw-bold m-0">Knotenpunkte (Nodes)</h4>
-                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addNodeModal">
-                    <i class="bi bi-plus-circle me-1"></i> Neuer Schritt
+                <h4 class="fw-bold m-0">Szenario-Bausteine</h4>
+                <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addNodeModal">
+                    <i class="bi bi-plus-circle-fill me-1"></i> Neuen Baustein hinzufügen
                 </button>
             </div>
 
-            {% for node in scenario.nodes %}
-            <div class="card mb-4 border-{{ 'primary' if scenario.first_node_id == node.id else 'secondary' }} shadow-sm">
-                <div class="card-header bg-{{ 'primary text-white' if scenario.first_node_id == node.id else 'light' }} d-flex justify-content-between align-items-center">
-                    <span class="fw-bold">
-                        #{{ node.id }} | Badge: {{ node.status_badge }}
-                        {% if scenario.first_node_id == node.id %} <span class="badge bg-warning text-dark ms-2">STARTPUNKT</span>{% endif %}
-                        {% if node.is_endpoint %} <span class="badge bg-danger ms-2">ENDE</span>{% endif %}
-                    </span>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted fst-italic mb-3">"{{ node.situation_text }}"</p>
-                    
-                    {% if node.vitals %}
-                    <div class="bg-dark text-white p-2 rounded small mb-3 d-flex gap-3">
-                        <span><strong class="text-success">HF:</strong> {{ node.vitals.hf or '-' }}</span>
-                        <span><strong class="text-danger">RR:</strong> {{ node.vitals.rr or '-' }}</span>
-                        <span><strong class="text-info">SpO2:</strong> {{ node.vitals.spo2 or '-' }}</span>
-                        <span><strong class="text-warning">AF:</strong> {{ node.vitals.af or '-' }}</span>
-                        <span><strong style="color:orange;">Temp:</strong> {{ node.vitals.temp or '-' }}</span>
-                        <span><strong style="color:violet;">BZ:</strong> {{ node.vitals.bz or '-' }}</span>
+            <div class="editor-canvas">
+                {% if not scenario.nodes %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-node-plus display-1 opacity-25"></i>
+                        <h4 class="mt-3">Die Leinwand ist leer</h4>
+                        <p>Erstelle deinen ersten Baustein, um das Szenario zu beginnen.</p>
                     </div>
-                    {% endif %}
-                    
-                    <hr>
-                    <h6 class="fw-bold text-uppercase small text-muted">Auswahlmöglichkeiten (Buttons)</h6>
-                    
-                    <ul class="list-group list-group-flush mb-3">
-                        {% for choice in node.choices %}
-                        <li class="list-group-item px-0">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="fw-bold"><i class="bi bi-chevron-right text-primary me-1"></i> {{ choice.action_text }}</span>
-                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addOutcomeModal" data-choice-id="{{ choice.id }}">
-                                    + Outcome hinzufügen
-                                </button>
-                            </div>
-                            
-                            {% if choice.outcomes %}
-                            <div class="mt-2 ps-4 border-start border-2 border-primary">
-                                {% for outcome in choice.outcomes %}
-                                <div class="p-2 mb-1 bg-light rounded small">
-                                    <span class="badge bg-info">{{ outcome.probability_weight }}%</span> 
-                                    <i class="bi bi-arrow-right mx-1"></i> 
-                                    {% if outcome.is_fatal_error %}
-                                        <span class="text-danger fw-bold">FATAL ERROR:</span> {{ outcome.error_feedback }}
-                                    {% else %}
-                                        Gehe zu Node <strong>#{{ outcome.next_node_id }}</strong>
-                                    {% endif %}
-                                    
-                                    {% if outcome.required_flags %}
-                                    <br><span class="text-muted"><i class="bi bi-lock-fill"></i> Braucht: {{ outcome.required_flags }}</span>
-                                    {% endif %}
-                                    {% if outcome.set_flags %}
-                                    <br><span class="text-success"><i class="bi bi-plus-circle-fill"></i> Setzt: {{ outcome.set_flags }}</span>
-                                    {% endif %}
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% else %}
-                            <div class="text-danger small ps-4 mt-1"><i class="bi bi-exclamation-triangle"></i> Dieser Button führt ins Nichts!</div>
-                            {% endif %}
-                        </li>
-                        {% else %}
-                        <li class="list-group-item px-0 text-muted small">Keine Buttons für diesen Knoten.</li>
-                        {% endfor %}
-                    </ul>
+                {% else %}
+                    <div class="mb-4 p-3 bg-white rounded shadow-sm border">
+                        <small class="text-muted fw-bold text-uppercase d-block mb-2">Schnellnavigation zu Bausteinen:</small>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for node in scenario.nodes %}
+                                <a href="#node-{{ node.id }}" class="badge rounded-pill text-decoration-none {% if scenario.first_node_id == node.id %}bg-success{% else %}bg-secondary{% endif %}">
+                                    #{{ node.id }} {{ node.status_badge }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
 
-                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addChoiceModal" data-node-id="{{ node.id }}">
-                        <i class="bi bi-plus"></i> Button hinzufügen
-                    </button>
-                </div>
+                    {% for node in scenario.nodes %}
+                    <div class="node-block bg-white shadow-sm mb-5" id="node-{{ node.id }}">
+                        <div class="node-header p-3 d-flex justify-content-between align-items-center {% if scenario.first_node_id == node.id %}bg-success bg-opacity-10{% endif %}">
+                            <h5 class="mb-0 fw-bold">
+                                <span class="text-primary me-2">Block #{{ node.id }}</span> 
+                                {{ node.status_badge }}
+                                {% if scenario.first_node_id == node.id %}
+                                    <span class="badge bg-success ms-2"><i class="bi bi-flag-fill"></i> START</span>
+                                {% endif %}
+                                {% if node.is_endpoint %}
+                                    <span class="badge {% if node.is_success %}bg-success{% else %}bg-danger{% endif %} ms-2">
+                                        <i class="bi bi-stop-circle-fill"></i> ENDPUNKT
+                                    </span>
+                                {% endif %}
+                            </h5>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addChoiceModal{{ node.id }}">
+                                <i class="bi bi-plus"></i> Auswahl andocken
+                            </button>
+                        </div>
+
+                        <div class="p-4">
+                            <p class="fs-5 mb-3">{{ node.situation_text }}</p>
+                            
+                            {% if node.vitals %}
+                            <div class="d-flex flex-wrap gap-2 mb-4 p-3 bg-light rounded border">
+                                {% if node.vitals.hf %}<span class="badge vital-badge px-3 py-2"><i class="bi bi-heart-pulse text-danger me-1"></i> HF: <strong>{{ node.vitals.hf }}</strong></span>{% endif %}
+                                {% if node.vitals.rr %}<span class="badge vital-badge px-3 py-2"><i class="bi bi-speedometer text-primary me-1"></i> RR: <strong>{{ node.vitals.rr }}</strong></span>{% endif %}
+                                {% if node.vitals.spo2 %}<span class="badge vital-badge px-3 py-2"><i class="bi bi-lungs text-info me-1"></i> SpO2: <strong>{{ node.vitals.spo2 }}%</strong></span>{% endif %}
+                                {% if node.vitals.af %}<span class="badge vital-badge px-3 py-2"><i class="bi bi-wind text-secondary me-1"></i> AF: <strong>{{ node.vitals.af }}</strong></span>{% endif %}
+                                {% if node.vitals.temp %}<span class="badge vital-badge px-3 py-2"><i class="bi bi-thermometer-half text-warning me-1"></i> Temp: <strong>{{ node.vitals.temp }}°C</strong></span>{% endif %}
+                                {% if node.vitals.bz %}<span class="badge vital-badge px-3 py-2"><i class="bi bi-droplet-fill text-danger me-1"></i> BZ: <strong>{{ node.vitals.bz }}</strong></span>{% endif %}
+                            </div>
+                            {% endif %}
+
+                            {% if node.choices %}
+                                <h6 class="text-muted fw-bold text-uppercase small mb-3">Spieler-Optionen & Abzweigungen:</h6>
+                                <div class="d-flex flex-column gap-3">
+                                    {% for choice in node.choices %}
+                                    <div class="choice-block p-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <strong class="text-dark"><i class="bi bi-cursor-fill text-primary me-2"></i>"{{ choice.action_text }}"</strong>
+                                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addOutcomeModal{{ choice.id }}">
+                                                + Pfad verlinken
+                                            </button>
+                                        </div>
+
+                                        {% if choice.outcomes %}
+                                            <div class="ms-4 position-relative">
+                                                <div class="d-flex flex-column gap-2">
+                                                    {% for outcome in choice.outcomes %}
+                                                        <div class="outcome-block p-3 {% if outcome.is_fatal_error %}fatal-outcome{% else %}success-outcome{% endif %}">
+                                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                                <div>
+                                                                    {% if outcome.is_fatal_error %}
+                                                                        <h6 class="text-danger fw-bold mb-1"><i class="bi bi-x-octagon-fill me-1"></i> Abbruch: Fataler Fehler</h6>
+                                                                        <span class="text-dark">{{ outcome.error_feedback }}</span>
+                                                                    {% else %}
+                                                                        <h6 class="text-success fw-bold mb-0">
+                                                                            <i class="bi bi-link-45deg me-1"></i> Weiterleitung zu Block 
+                                                                            <a href="#node-{{ outcome.next_node_id }}" class="badge bg-success text-decoration-none fs-6 ms-1">#{{ outcome.next_node_id }}</a>
+                                                                        </h6>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <span class="badge bg-secondary rounded-pill">{{ outcome.probability_weight }}% Chance</span>
+                                                            </div>
+                                                            
+                                                            {% if outcome.required_flags or outcome.set_flags %}
+                                                            <div class="mt-3 pt-2 border-top border-secondary border-opacity-10 d-flex gap-3">
+                                                                {% if outcome.required_flags %}
+                                                                    <div>
+                                                                        <span class="text-muted small d-block"><i class="bi bi-lock-fill"></i> Benötigt:</span>
+                                                                        <code class="bg-warning bg-opacity-25 text-dark px-2 py-1 rounded">{{ outcome.required_flags | tojson }}</code>
+                                                                    </div>
+                                                                {% endif %}
+                                                                {% if outcome.set_flags %}
+                                                                    <div>
+                                                                        <span class="text-muted small d-block"><i class="bi bi-unlock-fill"></i> Aktiviert:</span>
+                                                                        <code class="bg-info bg-opacity-25 text-dark px-2 py-1 rounded">{{ outcome.set_flags | tojson }}</code>
+                                                                    </div>
+                                                                {% endif %}
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="ms-4 p-2 bg-warning bg-opacity-10 border border-warning rounded text-warning fw-bold small">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i> Toter Pfad! Bitte Ergebnis hinzufügen.
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="modal fade" id="addOutcomeModal{{ choice.id }}" tabindex="-1">
+                                        <div class="modal-dialog modal-lg">
+                                            <div class="modal-content">
+                                                <form method="POST" action="{{ url_for('admin.add_bpr_outcome', choice_id=choice.id) }}">
+                                                    <div class="modal-header bg-light">
+                                                        <h5 class="modal-title">Baustein verlinken (Ergebnis für "{{ choice.action_text }}")</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="row g-3">
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-bold text-success">Führt zu Block-ID</label>
+                                                                <input type="number" class="form-control border-success" name="next_node_id" placeholder="z.B. 102">
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-bold">Würfel-Chance (%)</label>
+                                                                <input type="number" class="form-control" name="probability" value="100">
+                                                            </div>
+                                                            <div class="col-12 mt-4">
+                                                                <div class="card border-danger bg-danger bg-opacity-10">
+                                                                    <div class="card-body py-2">
+                                                                        <div class="form-check form-switch mb-2">
+                                                                            <input class="form-check-input" type="checkbox" id="fatalCheck{{ choice.id }}" name="is_fatal">
+                                                                            <label class="form-check-label text-danger fw-bold" for="fatalCheck{{ choice.id }}">Ist FATALER FEHLER (Bricht ab)</label>
+                                                                        </div>
+                                                                        <textarea class="form-control border-danger" name="error_feedback" rows="2" placeholder="Feedback Text bei fatalem Fehler..."></textarea>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-12 mt-4">
+                                                                <label class="form-label fw-bold"><i class="bi bi-braces text-primary"></i> Bedingungen & Trigger (JSON)</label>
+                                                                <div class="row">
+                                                                    <div class="col-6">
+                                                                        <label class="form-label small">Wenn-Bedingung (Benötigt)</label>
+                                                                        <input type="text" class="form-control font-monospace json-validate" name="required_flags" placeholder='{"zugang": true}'>
+                                                                    </div>
+                                                                    <div class="col-6">
+                                                                        <label class="form-label small">Dann-Aktion (Aktiviert Flag)</label>
+                                                                        <input type="text" class="form-control font-monospace json-validate" name="set_flags" placeholder='{"ekg_geklebt": true}'>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-top-0">
+                                                        <button type="submit" class="btn btn-primary w-100">Verlinkung speichern</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="addChoiceModal{{ node.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content border-primary">
+                                <form method="POST" action="{{ url_for('admin.add_bpr_choice', node_id=node.id) }}">
+                                    <div class="modal-header bg-primary text-white">
+                                        <h5 class="modal-title">Auswahl an Block #{{ node.id }} andocken</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body p-4">
+                                        <label class="form-label fw-bold">Aktionstext (Button für den Spieler)</label>
+                                        <input type="text" class="form-control form-control-lg" name="action_text" placeholder="z.B. Atropin 0.5mg verabreichen" required>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="submit" class="btn btn-primary w-100">Andocken</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
             </div>
-            {% else %}
-            <div class="alert alert-info">Noch keine Knotenpunkte vorhanden. Klicke oben auf "Neuer Schritt".</div>
-            {% endfor %}
         </div>
 
         <div class="col-lg-4">
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
-                    <h5 class="fw-bold mb-3">Einstellungen</h5>
-                    <form action="{{ url_for('admin.set_bpr_start', scenario_id=scenario.id) }}" method="POST">
-                        <label class="form-label text-muted small">Start-Knoten festlegen</label>
-                        <select name="first_node_id" class="form-select mb-2">
-                            <option value="">-- Bitte wählen --</option>
-                            {% for node in scenario.nodes %}
-                            <option value="{{ node.id }}" {% if scenario.first_node_id == node.id %}selected{% endif %}>
-                                Node #{{ node.id }}
-                            </option>
+            <div class="card shadow-sm border-0 mb-4 sticky-top" style="top: 20px;">
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="bi bi-gear-fill me-2"></i> Szenario Controller
+                </div>
+                <div class="card-body bg-light">
+                    <form method="POST" action="{{ url_for('admin.set_bpr_start', scenario_id=scenario.id) }}">
+                        <label class="form-label fw-bold text-success"><i class="bi bi-play-circle-fill me-1"></i> Start-Baustein festlegen</label>
+                        <select class="form-select mb-2 border-success" name="first_node_id">
+                            <option value="">-- Startpunkt wählen --</option>
+                            {% for n in scenario.nodes %}
+                                <option value="{{ n.id }}" {% if scenario.first_node_id == n.id %}selected{% endif %}>Block #{{ n.id }} ({{ n.status_badge }})</option>
                             {% endfor %}
                         </select>
-                        <button type="submit" class="btn btn-sm btn-primary w-100">Startpunkt speichern</button>
+                        <button class="btn btn-success w-100" type="submit">Speichern</button>
+                    </form>
+                    
+                    <hr class="my-4">
+                    
+                    <h6 class="text-danger fw-bold"><i class="bi bi-exclamation-triangle"></i> Gefahrenzone</h6>
+                    <form method="POST" action="{{ url_for('admin.delete_bpr_scenario', scenario_id=scenario.id) }}" onsubmit="return confirm('Wirklich das komplette Szenario unwiderruflich löschen?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">Szenario komplett löschen</button>
                     </form>
                 </div>
-            </div>
-            
-            <div class="alert alert-warning small">
-                <strong><i class="bi bi-info-circle"></i> Kurzanleitung:</strong><br>
-                1. Erstelle die "Situation" (Node) inkl. Text und Monitor-Werten.<br>
-                2. Füge der Situation "Antwort-Buttons" (Choices) hinzu.<br>
-                3. Weise jedem Button "Ergebnisse" (Outcomes) zu, die festlegen, zu welcher nächsten Situation der Klick führt.
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="addNodeModal">
+<div class="modal fade" id="addNodeModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <form action="{{ url_for('admin.add_bpr_node', scenario_id=scenario.id) }}" method="POST" class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Neuer Knoten (Situation)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Status Badge</label>
-                    <input type="text" name="status_badge" class="form-control" value="Diagnostik" placeholder="z.B. Diagnostik oder SAA 1.1">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('admin.add_bpr_node', scenario_id=scenario.id) }}">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>Neuen Baustein auf die Leinwand legen</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Situations-Text</label>
-                    <textarea name="situation_text" class="form-control" rows="4" placeholder="Beschreibe, was passiert (ohne die Vitalwerte, die kommen unten rein)..." required></textarea>
-                </div>
-                
-                <div class="mb-3 p-3 bg-light rounded border">
-                    <label class="form-label fw-bold small text-primary mb-2"><i class="bi bi-activity"></i> Vitalparameter für Monitor</label>
-                    <div class="row g-2">
-                        <div class="col-md-4"><input type="text" name="vital_hf" class="form-control form-control-sm" placeholder="HF (z.B. 95)"></div>
-                        <div class="col-md-4"><input type="text" name="vital_rr" class="form-control form-control-sm" placeholder="RR (z.B. 120/80)"></div>
-                        <div class="col-md-4"><input type="text" name="vital_spo2" class="form-control form-control-sm" placeholder="SpO2 (z.B. 98)"></div>
-                        <div class="col-md-4"><input type="text" name="vital_af" class="form-control form-control-sm" placeholder="AF (z.B. 14)"></div>
-                        <div class="col-md-4"><input type="text" name="vital_temp" class="form-control form-control-sm" placeholder="Temp (z.B. 37.2)"></div>
-                        <div class="col-md-4"><input type="text" name="vital_bz" class="form-control form-control-sm" placeholder="BZ (z.B. 100)"></div>
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Status Badge</label>
+                            <input type="text" class="form-control" name="status_badge" placeholder="Kurzname (z.B. Schock)">
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label fw-bold">Situationstext</label>
+                            <textarea class="form-control" name="situation_text" rows="3" required placeholder="Was sieht/hört/fühlt der Spieler?"></textarea>
+                        </div>
                     </div>
-                    <div class="form-text small mt-2">Die Werte werden live an den Monitor des Nutzers gesendet. Wenn das Feld leer ist, wird "---" angezeigt.</div>
-                </div>
+                    
+                    <hr>
+                    
+                    <label class="form-label fw-bold mb-3"><i class="bi bi-activity text-danger"></i> Vitalparameter (optional)</label>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light w-25">HF</span>
+                                <input type="text" class="form-control" name="vital_hf" placeholder="z.B. 40">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light w-25">RR</span>
+                                <input type="text" class="form-control" name="vital_rr" placeholder="z.B. 80/40">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light w-25">SpO2</span>
+                                <input type="text" class="form-control" name="vital_spo2" placeholder="z.B. 94">
+                                <span class="input-group-text bg-light">%</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light w-25">AF</span>
+                                <input type="text" class="form-control" name="vital_af" placeholder="z.B. 16">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light w-25">Temp</span>
+                                <input type="text" class="form-control" name="vital_temp" placeholder="z.B. 36.5">
+                                <span class="input-group-text bg-light">°C</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light w-25">BZ</span>
+                                <input type="text" class="form-control" name="vital_bz" placeholder="z.B. 100">
+                            </div>
+                        </div>
+                    </div>
 
-                <div class="form-check form-switch mb-2 mt-3">
-                    <input class="form-check-input" type="checkbox" name="is_endpoint" id="ep">
-                    <label class="form-check-label text-danger" for="ep">Dies ist das Ende des Einsatzes</label>
+                    <hr class="mt-4">
+                    <div class="p-3 bg-light rounded border">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="isEndpoint" name="is_endpoint">
+                            <label class="form-check-label fw-bold" for="isEndpoint">Baustein ist ein ENDPUNKT (Szenario endet hier)</label>
+                        </div>
+                        <div class="form-check form-switch ms-3">
+                            <input class="form-check-input" type="checkbox" id="isSuccess" name="is_success">
+                            <label class="form-check-label text-success fw-bold" for="isSuccess">Endpunkt bedeutet ERFOLG (Leben gerettet)</label>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" name="is_success" id="suc">
-                    <label class="form-check-label text-success" for="suc">Bei Erreichen dieses Endes ist die SAA bestanden (Erfolg)</label>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100 btn-lg">Baustein erstellen</button>
                 </div>
-            </div>
-            <div class="modal-footer"><button type="submit" class="btn btn-success">Speichern</button></div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="addChoiceModal">
-    <div class="modal-dialog">
-        <form id="addChoiceForm" method="POST" class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Neuer Button</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Text auf dem Button (z.B. "Zugang legen")</label>
-                    <input type="text" name="action_text" class="form-control" required>
-                </div>
-            </div>
-            <div class="modal-footer"><button type="submit" class="btn btn-primary">Button anlegen</button></div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="addOutcomeModal">
-    <div class="modal-dialog">
-        <form id="addOutcomeForm" method="POST" class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Ergebnis (Outcome) verknüpfen</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Zu welchem Schritt (Node) führt das?</label>
-                    <select name="next_node_id" class="form-select">
-                        <option value="">-- Abbruch / Fatal Error --</option>
-                        {% for node in scenario.nodes %}
-                        <option value="{{ node.id }}">Node #{{ node.id }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Wahrscheinlichkeit (%)</label>
-                    <input type="number" name="probability" class="form-control" value="100" min="1" max="100">
-                </div>
-                <hr>
-                <div class="mb-3">
-                    <label class="form-label text-info"><i class="bi bi-lock-fill"></i> Benötigte Bedingungen (JSON, Optional)</label>
-                    <input type="text" name="required_flags" class="form-control" placeholder='{"zugang_liegt": true}'>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-success"><i class="bi bi-plus-circle-fill"></i> Flag setzen (JSON, Optional)</label>
-                    <input type="text" name="set_flags" class="form-control" placeholder='{"zugang_liegt": true}'>
-                </div>
-                <hr>
-                <div class="form-check form-switch mb-2">
-                    <input class="form-check-input" type="checkbox" name="is_fatal" id="fatal">
-                    <label class="form-check-label text-danger" for="fatal">Das ist ein tödlicher Fehler (Bricht Einsatz sofort ab)</label>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Feedback bei Fehler</label>
-                    <textarea name="error_feedback" class="form-control" rows="2" placeholder="Falsch! Patient verträgt kein ASS!"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer"><button type="submit" class="btn btn-primary">Outcome speichern</button></div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
 <script>
-    document.getElementById('addChoiceModal').addEventListener('show.bs.modal', function (event) {
-        let button = event.relatedTarget;
-        let nodeId = button.getAttribute('data-node-id');
-        this.querySelector('#addChoiceForm').action = "/admin/bpr/choice/add/" + nodeId;
+document.addEventListener("DOMContentLoaded", function() {
+    const jsonInputs = document.querySelectorAll('.json-validate');
+    jsonInputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            if (this.value.trim() === '') {
+                this.classList.remove('is-invalid');
+                return;
+            }
+            try {
+                JSON.parse(this.value);
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } catch (e) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+                alert("Ungültiges JSON Format. Achte auf doppelte Anführungszeichen! Bsp: {\"zugang\": true}");
+            }
+        });
     });
-    document.getElementById('addOutcomeModal').addEventListener('show.bs.modal', function (event) {
-        let button = event.relatedTarget;
-        let choiceId = button.getAttribute('data-choice-id');
-        this.querySelector('#addOutcomeForm').action = "/admin/bpr/outcome/add/" + choiceId;
-    });
+});
 </script>
 {% endblock %}

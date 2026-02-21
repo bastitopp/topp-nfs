@@ -63,7 +63,7 @@ class User(UserMixin, db.Model):
     streak = db.Column(db.Integer, default=0)
     xp = db.Column(db.Integer, default=0)
     
-    # --- NEU: Zähler für die historische Erfolgsquote ---
+    # --- Zähler für die historische Erfolgsquote ---
     total_reviews = db.Column(db.Integer, default=0)
     correct_reviews = db.Column(db.Integer, default=0)
     
@@ -144,6 +144,7 @@ class Scenario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     dispatch_text = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(100), nullable=True) # NEU hinzugefügt für zukünftige Gruppierung
     first_node_id = db.Column(db.Integer)
     nodes = db.relationship('ScenarioNode', backref='scenario', lazy=True, cascade="all, delete-orphan")
 

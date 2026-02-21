@@ -4,34 +4,29 @@
 <div class="row mb-4 align-items-center">
     <div class="col">
         <h2 class="fw-bold mb-0">
-            <i class="bi bi-diagram-3 text-primary me-2"></i>BPR-Trainer
+            <i class="bi bi-diagram-3 text-primary me-2"></i>BPR / SOP Trainer
         </h2>
-        <p class="text-muted mt-1">Trainiere Standardarbeitsanweisungen und Behandlungspfade in interaktiven Fallbeispielen.</p>
+        <p class="text-muted mt-1">Trainiere Standardarbeitsanweisungen und Behandlungspfade in interaktiven Fallbeispielen. Das Meldebild wird zufällig generiert!</p>
     </div>
 </div>
 
-<div class="row g-4">
+<div class="row g-4 justify-content-center">
     {% if scenarios %}
-        {% for scenario in scenarios %}
-        <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0" style="border-radius: 16px;">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">
-                            <i class="bi bi-ambulance me-1"></i> Einsatz
-                        </span>
-                    </div>
-                    <h5 class="card-title fw-bold">{{ scenario.title }}</h5>
-                    <p class="card-text text-muted small mb-4">
-                        <i class="bi bi-info-circle me-1"></i> Stichwort: <strong>{{ scenario.dispatch_text }}</strong>
-                    </p>
-                    <a href="{{ url_for('learn.bpr_play', scenario_id=scenario.id) }}" class="btn btn-primary w-100 rounded-3 fw-bold">
-                        <i class="bi bi-play-fill me-1"></i> Einsatz starten
-                    </a>
+        <div class="col-md-8 text-center mt-5">
+            <div class="p-5 bg-white shadow-sm rounded-4 border">
+                <div class="display-1 text-primary mb-4">
+                    <i class="bi bi-shuffle"></i>
                 </div>
+                <h3 class="fw-bold mb-3">Zufälliges Einsatzszenario</h3>
+                <p class="text-muted mb-4 text-center mx-auto" style="max-width: 500px;">
+                    Du weißt vorher nicht, welches Meldebild dich erwartet. 
+                    Stelle dich der Herausforderung und teste dein Wissen über die Behandlungsrichtlinien unter strikten, realistischen Bedingungen.
+                </p>
+                <a href="{{ url_for('learn.bpr_random') }}" class="btn btn-primary btn-lg rounded-pill px-5 fw-bold py-3 shadow">
+                    <i class="bi bi-play-fill me-2"></i> Unbekannten Einsatz starten
+                </a>
             </div>
         </div>
-        {% endfor %}
     {% else %}
         <div class="col-12 text-center py-5">
             <div class="display-1 text-muted opacity-25 mb-3">

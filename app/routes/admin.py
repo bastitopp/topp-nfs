@@ -535,8 +535,9 @@ def import_confirm():
 def add_bpr_scenario():
     title = request.form.get('title')
     dispatch = request.form.get('dispatch_text')
+    category = request.form.get('category', 'Allgemein') # NEU
     
-    s = Scenario(title=title, dispatch_text=dispatch)
+    s = Scenario(title=title, dispatch_text=dispatch, category=category)
     db.session.add(s)
     db.session.commit()
     
@@ -661,6 +662,7 @@ def export_bpr():
         s_data = {
             'title': s.title,
             'dispatch_text': s.dispatch_text,
+            'category': s.category, # NEU
             'first_node_id': s.first_node_id,
             'nodes': []
         }
@@ -722,7 +724,8 @@ def import_bpr():
         for s_data in data:
             new_s = Scenario(
                 title=s_data.get('title', 'Importiertes Szenario'),
-                dispatch_text=s_data.get('dispatch_text', 'Unbekanntes Stichwort')
+                dispatch_text=s_data.get('dispatch_text', 'Unbekanntes Stichwort'),
+                category=s_data.get('category', 'Allgemein') # NEU
             )
             db.session.add(new_s)
             db.session.flush()
