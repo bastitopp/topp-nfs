@@ -410,48 +410,32 @@ def bpr_choice(choice_id):
 def api_simulator_ecg():
     preset = request.args.get('preset', 'none')
     
-    # 1. Parameter abrufen
     hr = float(request.args.get('hr', 72))
     qrs_width = float(request.args.get('qrs_width', 0.015))
     st_elevation = float(request.args.get('st_elevation', 0.0))
     potassium = float(request.args.get('potassium', 4.0)) 
-    axis = float(request.args.get('axis', 60.0))          
+    # Standardachse auf 45° (damit aVL einen sichtbaren Ausschlag hat!)
+    axis = float(request.args.get('axis', 45.0))
+    duration = float(request.args.get('duration', 4.0)) 
     
-    # --- PRESET ÜBERSCHREIBUNGEN FÜR PATHOLOGIEN ---
     if preset != 'none':
-        if preset == 'vt':
-            hr = 170
-            qrs_width = 0.045
-            axis = -120 # Überdrehter Linkstyp bei VT
-            st_elevation = 0.0
-        elif preset == 'svt':
-            hr = 180
-            qrs_width = 0.015
-            axis = 60
-            st_elevation = 0.0
-        elif preset == 'av3':
-            hr = 40 # Typischer Kammer-Ersatzrhythmus
-            qrs_width = 0.025 # Meist leicht verbreitert
-            axis = 60
-        elif preset == 'stemi':
-            hr = 85
-            axis = 60
-            st_elevation = 0.5 # ST-Hebung für II und III wird unten verarbeitet
-        elif preset == 'av1':
-            hr = 65
-        elif preset == 'av2':
-            hr = 75 # Entspricht einer Kammerfrequenz von ca. 37 (bei 2:1 Block)
+        if preset == 'vt': hr, qrs_width, axis, st_elevation = 170, 0.045, -120, 0.0
+        elif preset == 'svt': hr, qrs_width, axis, st_elevation = 180, 0.015, 60, 0.0
+        elif preset == 'av3': hr, qrs_width, axis = 40, 0.025, 60
+        elif preset == 'stemi': hr, axis, st_elevation = 85, 60, 0.5
+        elif preset == 'av1': hr = 65
+        elif preset == 'av2_1': hr = 80 # Wenckebach Vorhofrate
+        elif preset == 'av2_2': hr = 80 # Mobitz Vorhofrate
+        elif preset == 'afib': hr, st_elevation = 110, 0.0 
+        elif preset == 'bbb': qrs_width = 0.06 
             
-    duration = 4.0
     fs = 250 
     t = np.linspace(0, duration, int(duration * fs), endpoint=False)
     beat_interval = 60.0 / hr
     
-    # --- BASIS-AMPLITUDEN ---
-    v_p = 0.15; v_q = -0.15; v_r = 1.5; v_s = -0.3; v_t = 0.35
-    
-    # --- KALIUM-EFFEKTE ---
+    v_p, v_q, v_r, v_s, v_t = 0.15, -0.15, 1.5, -0.3, 0.35
     t_amp, t_width, p_amp_current = v_t, 0.04, v_p
+    
     if potassium > 5.0:
         diff = potassium - 5.0
         t_amp = v_t + (diff * 0.4)
@@ -464,116 +448,119 @@ def api_simulator_ecg():
         t_width = 0.06 
         st_elevation -= (diff * 0.15) 
 
-    # --- ZEITPUNKTE BERECHNEN (RHYTHMUS-GENERATOR) ---
+    if preset == 'afib': p_amp_current = 0.0
+
     t_end = duration
-    p_times = []
-    qrs_times = []
+    p_times, qrs_times = [], []
     t_curr = 0.5
     
-    if preset in ['none', 'stemi']:
+    # RHYTHMUS-GENERATOR
+    if preset in ['none', 'stemi', 'bbb']:
         while t_curr < t_end:
             p_times.append(t_curr - 0.16)
             qrs_times.append(t_curr)
             t_curr += beat_interval
+            
+    elif preset == 'afib':
+        while t_curr < t_end:
+            qrs_times.append(t_curr)
+            t_curr += beat_interval * random.uniform(0.7, 1.3)
             
     elif preset == 'av1':
         while t_curr < t_end:
-            p_times.append(t_curr - 0.32) # PQ-Zeit extrem verlängert (>200ms)
+            p_times.append(t_curr - 0.32) # Konstante, aber verlängerte Überleitung
             qrs_times.append(t_curr)
             t_curr += beat_interval
             
-    elif preset == 'av2': # 2:1 Blockade
-        count = 0
-        while t_curr < t_end:
-            p_times.append(t_curr - 0.16)
-            if count % 2 == 0:
-                qrs_times.append(t_curr)
-            t_curr += (60.0 / 80.0) # Vorhofrate = 80 bpm
-            count += 1
-            
-    elif preset == 'av3':
-        # Vorhöfe (85 bpm) und Kammern (40 bpm) schlagen entkoppelt
-        tp = 0.2
+    elif preset == 'av2_1': # Wenckebach (Typ I) - 4:3 Block
+        p_interval = 60.0 / hr
+        tp = 0.5; count = 0
         while tp < t_end:
             p_times.append(tp)
-            tp += (60.0 / 85.0) 
+            if count % 4 != 3: # Jeder 4. Schlag fällt aus
+                pr_time = 0.16 + (count % 4) * 0.08 # PQ wird immer länger
+                qrs_times.append(tp + pr_time)
+            tp += p_interval; count += 1
+
+    elif preset == 'av2_2': # Mobitz (Typ II) - 2:1 Block
+        p_interval = 60.0 / hr
+        tp = 0.5; count = 0
+        while tp < t_end:
+            p_times.append(tp)
+            if count % 2 == 0: # Jeder 2. Schlag fällt aus, PQ konstant
+                qrs_times.append(tp + 0.16)
+            tp += p_interval; count += 1
+            
+    elif preset == 'av3':
+        tp = 0.2
+        while tp < t_end: p_times.append(tp); tp += (60.0 / 85.0) 
         tq = 0.5
-        while tq < t_end:
-            qrs_times.append(tq)
-            tq += beat_interval 
+        while tq < t_end: qrs_times.append(tq); tq += beat_interval 
             
-    elif preset == 'vt':
+    elif preset in ['vt', 'svt']:
         while t_curr < t_end:
-            qrs_times.append(t_curr) # P-Wellen fehlen komplett
-            t_curr += beat_interval
-            
-    elif preset == 'svt':
-        while t_curr < t_end:
-            qrs_times.append(t_curr) # P-Wellen fallen in die T-Welle/fehlen
+            qrs_times.append(t_curr)
             t_curr += beat_interval
 
-    # --- VEKTOR-PROJEKTION UND ZEICHNEN ---
+    # ZEICHNEN
     axis_rad = np.radians(axis)
-    def project(amp, angle_rad, lead_angle_deg):
-        return amp * np.cos(angle_rad - np.radians(lead_angle_deg))
+    def project(amp, angle_rad, lead_angle_deg): return amp * np.cos(angle_rad - np.radians(lead_angle_deg))
 
     leads = {'I': np.zeros_like(t), 'II': np.zeros_like(t), 'III': np.zeros_like(t)}
     lead_angles = {'I': 0, 'II': 60, 'III': 120} 
     
     for name, angle in lead_angles.items():
-        p_amp = project(p_amp_current, axis_rad, angle)
-        q_amp = project(v_q, axis_rad, angle)
-        r_amp = project(v_r, axis_rad, angle)
-        s_amp = project(v_s, axis_rad, angle)
-        t_amp_proj = project(t_amp, axis_rad, angle)
-        
-        p_params = [(p_amp, 0.0, 0.02)]
+        p_params = [(project(p_amp_current, axis_rad, angle), 0.0, 0.02)]
         qrs_t_params = [
-            (q_amp, -0.04, 0.01),
-            (r_amp, 0.0, qrs_width),
-            (s_amp, 0.04, qrs_width),
-            (t_amp_proj, 0.28, t_width) 
+            (project(v_q, axis_rad, angle), -0.04, 0.01),
+            (project(v_r, axis_rad, angle), 0.0, qrs_width),
+            (project(v_s, axis_rad, angle), 0.04, qrs_width),
+            (project(t_amp, axis_rad, angle), 0.28, t_width) 
         ]
         
         ecg = leads[name]
-        
-        # P-Wellen zeichnen
         for pt in p_times:
-            for amp, offset, width in p_params:
-                ecg += amp * np.exp(-((t - (pt + offset)) ** 2) / (2 * width ** 2))
+            for amp, offset, width in p_params: ecg += amp * np.exp(-((t - (pt + offset)) ** 2) / (2 * width ** 2))
                 
-        # QRS-Komplexe und T-Wellen zeichnen
         for qt in qrs_times:
-            for amp, offset, width in qrs_t_params:
-                ecg += amp * np.exp(-((t - (qt + offset)) ** 2) / (2 * width ** 2))
+            for amp, offset, width in qrs_t_params: ecg += amp * np.exp(-((t - (qt + offset)) ** 2) / (2 * width ** 2))
                 
-            # Pathologische ST-Hebungen (STEMI Logik für Hinterwand)
             st_val = st_elevation
             if preset == 'stemi':
-                if name in ['II', 'III']: st_val = 0.5     # Hebung inferior
-                elif name == 'I': st_val = -0.2            # Reziproke Senkung
+                if name in ['II', 'III']: st_val = 0.5     
+                elif name == 'I': st_val = -0.2            
                 
             if st_val != 0:
-                st_start = qt + 0.06
-                st_end = qt + 0.20
+                st_start, st_end = qt + 0.06, qt + 0.20
                 mask = (t > st_start) & (t < st_end)
                 ecg[mask] += st_val * np.sin(np.pi * (t[mask] - st_start) / (st_end - st_start))
 
-        # Rauschen
-        ecg += 0.02 * np.sin(2 * np.pi * 0.2 * t)
+        if preset == 'afib': ecg += 0.05 * np.sin(2 * np.pi * 5.0 * t)
+        else: ecg += 0.02 * np.sin(2 * np.pi * 0.2 * t)
+            
         leads[name] = ecg.tolist()
         
+    # 12-Kanal Berechnung
+    aVR = -(np.array(leads['I']) + np.array(leads['II'])) / 2
+    aVL = (np.array(leads['I']) - np.array(leads['III'])) / 2
+    aVF = (np.array(leads['II']) + np.array(leads['III'])) / 2
+    
+    v1 = np.array(leads['III']) * 0.8 - np.array(leads['I']) * 0.5
+    v2 = np.array(leads['III']) * 0.5 - np.array(leads['I']) * 0.2
+    v3 = np.array(leads['II']) * 0.5
+    v4 = np.array(leads['II']) * 0.8
+    v5 = np.array(leads['I']) * 0.8 + np.array(leads['II']) * 0.2
+    v6 = np.array(leads['I']) * 0.9
+
     return jsonify({
         'time': t.tolist(),
-        'lead_I': leads['I'],
-        'lead_II': leads['II'],
-        'lead_III': leads['III'],
+        'lead_I': leads['I'], 'lead_II': leads['II'], 'lead_III': leads['III'],
+        'aVR': aVR.tolist(), 'aVL': aVL.tolist(), 'aVF': aVF.tolist(),
+        'V1': v1.tolist(), 'V2': v2.tolist(), 'V3': v3.tolist(),
+        'V4': v4.tolist(), 'V5': v5.tolist(), 'V6': v6.tolist(),
         'metadata': {
-            'hr': int(hr),
-            'axis': int(axis),
-            'potassium': round(potassium, 1),
-            'qrs_width': round(qrs_width, 3),
-            'st_elevation': round(st_elevation, 1),
+            'hr': int(hr), 'axis': int(axis), 'potassium': round(potassium, 1),
+            'qrs_width': round(qrs_width, 3), 'st_elevation': round(st_elevation, 1),
             'preset': preset
         }
     })

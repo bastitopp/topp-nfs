@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container mt-4 mb-5">
     <h2>Interaktiver EKG-Simulator</h2>
-    <p>Wähle ein Krankheitsbild oder verändere die Parameter manuell.</p>
+    <p>Wähle ein Krankheitsbild, die Kanal-Anzahl oder den Live-Monitor.</p>
 
     <div class="row g-4">
         <div class="col-lg-4">
@@ -11,39 +11,62 @@
             <div class="card p-3 shadow-sm border-0 bg-primary bg-opacity-10 mb-3">
                 <label for="presetSelect" class="form-label fw-bold text-primary mb-1"><i class="bi bi-file-medical-fill me-2"></i>Krankheitsbild laden:</label>
                 <select id="presetSelect" class="form-select border-primary shadow-sm" onchange="updateEKG()">
-                    <option value="none">Keines (Manuelle Kontrolle)</option>
+                    <option value="none">Manuelle Kontrolle / Sinusrhythmus</option>
                     <option value="av1">AV-Block I. Grades</option>
-                    <option value="av2">AV-Block II. Grades (2:1 Block)</option>
-                    <option value="av3">AV-Block III. Grades (komplette Dissoziation)</option>
+                    <option value="av2_1">AV-Block II. Grades (Typ Wenckebach)</option>
+                    <option value="av2_2">AV-Block II. Grades (Typ Mobitz, 2:1)</option>
+                    <option value="av3">AV-Block III. Grades (Dissoziation)</option>
                     <option value="stemi">STEMI (Hinterwand-Infarkt II, III)</option>
                     <option value="vt">Ventrikuläre Tachykardie (VT)</option>
                     <option value="svt">Supraventrikuläre Tachykardie (SVT)</option>
+                    <option value="afib">Vorhofflimmern (Absolute Arrhythmie)</option>
+                    <option value="bbb">Schenkelblock (verbreiterter QRS)</option>
                 </select>
+                
+                <div class="mt-3 p-3 bg-white rounded border border-primary small shadow-sm">
+                    <strong class="text-primary fs-6"><i class="bi bi-info-circle"></i> EKG-Befund & Erklärung:</strong>
+                    <hr class="mt-1 mb-2 text-primary">
+                    <div id="explanationText" class="text-dark">Lade ein Krankheitsbild für Erklärungen.</div>
+                </div>
             </div>
 
-            <div class="card p-3 shadow-sm border-0">
+            <div class="card p-3 shadow-sm border-0 bg-success bg-opacity-10 mb-3">
+                <label class="form-label fw-bold text-success mb-1"><i class="bi bi-display me-2"></i>Darstellung:</label>
+                <select id="channelSelect" class="form-select border-success shadow-sm mb-2" onchange="updateEKG()">
+                    <option value="3">3-Kanal (Einthoven)</option>
+                    <option value="6">6-Kanal (Einthoven + Goldberger)</option>
+                    <option value="12" selected>12-Kanal EKG</option>
+                </select>
+                
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="monitorToggle" onchange="updateEKG()">
+                    <label class="form-check-label fw-bold small text-dark" for="monitorToggle">Laufender Monitor (Darkmode)</label>
+                </div>
+            </div>
+
+<div class="card p-3 shadow-sm border-0">
                 <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">Manuelle Parameter</h5>
                 
                 <label for="hrSlider" class="form-label fw-bold small">Herzfrequenz: <span class="text-primary" id="hrVal">72</span> BPM</label>
-                <input type="range" class="form-range" id="hrSlider" min="30" max="220" value="72" oninput="forceManual(); updateEKG()">
+                <input type="range" class="form-range" id="hrSlider" min="30" max="220" value="72" oninput="onSliderInput()">
 
                 <label for="axisSlider" class="form-label fw-bold small mt-3">Lagetyp (Herzachse): <span class="text-primary" id="axisVal">Normtyp</span></label>
-                <input type="range" class="form-range" id="axisSlider" min="-90" max="180" step="15" value="60" oninput="forceManual(); updateEKG()">
-                <div class="text-muted" style="font-size: 0.75rem;" id="axisDegVal">60° (Normal)</div>
+                <input type="range" class="form-range" id="axisSlider" min="-90" max="180" step="15" value="45" oninput="onSliderInput()">
+                <div class="text-muted" style="font-size: 0.75rem;" id="axisDegVal">45° (Normal)</div>
 
                 <label for="potassiumSlider" class="form-label fw-bold small mt-4">Kaliumspiegel: <span class="text-danger" id="potassiumVal">4.0</span> mmol/L</label>
-                <input type="range" class="form-range" id="potassiumSlider" min="2.0" max="8.0" step="0.1" value="4.0" oninput="forceManual(); updateEKG()">
+                <input type="range" class="form-range" id="potassiumSlider" min="2.0" max="8.0" step="0.1" value="4.0" oninput="onSliderInput()">
 
                 <label for="qrsSlider" class="form-label fw-bold small mt-3">QRS-Breite: <span class="text-danger" id="qrsVal">Normal</span></label>
-                <input type="range" class="form-range" id="qrsSlider" min="0.01" max="0.06" step="0.005" value="0.015" oninput="forceManual(); updateEKG()">
+                <input type="range" class="form-range" id="qrsSlider" min="0.01" max="0.06" step="0.005" value="0.015" oninput="onSliderInput()">
                 
                 <label for="stSlider" class="form-label fw-bold small mt-3">ST-Strecke: <span class="text-danger" id="stVal">0.0 mV</span></label>
-                <input type="range" class="form-range" id="stSlider" min="-0.5" max="1.0" step="0.1" value="0.0" oninput="forceManual(); updateEKG()">
+                <input type="range" class="form-range" id="stSlider" min="-0.5" max="1.0" step="0.1" value="0.0" oninput="onSliderInput()">
             </div>
         </div>
 
         <div class="col-lg-8">
-            <div class="card p-1 shadow-sm border-0">
+            <div class="card shadow-sm border-0" id="graphCard">
                 <div id="ecgGraph" style="width:100%; height:750px;"></div>
             </div>
         </div>
@@ -52,6 +75,21 @@
 
 <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
 <script>
+    let animationId = null;
+    let debounceTimer = null; // NEU: Timer für Debouncing
+    
+    const explanations = {
+        'av1': '<b>AV-Block I. Grades.</b> Überleitung vom Vorhof zur Kammer ist verzögert. Die PQ-Zeit ist konstant verlängert (>200ms), es fällt aber kein Schlag aus.',
+        'av2_1': '<b>AV-Block II. Grades (Wenckebach).</b> Die PQ-Zeit wird von Schlag zu Schlag immer länger, bis schließlich ein QRS-Komplex komplett ausfällt. Danach beginnt der Zyklus von vorn.',
+        'av2_2': '<b>AV-Block II. Grades (Mobitz).</b> Sehr gefährlich! Plötzlicher Ausfall eines QRS-Komplexes (oft im 2:1 oder 3:1 Rhythmus) bei ansonsten völlig konstanter PQ-Zeit. Schrittmacher-Indikation!',
+        'av3': '<b>AV-Block III. Grades.</b> Komplette AV-Dissoziation. Vorhöfe und Kammern schlagen völlig unabhängig voneinander. Meist langsamer, breiter Kammer-Ersatzrhythmus.',
+        'stemi': '<b>ST-Hebungs-Infarkt (STEMI).</b> Typische pathologische ST-Hebungen (hier inferior in II, III, aVF) als Zeichen eines akuten myokardialen Sauerstoffmangels.',
+        'vt': '<b>Ventrikuläre Tachykardie (VT).</b> Lebensbedrohlich! Schnelle, breite und deformierte Kammerkomplexe ohne erkennbare P-Wellen.',
+        'svt': '<b>Supraventrikuläre Tachykardie (SVT).</b> Sehr schneller, regelmäßiger Rhythmus mit schmalen QRS-Komplexen. P-Wellen sind oft in der T-Welle der Voraktion verborgen.',
+        'afib': '<b>Vorhofflimmern.</b> Absolute Arrhythmie: Völlig unregelmäßige RR-Abstände und keine sichtbaren P-Wellen (stattdessen leichtes Flimmern auf der Nulllinie).',
+        'bbb': '<b>Schenkelblock.</b> Leitungsverzögerung im Tawara-Schenkel-System. Führt zu einem verbreiterten und oft deformierten QRS-Komplex (> 0,12s).'
+    };
+
     function getAxisName(degrees) {
         if (degrees < -30) return "Überdrehter Linkstyp";
         if (degrees <= 30) return "Linkstyp";
@@ -61,9 +99,27 @@
         return "Überdrehter Rechtstyp";
     }
 
-    // Wechselt auf "Manuell", sobald der Nutzer einen Slider berührt
-    function forceManual() {
+    // NEU: Diese Funktion verarbeitet die Slider-Eingaben flüssig
+    function onSliderInput() {
         document.getElementById('presetSelect').value = 'none';
+        
+        // Zahlenwerte sofort im HTML aktualisieren, damit es sich flüssig anfühlt
+        document.getElementById('hrVal').innerText = document.getElementById('hrSlider').value;
+        document.getElementById('axisVal').innerText = getAxisName(document.getElementById('axisSlider').value);
+        document.getElementById('axisDegVal').innerText = document.getElementById('axisSlider').value + "°";
+        document.getElementById('potassiumVal').innerText = parseFloat(document.getElementById('potassiumSlider').value).toFixed(1);
+        
+        let qrs = parseFloat(document.getElementById('qrsSlider').value);
+        document.getElementById('qrsVal').innerText = qrs > 0.025 ? "Verbreitert" : "Normal";
+        
+        let st = parseFloat(document.getElementById('stSlider').value);
+        document.getElementById('stVal').innerText = (st > 0 ? "+" : "") + st.toFixed(1) + " mV";
+
+        // Debouncing: 50ms warten, ob der Nutzer noch zieht, bevor das Backend gefragt wird
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            updateEKG();
+        }, 50);
     }
 
     function updateEKG() {
@@ -73,58 +129,190 @@
         const k = document.getElementById('potassiumSlider').value;
         const qrs = document.getElementById('qrsSlider').value;
         const st = document.getElementById('stSlider').value;
+        
+        const channels = parseInt(document.getElementById('channelSelect').value);
+        const isMonitor = document.getElementById('monitorToggle').checked;
+        
+        if (preset === 'none') {
+            let hrNum = parseInt(hr);
+            let axisNum = parseInt(axis);
+            let kNum = parseFloat(k);
+            let qrsNum = parseFloat(qrs);
+            let stNum = parseFloat(st);
 
-        fetch(`/api/simulator/ecg?preset=${preset}&hr=${hr}&axis=${axis}&potassium=${k}&qrs_width=${qrs}&st_elevation=${st}`)
+            let exp = '<ul class="mb-0 ps-3" style="line-height: 1.6;">';
+            if (hrNum < 60) exp += '<li><b>Frequenz:</b> <span class="text-danger">Bradykardie</span> (' + hrNum + ' bpm) – verlangsamter Rhythmus.</li>';
+            else if (hrNum > 100) exp += '<li><b>Frequenz:</b> <span class="text-danger">Tachykardie</span> (' + hrNum + ' bpm) – beschleunigter Rhythmus.</li>';
+            else exp += '<li><b>Frequenz:</b> Normofrequent (' + hrNum + ' bpm).</li>';
+
+            let axisText = getAxisName(axisNum) + ' (' + axisNum + '°)';
+            exp += '<li><b>Lagetyp:</b> ' + axisText + '. ';
+            if (axisNum === 60) {
+                exp += '<br><small class="text-muted border-start border-3 border-info ps-2 mt-1 mb-1 d-block"><i><b>Info zu aVL:</b> Da der Herzvektor bei exakt 60° im perfekten 90°-Winkel zur Ableitung aVL (-30°) steht, zeigt aVL hier physikalisch völlig korrekt eine Nulllinie!</i></small>';
+            }
+            exp += '</li>';
+
+            if (kNum > 5.0) exp += '<li><b>Kalium:</b> <span class="text-danger">Hyperkaliämie</span> – Erzeugt typischerweise spitze, überhöhte T-Wellen und kann den QRS-Komplex verbreitern.</li>';
+            else if (kNum < 3.5) exp += '<li><b>Kalium:</b> <span class="text-danger">Hypokaliämie</span> – Führt oft zu stark abgeflachten T-Wellen.</li>';
+            else exp += '<li><b>Kalium:</b> Normbereich (' + kNum.toFixed(1) + ' mmol/L).</li>';
+
+            if (qrsNum > 0.025) exp += '<li><b>QRS-Morphologie:</b> <span class="text-danger">Verbreitert</span> – Dies ist typisch für Blockaden (Schenkelblock) oder einen Ursprung in der Herzkammer (ventrikulär).</li>';
+            if (stNum >= 0.1) exp += '<li><b>ST-Strecke:</b> <span class="text-danger">ST-Hebung</span> – Ein dringender Verdacht auf einen akuten Herzinfarkt (STEMI).</li>';
+            else if (stNum <= -0.1) exp += '<li><b>ST-Strecke:</b> <span class="text-danger">ST-Senkung</span> – Kann ein Zeichen für Ischämie (Sauerstoffmangel) sein.</li>';
+
+            exp += '</ul>';
+            document.getElementById('explanationText').innerHTML = exp;
+            
+        } else if (explanations[preset]) {
+            document.getElementById('explanationText').innerHTML = explanations[preset];
+        }
+
+        const duration = isMonitor ? 20.0 : 4.0;
+
+        fetch(`/api/simulator/ecg?preset=${preset}&hr=${hr}&axis=${axis}&potassium=${k}&qrs_width=${qrs}&st_elevation=${st}&duration=${duration}`)
             .then(response => response.json())
             .then(data => {
                 
-                // Metadaten vom Backend verarbeiten (damit die Slider und Zahlen den echten, vom Preset erzwungenen Werten entsprechen)
                 const meta = data.metadata;
-                document.getElementById('hrVal').innerText = meta.hr;
-                document.getElementById('hrSlider').value = meta.hr;
                 
-                document.getElementById('axisVal').innerText = getAxisName(meta.axis);
-                document.getElementById('axisDegVal').innerText = meta.axis + "°";
-                document.getElementById('axisSlider').value = meta.axis;
-                
-                document.getElementById('potassiumVal').innerText = meta.potassium.toFixed(1);
-                
-                document.getElementById('qrsVal').innerText = meta.qrs_width > 0.025 ? "Verbreitert" : "Normal";
-                document.getElementById('qrsSlider').value = meta.qrs_width;
-                
-                document.getElementById('stVal').innerText = (meta.st_elevation > 0 ? "+" : "") + meta.st_elevation.toFixed(1) + " mV";
-                document.getElementById('stSlider').value = meta.st_elevation;
+                // GANZ WICHTIGER FIX: Wir überschreiben die Slider-Werte NUR, 
+                // wenn ein festes Preset geladen wird. Wenn wir im manuellen Modus sind, 
+                // darf die asynchrone Backend-Antwort den Slider nicht mehr zurückschnappen lassen!
+                if (preset !== 'none') {
+                    document.getElementById('hrVal').innerText = meta.hr;
+                    document.getElementById('hrSlider').value = meta.hr;
+                    document.getElementById('axisVal').innerText = getAxisName(meta.axis);
+                    document.getElementById('axisDegVal').innerText = meta.axis + "°";
+                    document.getElementById('axisSlider').value = meta.axis;
+                    document.getElementById('potassiumVal').innerText = meta.potassium.toFixed(1);
+                    document.getElementById('potassiumSlider').value = meta.potassium;
+                    document.getElementById('qrsVal').innerText = meta.qrs_width > 0.025 ? "Verbreitert" : "Normal";
+                    document.getElementById('qrsSlider').value = meta.qrs_width;
+                    document.getElementById('stVal').innerText = (meta.st_elevation > 0 ? "+" : "") + meta.st_elevation.toFixed(1) + " mV";
+                    document.getElementById('stSlider').value = meta.st_elevation;
+                }
 
-                // BUGFIX: Die 3 Ableitungen den korrekten Achsen (xaxis/yaxis) zuweisen!
-                const trace1 = { x: data.time, y: data.lead_I, type: 'scatter', mode: 'lines', line: {color: 'black', width: 1.5}, name: 'I', xaxis: 'x', yaxis: 'y' };
-                const trace2 = { x: data.time, y: data.lead_II, type: 'scatter', mode: 'lines', line: {color: 'black', width: 1.5}, name: 'II', xaxis: 'x2', yaxis: 'y2' };
-                const trace3 = { x: data.time, y: data.lead_III, type: 'scatter', mode: 'lines', line: {color: 'black', width: 1.5}, name: 'III', xaxis: 'x3', yaxis: 'y3' };
+                let traces = [];
+                let leadKeys = [];
+                let cols = 1; let rows = 3;
 
-                const layout = {
-                    title: { text: 'Einthoven (Vorschub: 25 mm/s, Eichung: 10 mm/mV)', font: {size: 14} },
-                    plot_bgcolor: '#fff5f5',
-                    margin: {l: 50, r: 20, t: 40, b: 40},
+                if (channels === 3) {
+                    leadKeys = ['lead_I', 'lead_II', 'lead_III'];
+                    cols = 1; rows = 3;
+                } else if (channels === 6) {
+                    leadKeys = ['lead_I', 'aVR', 'lead_II', 'aVL', 'lead_III', 'aVF'];
+                    cols = 2; rows = 3;
+                } else if (channels === 12) {
+                    leadKeys = [
+                        'lead_I', 'aVR', 'V1', 'V4',
+                        'lead_II', 'aVL', 'V2', 'V5',
+                        'lead_III', 'aVF', 'V3', 'V6'
+                    ];
+                    cols = 4; rows = 3; 
+                }
+                
+                const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                
+                let bgColor, gridColor, lineColor, textColor, titleColor;
+
+                if (isMonitor) {
+                    bgColor = isDarkMode ? '#050505' : '#212529'; 
+                    gridColor = isDarkMode ? '#0a250a' : '#1e3d1e';
+                    lineColor = '#00ff41'; 
+                    textColor = '#00ff41';
+                    titleColor = '#00ff41';
+                } else {
+                    bgColor = isDarkMode ? '#2b3035' : '#fff5f5'; 
+                    gridColor = isDarkMode ? '#5c3a3a' : '#ffcccc'; 
+                    lineColor = isDarkMode ? '#ffffff' : '#1a1a1a'; 
+                    textColor = isDarkMode ? '#9ec5fe' : '#0056b3';
+                    titleColor = isDarkMode ? '#ffffff' : '#000000';
+                }
+
+                document.getElementById('graphCard').style.backgroundColor = bgColor;
+
+                let layout = {
+                    title: { text: isMonitor ? 'Laufendes EKG (Monitor)' : 'Ruhe-EKG (25 mm/s, 10 mm/mV)', font: {size: 14, color: titleColor} },
+                    plot_bgcolor: bgColor,
+                    paper_bgcolor: bgColor,
+                    margin: {l: 10, r: 10, t: 40, b: 10},
                     showlegend: false,
-                    grid: {rows: 3, columns: 1, pattern: 'independent'}, // 3 Reihen untereinander
-                    
-                    // Ableitung I
-                    xaxis:  { dtick: 0.2, gridcolor: '#ffcccc', zeroline: false, showticklabels: false },
-                    yaxis:  { title: 'I (mV)', range: [-2, 2.5], dtick: 0.5, gridcolor: '#ffcccc' },
-                    
-                    // Ableitung II
-                    xaxis2: { dtick: 0.2, gridcolor: '#ffcccc', zeroline: false, showticklabels: false },
-                    yaxis2: { title: 'II (mV)', range: [-2, 2.5], dtick: 0.5, gridcolor: '#ffcccc' },
-                    
-                    // Ableitung III
-                    xaxis3: { title: 'Zeit (s)', dtick: 0.2, gridcolor: '#ffcccc', zeroline: false },
-                    yaxis3: { title: 'III (mV)', range: [-2, 2.5], dtick: 0.5, gridcolor: '#ffcccc' }
+                    grid: {rows: rows, columns: cols, pattern: 'independent'},
+                    annotations: []
                 };
 
-                Plotly.react('ecgGraph', [trace1, trace2, trace3], layout, {staticPlot: false, displayModeBar: false});
+                leadKeys.forEach((key, index) => {
+                    let xName = index === 0 ? 'x' : 'x' + (index + 1);
+                    let yName = index === 0 ? 'y' : 'y' + (index + 1);
+                    let displayName = key.replace('lead_', ''); 
+
+                    traces.push({
+                        x: data.time, 
+                        y: data[key], 
+                        type: 'scattergl', 
+                        mode: 'lines', 
+                        line: {color: lineColor, width: 1.5},
+                        name: displayName, 
+                        xaxis: xName, 
+                        yaxis: yName,
+                        hoverinfo: 'none' 
+                    });
+
+                    let windowEnd = isMonitor ? 3.0 : 4.0;
+
+                    layout['xaxis' + (index === 0 ? '' : (index + 1))] = { 
+                        dtick: 0.2, gridcolor: gridColor, zeroline: false, showticklabels: false,
+                        range: [0, windowEnd]
+                    };
+                    
+                    layout['yaxis' + (index === 0 ? '' : (index + 1))] = { 
+                        range: [-2.5, 2.5], dtick: 0.5, gridcolor: gridColor, zeroline: false, showticklabels: false 
+                    };
+
+                    layout.annotations.push({
+                        xref: xName + ' domain',
+                        yref: yName + ' domain',
+                        x: 0.02, y: 0.90, 
+                        text: '<b>' + displayName + '</b>',
+                        showarrow: false,
+                        font: {size: 14, color: textColor},
+                        xanchor: 'left'
+                    });
+                });
+
+                Plotly.react('ecgGraph', traces, layout, {staticPlot: false, displayModeBar: false});
+
+                if (animationId) cancelAnimationFrame(animationId);
+                
+                if (isMonitor) {
+                    let t = 0;
+                    let windowSize = 3.0;
+                    let lastTime = performance.now();
+                    
+                    function step(timestamp) {
+                        if (!document.getElementById('monitorToggle').checked) return;
+                        
+                        let dt = timestamp - lastTime;
+                        if (dt > 30) { 
+                            t += (dt / 1000.0) * 0.5; 
+                            if (t + windowSize >= duration) t = 0;
+                            
+                            let updateLayout = {};
+                            for(let i=1; i<=leadKeys.length; i++) {
+                                let ax = i === 1 ? 'xaxis' : 'xaxis' + i;
+                                updateLayout[ax + '.range'] = [t, t + windowSize];
+                            }
+                            Plotly.relayout('ecgGraph', updateLayout);
+                            lastTime = timestamp;
+                        }
+                        animationId = requestAnimationFrame(step);
+                    }
+                    animationId = requestAnimationFrame(step);
+                }
             });
     }
 
-    // Direkt beim Start laden
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateEKG);
     window.onload = updateEKG;
 </script>
 {% endblock %}
