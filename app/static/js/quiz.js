@@ -154,12 +154,16 @@ function initAnatomyMulti() {
                 
                 // 1. Prüfen, ob der Punkt 1 oder 2 Labels benötigt
                 this.setAttribute('data-solved-' + type, '1');
+                this.setAttribute('data-assigned-' + type, selectedVal); // Wert speichern
                 
                 let needsDe = this.getAttribute('data-de') && this.getAttribute('data-de') !== '-' && this.getAttribute('data-de') !== '%';
                 let needsLat = this.getAttribute('data-lat') && this.getAttribute('data-lat') !== '-' && this.getAttribute('data-lat') !== '%';
                 
                 let solvedDe = this.getAttribute('data-solved-de') === '1';
                 let solvedLat = this.getAttribute('data-solved-lat') === '1';
+                
+                let assignedDe = this.getAttribute('data-assigned-de');
+                let assignedLat = this.getAttribute('data-assigned-lat');
                 
                 // Ist ALLES da, was der Punkt verlangt?
                 let isFullySolved = (!needsDe || solvedDe) && (!needsLat || solvedLat);
@@ -171,10 +175,15 @@ function initAnatomyMulti() {
                     this.classList.add('partially-solved');
                 }
                 
-                // Fragezeichen durch ID-Nummer ersetzen
-                let icon = this.querySelector('i.bi-question');
-                if(icon) icon.remove();
-                this.innerHTML = `<span class="fw-bold" style="font-size: 0.9rem;">${id}</span>`;
+                // Bezeichnungen direkt auf dem Punkt anzeigen (mit Sprachhinweis, ohne Umbruch, untereinander)
+                let labelHtml = '';
+                if (assignedDe) {
+                    labelHtml += `<div class="fw-bold" style="white-space: nowrap; line-height: 1.2;">${assignedDe} <span style="font-weight: normal; font-size: 0.85em; opacity: 0.9;">(DE)</span></div>`;
+                }
+                if (assignedLat) {
+                    labelHtml += `<div style="white-space: nowrap; line-height: 1.2; font-size: 0.9em;">${assignedLat} <span style="font-size: 0.85em; opacity: 0.9;">(LAT)</span></div>`;
+                }
+                this.innerHTML = labelHtml;
                 
                 // Button aus der Liste entfernen
                 selectedLabel.style.visibility = 'hidden';
