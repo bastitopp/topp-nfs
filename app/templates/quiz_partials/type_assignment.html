@@ -1,0 +1,54 @@
+{% if feedback %}
+    <div class="row g-3">
+        {% for gr in assignment_results %}
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm border-{{ 'success' if gr.missing|length == 0 and (gr.group_items | selectattr('correct', 'equalto', false) | list | length == 0) else 'danger' }}">
+                <div class="card-header bg-{{ 'success' if gr.missing|length == 0 and (gr.group_items | selectattr('correct', 'equalto', false) | list | length == 0) else 'danger' }} text-white fw-bold text-break">
+                    {{ gr.name }}
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 d-flex flex-column gap-2">
+                        {% for item in gr.group_items %}
+                            {% if item.correct %}
+                                <li class="text-success fw-bold text-break"><i class="bi bi-check-lg me-2"></i>{{ item.text }}</li>
+                            {% else %}
+                                <li class="text-danger text-decoration-line-through text-break"><i class="bi bi-x-lg me-2"></i>{{ item.text }}</li>
+                            {% endif %}
+                        {% endfor %}
+                        {% for m in gr.missing %}
+                            <li class="text-primary fw-bold bg-primary bg-opacity-10 p-2 rounded text-break"><i class="bi bi-arrow-right-short me-1"></i>Fehlt: {{ m }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <input type="hidden" name="assignment_json" id="assignment_json_input">
+    
+    <div class="card bg-light border-0 shadow-sm mb-4">
+        <div class="card-body p-2 p-sm-3">
+            <div class="small fw-bold text-muted mb-2 text-uppercase letter-spacing-1">Begriffe (hierher ziehen)</div>
+            <div id="assignment_pool" class="d-flex flex-wrap gap-2 p-2 min-vh-10 border border-dashed rounded bg-white" style="min-height: 80px;">
+                {% for item in pool_items %}
+                <div class="badge bg-primary fs-6 fw-normal cursor-grab shadow-sm border p-2 text-wrap text-break lh-base text-start">{{ item.val }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        {% for gr in options %}
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm border">
+                <div class="card-header bg-white fw-bold text-center border-bottom-0 pt-3 text-break">{{ gr.name }}</div>
+                <div class="card-body px-2 pb-2 pt-0">
+                    <div class="assignment-dropzone p-2 rounded bg-adaptive h-100 d-flex flex-column gap-2" data-group="{{ gr.name }}" style="min-height: 120px; border: 2px dashed var(--bs-border-color);"></div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Lösung prüfen</button>
+{% endif %}

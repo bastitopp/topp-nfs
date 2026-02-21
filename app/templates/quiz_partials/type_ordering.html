@@ -1,0 +1,33 @@
+{% if feedback %}
+    <div class="row g-4">
+        <div class="col-md-6">
+            <h6 class="fw-bold text-muted mb-3"><i class="bi bi-x-circle text-danger me-2"></i>Deine Reihenfolge</h6>
+            <ol class="list-group list-group-numbered shadow-sm">
+                {% set user_order = request.form.get('order_json') | from_json %}
+                {% for item in user_order %}
+                    <li class="list-group-item bg-light text-muted text-break">{{ item }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+        <div class="col-md-6">
+            <h6 class="fw-bold text-success mb-3"><i class="bi bi-check-circle-fill me-2"></i>Richtige Reihenfolge</h6>
+            <ol class="list-group list-group-numbered shadow-sm border-success">
+                {% for item in correct_order %}
+                    <li class="list-group-item list-group-item-success fw-bold border-success text-break">{{ item }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+{% else %}
+    <input type="hidden" name="order_json" id="order_json_input">
+    <p class="text-muted small mb-3"><i class="bi bi-arrows-move me-1"></i> Ziehe die Elemente in die richtige Reihenfolge.</p>
+    <ul class="list-group sortable-list shadow-sm mb-4" id="sortable_list">
+        {% set shuffled = options | list %}
+        {% for item in shuffled %}
+        <li class="list-group-item cursor-grab bg-adaptive border d-flex align-items-center p-2 p-sm-3 fs-6 fs-sm-5 text-break">
+            <i class="bi bi-grip-vertical text-muted me-2 flex-shrink-0"></i> <span>{{ item }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Lösung prüfen</button>
+{% endif %}

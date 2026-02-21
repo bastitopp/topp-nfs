@@ -14,6 +14,10 @@
                 <input type="hidden" name="next" value="{{ next_url }}">
                 {% endif %}
                 
+                <script id="anatomy_raw_data" type="application/json">
+                    {{ card.options | safe if card.options else '[]' }}
+                </script>
+
                 <input type="hidden" name="multi_json" id="multi_json_input" value="{{ card.options | e if card.options else '[]' }}">
                 <input type="hidden" name="options" id="fallback_options_input" value="{{ card.options | e if card.options else '[]' }}">
                 
@@ -136,15 +140,28 @@
 </div>
 
 <script>
-// --- Direkter JSON Injektor, umgeht den fehleranfälligen Textarea-Workaround ---
-try {
-    window.anatomyMarkers = {{ (card.options or '[]') | safe }};
-    if (!Array.isArray(window.anatomyMarkers)) window.anatomyMarkers = [];
-} catch(e) {
-    console.error("JSON Parse Fehler:", e);
-    window.anatomyMarkers = [];
+function loadAnatomyData() {
+    try {
+        const rawScript = document.getElementById('anatomy_raw_data');
+        if (!rawScript) return [];
+        
+        let content = rawScript.textContent.trim();
+        if (!content) return [];
+        
+        let parsed = JSON.parse(content);
+        
+        if (typeof parsed === 'string') {
+            parsed = JSON.parse(parsed);
+        }
+        
+        return Array.isArray(parsed) ? parsed : [];
+    } catch(e) {
+        console.error("Fehler beim Laden der Anatomie-Daten:", e);
+        return [];
+    }
 }
 
+window.anatomyMarkers = loadAnatomyData();
 window.anatomyNextId = 1;
 
 window.syncAnatomyJson = function() {
@@ -327,13 +344,62 @@ window.handleImageUpload = function(event) {
     }
 };
 
-document.addEventListener('DOMContentLoaded', function() {
+// --- 2. Initialisierung mit Safari-Puls ---
+function initAnatomySystem() {
     let maxId = 0;
     window.anatomyMarkers.forEach(m => { if (parseInt(m.id) > maxId) maxId = parseInt(m.id); });
     window.anatomyNextId = maxId + 1;
     
-    // Sofort laden, nicht mehr auf das Bild warten!
+    // Erster Standard-Versuch
     window.updateAnatomyView();
+    
+    const imgContainer = document.getElementById('admin-img-container');
+    const anatomyImg = document.getElementById('admin-anatomy-img');
+    
+    // Resize-Beobachter (für saubere Desktop-Browser)
+    if (window.ResizeObserver && imgContainer) {
+        new ResizeObserver(() => {
+            if (anatomyImg && anatomyImg.offsetHeight > 0) {
+                if (document.querySelectorAll('.admin-marker').length === 0 && window.anatomyMarkers.length > 0) {
+                    window.updateAnatomyView();
+                }
+            }
+        }).observe(imgContainer);
+    }
+    
+    // SAFARI-PULS: Pollt für die ersten 2 Sekunden, ob das Bild plötzlich eine Höhe hat
+    if (anatomyImg) {
+        let checkCount = 0;
+        let safariTimer = setInterval(function() {
+            checkCount++;
+            
+            // Wenn das Bild eine reale Höhe auf dem Bildschirm einnimmt...
+            if (anatomyImg.offsetHeight > 0) {
+                // ...und die Punkte noch fehlen, zeichnen wir sie neu!
+                if (window.anatomyMarkers.length > 0 && document.querySelectorAll('.admin-marker').length === 0) {
+                    window.updateAnatomyView();
+                }
+                clearInterval(safariTimer); // Ziel erreicht, Timer stoppen
+            }
+            
+            // Nach 2 Sekunden (40 Durchläufe à 50ms) aufgeben
+            if (checkCount > 40) {
+                clearInterval(safariTimer);
+            }
+        }, 50);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAnatomySystem);
+} else {
+    initAnatomySystem();
+}
+
+window.addEventListener('load', function() {
+    if (document.querySelectorAll('.admin-marker').length === 0 && window.anatomyMarkers.length > 0) {
+        window.updateAnatomyView();
+    }
 });
 
 function updateFormFields() {

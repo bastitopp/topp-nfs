@@ -1,0 +1,13 @@
+{% if feedback %}
+    <div class="text-center py-4 bg-light rounded-4 shadow-sm border px-2">
+        <h2 class="display-5 fw-bold {{ 'text-success' if is_correct else 'text-danger' }} mb-2 text-break">{{ user_val }}</h2>
+        <p class="text-muted mb-0 fs-5 text-break">Zielbereich: <strong>{{ result_text }}</strong></p>
+    </div>
+{% else %}
+    <input type="hidden" name="calc_var" value="{{ calc_data.val }}">
+    <div class="input-group input-group-lg mb-3 shadow-sm flex-nowrap">
+        <input type="number" step="any" name="calc_input" class="form-control text-center fw-bold" placeholder="Dein Ergebnis" required autofocus>
+        {% if calc_data.unit %}<span class="input-group-text bg-light text-secondary fw-bold text-wrap">{{ calc_data.unit }}</span>{% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 shadow-sm fw-bold fs-5">Bestätigen</button>
+{% endif %}

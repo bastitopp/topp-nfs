@@ -1,0 +1,68 @@
+{% if feedback %}
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card border-{{ 'success' if result_de else 'danger' }} h-100">
+                <div class="card-header bg-{{ 'success' if result_de else 'danger' }} text-white fw-bold">Deutsch</div>
+                <div class="card-body">
+                    <p class="mb-1 text-muted small">Deine Antwort:</p><h5 class="text-{{ 'success' if result_de else 'danger' }} text-break">{{ user_de or '-' }}</h5>
+                    {% if not result_de %}<hr><p class="mb-1 text-muted small">Richtige Lösung:</p><h5 class="text-success text-break">{{ card.answer }}</h5>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-{{ 'success' if result_lat else 'danger' }} h-100">
+                <div class="card-header bg-{{ 'success' if result_lat else 'danger' }} text-white fw-bold">Latein</div>
+                <div class="card-body">
+                    <p class="mb-1 text-muted small">Deine Antwort:</p><h5 class="text-{{ 'success' if result_lat else 'danger' }} text-break">{{ user_lat or '-' }}</h5>
+                    {% if not result_lat %}<hr><p class="mb-1 text-muted small">Richtige Lösung:</p><h5 class="text-success text-break">{{ card.answer_lat }}</h5>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="alert alert-info small text-center mb-4 border-0 shadow-sm">
+        <i class="bi bi-hand-index-thumb fw-bold me-1"></i> Tippe auf einen Begriff und platziere ihn im richtigen Kasten.
+    </div>
+    
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <label class="fw-bold mb-2 text-secondary">Deutsch</label>
+            {% if card.answer and card.answer not in ['-', '%'] %}
+                <div class="anatomy-single-dropzone form-control form-control-lg bg-light text-center shadow-sm text-break h-auto py-3" style="min-height: 60px; display:flex; justify-content:center; align-items:center; cursor: pointer; border: 2px dashed #0d6efd;" data-type="de" data-answer="{{ card.answer | e }}">
+                    <span class="text-muted small"><i class="bi bi-box-arrow-in-down"></i> Hier platzieren</span>
+                </div>
+            {% else %}
+                <div class="form-control form-control-lg anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <label class="fw-bold mb-2 text-secondary">Latein</label>
+            {% if card.answer_lat and card.answer_lat not in ['-', '%'] %}
+                <div class="anatomy-single-dropzone form-control form-control-lg bg-light text-center shadow-sm text-break h-auto py-3" style="min-height: 60px; display:flex; justify-content:center; align-items:center; cursor: pointer; border: 2px dashed #6c757d;" data-type="lat" data-answer="{{ card.answer_lat | e }}">
+                    <span class="text-muted small"><i class="bi bi-box-arrow-in-down"></i> Hier platzieren</span>
+                </div>
+            {% else %}
+                <div class="form-control form-control-lg anatomy-empty-slot"><i class="bi bi-slash-lg"></i></div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
+        {% set labels = [] %}
+        {% if card.answer and card.answer not in ['-', '%'] %}{% set _ = labels.append({'val': card.answer, 'type': 'de'}) %}{% endif %}
+        {% if card.answer_lat and card.answer_lat not in ['-', '%'] %}{% set _ = labels.append({'val': card.answer_lat, 'type': 'lat'}) %}{% endif %}
+        
+        {% for label in labels | shuffle %}
+            <button type="button" class="btn btn-outline-{{ 'primary' if label.type == 'de' else 'secondary' }} rounded-pill anatomy-single-btn shadow-sm fw-bold text-wrap lh-sm py-2 px-3" data-val="{{ label.val | e }}" data-type="{{ label.type }}">
+                {{ label.val }} <small class="fw-normal opacity-75 d-block d-sm-inline">({{ 'DE' if label.type == 'de' else 'LAT' }})</small>
+            </button>
+        {% endfor %}
+    </div>
+
+    <input type="hidden" name="input_de" id="single_input_de" value="">
+    <input type="hidden" name="input_lat" id="single_input_lat" value="">
+    
+    <button type="submit" id="submit-single-btn" class="btn btn-success w-100 rounded-pill py-3 shadow-sm fw-bold fs-5 d-none">
+        Korrekt! Weiter <i class="bi bi-arrow-right ms-1"></i>
+    </button>
+{% endif %}

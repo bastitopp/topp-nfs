@@ -1,0 +1,101 @@
+/* Globaler Schutz gegen horizontales Scrollen auf Handys */
+body, html { overflow-x: hidden; }
+
+.quiz-container { min-height: 520px; display: flex; flex-direction: column; }
+.answer-section { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
+.mc-grid { display: grid; gap: 12px; grid-template-columns: 1fr; width: 100%; }
+
+.btn-answer {
+    min-height: 64px; display: flex; align-items: center; text-align: left;
+    border-width: 2px; border-style: solid; transition: all 0.2s ease-in-out;
+    white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; width: 100%;
+}
+
+.btn-answer:focus-visible { outline: 3px solid var(--bs-primary); outline-offset: 2px; }
+.btn-answer div, .btn-answer p, .btn-answer span { color: inherit !important; margin-bottom: 0; }
+.btn-answer > div { flex: 1; min-width: 0; }
+
+.question-text { word-break: break-word; overflow-wrap: break-word; text-align: center; width: 100%; }
+.question-text p { margin-bottom: 0; text-align: center; }
+
+.shortcut-badge { 
+    display: inline-block; width: 24px; height: 24px; background: rgba(0,0,0,0.15); 
+    border-radius: 4px; text-align: center; line-height: 24px; font-size: 0.8em; 
+    margin-right: 12px; font-family: monospace; flex-shrink: 0;
+}
+
+.explanation-box {
+    margin-top: 1.5rem; border-left: 4px solid #0dcaf0;
+    background-color: rgba(13, 202, 240, 0.1); padding: 1rem; border-radius: 8px;
+    display: block !important;
+}
+
+.markdown-content table { display: block; overflow-x: auto; white-space: nowrap; max-width: 100%; }
+.markdown-content img { max-width: 100%; height: auto; }
+
+.anatomy-empty-slot {
+    background-color: transparent !important;
+    background-image: linear-gradient(45deg, rgba(128, 128, 128, 0.1) 25%, transparent 25%, transparent 50%, rgba(128, 128, 128, 0.1) 50%, rgba(128, 128, 128, 0.1) 75%, transparent 75%, transparent) !important;
+    background-size: 10px 10px !important; border: 1px dashed var(--bs-border-color) !important;
+    color: var(--bs-secondary-color) !important; opacity: 0.6; cursor: not-allowed; box-shadow: none !important;
+    display: flex; align-items: center; justify-content: center;
+}
+[data-bs-theme="dark"] .anatomy-empty-slot {
+    background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent) !important;
+}
+
+.anatomy-dropzone {
+    position: absolute; width: 32px; height: 32px;
+    background-color: rgba(255, 255, 255, 0.9); border: 3px solid var(--bs-primary); border-radius: 50%;
+    display: flex; justify-content: center; align-items: center; cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    z-index: 10; transform: translate(-50%, -50%); 
+}
+.anatomy-dropzone:hover { transform: translate(-50%, -50%) scale(1.1); }
+
+/* --- 4-WAY SMART PINS CSS --- */
+.anatomy-image-container {
+    padding: 20% 15%; 
+    overflow: visible !important;
+}
+@media (max-width: 768px) {
+    .anatomy-image-container { padding: 25% 5%; }
+}
+
+.anatomy-dropzone.solved {
+    width: 14px !important; height: 14px !important; background-color: #198754 !important;
+    border: 2px solid white !important; border-radius: 50% !important; padding: 0 !important;
+    box-shadow: 0 0 0 2px #198754 !important; display: flex !important;
+    justify-content: center !important; align-items: center !important;
+}
+
+.solved-label {
+    position: absolute; background-color: rgba(255, 255, 255, 0.95); border: 1px solid #198754;
+    color: #198754; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: bold;
+    white-space: nowrap !important; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    z-index: 100; line-height: 1.2;
+}
+
+.solved-line { position: absolute; background-color: #198754; z-index: 99; }
+
+.anatomy-dropzone.solved[data-side="left"] .solved-label { right: 100%; margin-right: var(--line-len, 25px); top: 50%; transform: translateY(calc(-50% + var(--offset, 0px))); }
+.anatomy-dropzone.solved[data-side="left"] .solved-line { right: 100%; width: var(--line-len, 25px); top: 50%; height: 2px; transform: translateY(-50%); }
+
+.anatomy-dropzone.solved[data-side="right"] .solved-label { left: 100%; margin-left: var(--line-len, 25px); top: 50%; transform: translateY(calc(-50% + var(--offset, 0px))); }
+.anatomy-dropzone.solved[data-side="right"] .solved-line { left: 100%; width: var(--line-len, 25px); top: 50%; height: 2px; transform: translateY(-50%); }
+
+.anatomy-dropzone.solved[data-side="top"] .solved-label { bottom: 100%; margin-bottom: var(--line-len, 25px); left: 50%; transform-origin: left bottom; transform: translateX(var(--offset, 0px)) rotate(-90deg); }
+.anatomy-dropzone.solved[data-side="top"] .solved-line { bottom: 100%; height: var(--line-len, 25px); left: 50%; width: 2px; transform: translateX(-50%); }
+
+.anatomy-dropzone.solved[data-side="bottom"] .solved-label { top: 100%; margin-top: var(--line-len, 25px); left: 50%; transform-origin: left top; transform: translateX(var(--offset, 0px)) rotate(90deg); }
+.anatomy-dropzone.solved[data-side="bottom"] .solved-line { top: 100%; height: var(--line-len, 25px); left: 50%; width: 2px; transform: translateX(-50%); }
+
+.labels-hidden .solved-label, .labels-hidden .solved-line { display: none !important; }
+.cursor-grab { cursor: grab; } .cursor-grab:active { cursor: grabbing; }
+.bg-adaptive { background-color: var(--bs-tertiary-bg) !important; }
+
+.flash-error { animation: flashRed 0.6s ease-out; }
+@keyframes flashRed {
+    0% { background-color: #dc3545; border-color: #dc3545; color: white; transform: translate(-50%, -50%) scale(1.1); }
+    100% { background-color: white; border-color: var(--bs-primary); color: var(--bs-primary); transform: translate(-50%, -50%) scale(1); }
+}
