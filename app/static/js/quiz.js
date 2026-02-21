@@ -110,63 +110,8 @@ function initAnatomySingle() {
     });
 }
 
-// --- Ausgelagerte Anatomie Multi Logik ---
+// --- Ausgelagerte Anatomie Multi Logik (Legenden-System) ---
 function initAnatomyMulti() {
-    const toggleBtn = document.getElementById('toggle-labels-btn');
-    const imgWrapper = document.getElementById('anatomy-img-wrapper');
-    
-    if(toggleBtn && imgWrapper) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            imgWrapper.classList.toggle('labels-hidden');
-            const icon = this.querySelector('i');
-            if(imgWrapper.classList.contains('labels-hidden')) {
-                icon.classList.replace('bi-eye-slash-fill', 'bi-eye-fill');
-                icon.classList.replace('text-secondary', 'text-primary');
-                this.innerHTML = '<i class="bi bi-eye-fill text-primary me-1"></i> Einblenden';
-            } else {
-                icon.classList.replace('bi-eye-fill', 'bi-eye-slash-fill');
-                icon.classList.replace('text-primary', 'text-secondary');
-                this.innerHTML = '<i class="bi bi-eye-slash-fill text-secondary me-1"></i> Ausblenden';
-                setTimeout(resolveAnatomyOverlaps, 50); 
-            }
-        });
-    }
-
-    function resolveAnatomyOverlaps() {
-        if(imgWrapper && imgWrapper.classList.contains('labels-hidden')) return;
-        const zones = Array.from(document.querySelectorAll('.anatomy-dropzone.solved'));
-        let overlap = true;
-        let iters = 0;
-        
-        while(overlap && iters < 50) {
-            overlap = false;
-            for(let i=0; i<zones.length; i++) {
-                for(let j=i+1; j<zones.length; j++) {
-                    let l1 = zones[i].querySelector('.solved-label');
-                    let l2 = zones[j].querySelector('.solved-label');
-                    if(!l1 || !l2) continue;
-                    let r1 = l1.getBoundingClientRect();
-                    let r2 = l2.getBoundingClientRect();
-                    if (!(r1.right < r2.left - 2 || r1.left > r2.right + 2 || r1.bottom < r2.top - 2 || r1.top > r2.bottom + 2)) {
-                        overlap = true;
-                        let side = zones[j].getAttribute('data-side');
-                        let currentOffset = parseInt(zones[j].style.getPropertyValue('--offset')) || 0;
-                        let currentLen = parseInt(zones[j].style.getPropertyValue('--line-len')) || 25;
-                        if (side === 'left' || side === 'right') {
-                            zones[j].style.setProperty('--offset', (currentOffset + (r2.top >= r1.top ? 6 : -6)) + 'px');
-                            zones[j].style.setProperty('--line-len', (currentLen + 3) + 'px');
-                        } else {
-                            zones[j].style.setProperty('--offset', (currentOffset + (r2.left >= r1.left ? 6 : -6)) + 'px');
-                            zones[j].style.setProperty('--line-len', (currentLen + 3) + 'px');
-                        }
-                    }
-                }
-            }
-            iters++;
-        }
-    }
-
     let selectedLabel = null;
     let correctCount = 0;
     let totalTargets = 0;
@@ -178,6 +123,7 @@ function initAnatomyMulti() {
         if(lat && lat !== '-' && lat !== '%') totalTargets++;
     });
 
+    // Event-Listener für das Anklicken der Antwort-Buttons
     document.querySelectorAll('.anatomy-label-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -193,9 +139,11 @@ function initAnatomyMulti() {
         });
     });
 
+    // Event-Listener für das Ablegen auf dem Bild-Punkt
     document.querySelectorAll('.anatomy-dropzone').forEach(zone => {
         zone.addEventListener('click', function() {
             if(!selectedLabel) return;
+            
             let type = selectedLabel.getAttribute('data-type');
             let expected = this.getAttribute('data-' + type);
             let selectedVal = selectedLabel.getAttribute('data-val');
@@ -203,36 +151,86 @@ function initAnatomyMulti() {
             let alreadySolved = this.getAttribute('data-solved-' + type) === '1';
             
             if(!alreadySolved && expected === selectedVal) {
-                this.classList.add('solved');
                 
-                let xCoord = parseFloat(this.style.left);
-                let yCoord = parseFloat(this.style.top);
-                let distTop = yCoord, distBottom = 100 - yCoord, distLeft = xCoord, distRight = 100 - xCoord;
-                let min = Math.min(distTop, distBottom, distLeft, distRight);
-                let side = 'left';
-                if (min === distTop) side = 'top';
-                else if (min === distBottom) side = 'bottom';
-                else if (min === distRight) side = 'right';
-                
-                this.setAttribute('data-side', side);
-                let icon = this.querySelector('i.bi-question');
-                if(icon) icon.remove();
-                
-                this.innerHTML += `<div class="solved-line"></div><div class="solved-label text-nowrap">${selectedVal}</div>`;
+                // 1. Prüfen, ob der Punkt 1 oder 2 Labels benötigt
                 this.setAttribute('data-solved-' + type, '1');
                 
-                if(toggleBtn) toggleBtn.classList.remove('d-none');
+                let needsDe = this.getAttribute('data-de') && this.getAttribute('data-de') !== '-' && this.getAttribute('data-de') !== '%';
+                let needsLat = this.getAttribute('data-lat') && this.getAttribute('data-lat') !== '-' && this.getAttribute('data-lat') !== '%';
                 
+                let solvedDe = this.getAttribute('data-solved-de') === '1';
+                let solvedLat = this.getAttribute('data-solved-lat') === '1';
+                
+                // Ist ALLES da, was der Punkt verlangt?
+                let isFullySolved = (!needsDe || solvedDe) && (!needsLat || solvedLat);
+
+                if (isFullySolved) {
+                    this.classList.remove('partially-solved');
+                    this.classList.add('solved');
+                } else {
+                    this.classList.add('partially-solved');
+                }
+                
+                // Fragezeichen durch ID-Nummer ersetzen
+                let icon = this.querySelector('i.bi-question');
+                if(icon) icon.remove();
+                this.innerHTML = `<span class="fw-bold" style="font-size: 0.9rem;">${id}</span>`;
+                
+                // Button aus der Liste entfernen
                 selectedLabel.style.visibility = 'hidden';
                 selectedLabel.classList.remove('anatomy-label-btn'); 
                 selectedLabel = null;
                 
+                // Wert für das Formular speichern
                 let hiddenInp = document.createElement('input');
-                hiddenInp.type = 'hidden'; hiddenInp.name = type + '_' + id; hiddenInp.value = selectedVal;
+                hiddenInp.type = 'hidden'; 
+                hiddenInp.name = type + '_' + id; 
+                hiddenInp.value = selectedVal;
                 document.getElementById('quizForm').appendChild(hiddenInp);
-                
-                setTimeout(resolveAnatomyOverlaps, 50);
 
+                // --- 2. Legenden-Eintrag (Zusammenfassen bei 2 Begriffen) ---
+                const legendContainer = document.getElementById('anatomy-legend-container');
+                const legend = document.getElementById('anatomy-legend');
+                if(legendContainer) legendContainer.classList.remove('d-none');
+                
+                let existingLegendItem = document.getElementById('legend-item-' + id);
+                let typeLabel = type === 'de' ? 'DE' : 'LAT';
+
+                if (existingLegendItem) {
+                    // Wenn der Eintrag für die Nummer schon existiert
+                    let textContainer = existingLegendItem.querySelector('.legend-text');
+                    textContainer.innerHTML += ` <span class="text-muted mx-1">/</span> ${selectedVal} <small class="text-muted fw-normal">(${typeLabel})</small>`;
+                    
+                    // Mache die Legende grün
+                    let badgeNum = existingLegendItem.querySelector('.badge-num');
+                    badgeNum.classList.remove('bg-warning', 'text-dark');
+                    badgeNum.classList.add('bg-success', 'text-white');
+                    existingLegendItem.classList.remove('border-warning');
+                    existingLegendItem.classList.add('border-success');
+                    
+                } else {
+                    // Neu anlegen
+                    const legendBadge = document.createElement('div');
+                    legendBadge.id = 'legend-item-' + id;
+                    
+                    // Farbe je nachdem, ob noch ein Begriff fehlt (gelb) oder nicht (grün)
+                    let isPartial = !isFullySolved;
+                    let borderClass = isPartial ? 'border-warning' : 'border-success';
+                    let badgeClass = isPartial ? 'bg-warning text-dark' : 'bg-success text-white';
+
+                    legendBadge.className = `anatomy-legend-item badge bg-white text-dark border ${borderClass} border-opacity-50 d-flex align-items-center gap-2 p-2 shadow-sm fs-6`;
+                    legendBadge.innerHTML = `<span class="badge-num badge ${badgeClass} rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">${id}</span> <span class="legend-text fw-medium">${selectedVal} <small class="text-muted fw-normal">(${typeLabel})</small></span>`;
+                    
+                    // Hover-Effekte synchronisieren
+                    legendBadge.addEventListener('mouseenter', () => this.classList.add('pin-hover'));
+                    legendBadge.addEventListener('mouseleave', () => this.classList.remove('pin-hover'));
+                    this.addEventListener('mouseenter', () => legendBadge.classList.add('legend-hover'));
+                    this.addEventListener('mouseleave', () => legendBadge.classList.remove('legend-hover'));
+                    
+                    if(legend) legend.appendChild(legendBadge);
+                }
+
+                // Checken, ob alle Punkte gelöst sind
                 correctCount++;
                 if(correctCount === totalTargets) {
                      document.querySelectorAll('.anatomy-dropzone').forEach(z => z.style.borderColor = 'transparent');

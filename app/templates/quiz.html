@@ -4,8 +4,9 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">
-<script src="{{ url_for('static', filename='js/quiz.js') }}" defer></script>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}?v=4">
+<script src="{{ url_for('static', filename='js/quiz.js') }}?v=4" defer></script>
 
 <div class="container py-2 py-sm-3" style="max-width: 800px;">
     {% if not finished %}
@@ -96,7 +97,7 @@
                 <input type="hidden" name="start_time" value="{{ now.timestamp() }}">
                 <input type="hidden" name="origin_path" value="{{ current_category }}">
 
-                {# Lädt automatisch das zur Frage passende HTML-Fragment (Partial) #}
+                {# Lädt dynamisch die Teil-Datei für den jeweiligen Fragetyp #}
                 {% set partial_path = 'quiz_partials/type_' ~ card.type ~ '.html' %}
                 {% include partial_path ignore missing %}
 
