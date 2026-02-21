@@ -138,6 +138,11 @@
                                 <i class="bi bi-diagram-3-fill me-1 d-none d-lg-inline"></i>BPR-Trainer
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'text-primary fw-bold' if 'ecg-simulator' in request.path }}" href="{{ url_for('learn.ecg_simulator') }}">
+                                <i class="bi bi-activity me-1 d-none d-lg-inline"></i>EKG
+                            </a>
+                        </li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('main.leaderboard') }}">Rangliste</a></li>
                         {% if current_user.is_admin %}
                         <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('admin.admin_dashboard') }}"><i class="bi bi-gear-fill"></i></a></li>
@@ -222,13 +227,21 @@
     {% if current_user.is_authenticated %}
     <div class="mobile-nav d-lg-none">
         <a href="{{ url_for('main.index') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.index') }}"><i class="bi bi-house-door{{ '-fill' if request.path == url_for('main.index') }}"></i><span>Start</span></a>
+        
         <a href="{{ url_for('learn.exam_index') }}" class="mobile-nav-item {{ 'active' if '/exam' in request.path }}"><i class="bi bi-clipboard-check{{ '-fill' if '/exam' in request.path }}"></i><span>Prüfung</span></a>
+        
         <a href="{{ url_for('learn.bpr_index') }}" class="mobile-nav-item {{ 'active' if '/bpr' in request.path }}">
             <i class="bi bi-diagram-3{{ '-fill' if '/bpr' in request.path }}"></i>
             <span>BPR</span>
         </a>
-        <a href="{{ url_for('main.leaderboard') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.leaderboard') }}"><i class="bi bi-trophy{{ '-fill' if request.path == url_for('main.leaderboard') }}"></i><span>Rang</span></a>
+        
+        <a href="{{ url_for('learn.ecg_simulator') }}" class="mobile-nav-item {{ 'active' if 'ecg-simulator' in request.path }}">
+            <i class="bi bi-activity"></i>
+            <span>EKG</span>
+        </a>
+
         {% if current_user.is_admin %}<a href="{{ url_for('admin.admin_dashboard') }}" class="mobile-nav-item {{ 'active' if '/admin' in request.path }}"><i class="bi bi-gear{{ '-fill' if '/admin' in request.path }}"></i><span>Admin</span></a>{% endif %}
+        
         <a href="{{ url_for('main.profile') }}" class="mobile-nav-item {{ 'active' if request.path == url_for('main.profile') }}"><div class="profile-wrapper">{% if current_user.profile_image %}<img src="{{ current_user.profile_image }}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">{% else %}<i class="bi bi-person{{ '-fill' if request.path == url_for('main.profile') }}"></i>{% endif %}</div><span>Profil</span></a>
     </div>
     {% endif %}

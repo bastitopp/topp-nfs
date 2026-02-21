@@ -1,0 +1,130 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <h2>Interaktiver EKG-Simulator</h2>
+    <p>Wähle ein Krankheitsbild oder verändere die Parameter manuell.</p>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            
+            <div class="card p-3 shadow-sm border-0 bg-primary bg-opacity-10 mb-3">
+                <label for="presetSelect" class="form-label fw-bold text-primary mb-1"><i class="bi bi-file-medical-fill me-2"></i>Krankheitsbild laden:</label>
+                <select id="presetSelect" class="form-select border-primary shadow-sm" onchange="updateEKG()">
+                    <option value="none">Keines (Manuelle Kontrolle)</option>
+                    <option value="av1">AV-Block I. Grades</option>
+                    <option value="av2">AV-Block II. Grades (2:1 Block)</option>
+                    <option value="av3">AV-Block III. Grades (komplette Dissoziation)</option>
+                    <option value="stemi">STEMI (Hinterwand-Infarkt II, III)</option>
+                    <option value="vt">Ventrikuläre Tachykardie (VT)</option>
+                    <option value="svt">Supraventrikuläre Tachykardie (SVT)</option>
+                </select>
+            </div>
+
+            <div class="card p-3 shadow-sm border-0">
+                <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">Manuelle Parameter</h5>
+                
+                <label for="hrSlider" class="form-label fw-bold small">Herzfrequenz: <span class="text-primary" id="hrVal">72</span> BPM</label>
+                <input type="range" class="form-range" id="hrSlider" min="30" max="220" value="72" oninput="forceManual(); updateEKG()">
+
+                <label for="axisSlider" class="form-label fw-bold small mt-3">Lagetyp (Herzachse): <span class="text-primary" id="axisVal">Normtyp</span></label>
+                <input type="range" class="form-range" id="axisSlider" min="-90" max="180" step="15" value="60" oninput="forceManual(); updateEKG()">
+                <div class="text-muted" style="font-size: 0.75rem;" id="axisDegVal">60° (Normal)</div>
+
+                <label for="potassiumSlider" class="form-label fw-bold small mt-4">Kaliumspiegel: <span class="text-danger" id="potassiumVal">4.0</span> mmol/L</label>
+                <input type="range" class="form-range" id="potassiumSlider" min="2.0" max="8.0" step="0.1" value="4.0" oninput="forceManual(); updateEKG()">
+
+                <label for="qrsSlider" class="form-label fw-bold small mt-3">QRS-Breite: <span class="text-danger" id="qrsVal">Normal</span></label>
+                <input type="range" class="form-range" id="qrsSlider" min="0.01" max="0.06" step="0.005" value="0.015" oninput="forceManual(); updateEKG()">
+                
+                <label for="stSlider" class="form-label fw-bold small mt-3">ST-Strecke: <span class="text-danger" id="stVal">0.0 mV</span></label>
+                <input type="range" class="form-range" id="stSlider" min="-0.5" max="1.0" step="0.1" value="0.0" oninput="forceManual(); updateEKG()">
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card p-1 shadow-sm border-0">
+                <div id="ecgGraph" style="width:100%; height:750px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script>
+    function getAxisName(degrees) {
+        if (degrees < -30) return "Überdrehter Linkstyp";
+        if (degrees <= 30) return "Linkstyp";
+        if (degrees <= 60) return "Normtyp";
+        if (degrees <= 90) return "Steiltyp";
+        if (degrees <= 120) return "Rechtstyp";
+        return "Überdrehter Rechtstyp";
+    }
+
+    // Wechselt auf "Manuell", sobald der Nutzer einen Slider berührt
+    function forceManual() {
+        document.getElementById('presetSelect').value = 'none';
+    }
+
+    function updateEKG() {
+        const preset = document.getElementById('presetSelect').value;
+        const hr = document.getElementById('hrSlider').value;
+        const axis = document.getElementById('axisSlider').value;
+        const k = document.getElementById('potassiumSlider').value;
+        const qrs = document.getElementById('qrsSlider').value;
+        const st = document.getElementById('stSlider').value;
+
+        fetch(`/api/simulator/ecg?preset=${preset}&hr=${hr}&axis=${axis}&potassium=${k}&qrs_width=${qrs}&st_elevation=${st}`)
+            .then(response => response.json())
+            .then(data => {
+                
+                // Metadaten vom Backend verarbeiten (damit die Slider und Zahlen den echten, vom Preset erzwungenen Werten entsprechen)
+                const meta = data.metadata;
+                document.getElementById('hrVal').innerText = meta.hr;
+                document.getElementById('hrSlider').value = meta.hr;
+                
+                document.getElementById('axisVal').innerText = getAxisName(meta.axis);
+                document.getElementById('axisDegVal').innerText = meta.axis + "°";
+                document.getElementById('axisSlider').value = meta.axis;
+                
+                document.getElementById('potassiumVal').innerText = meta.potassium.toFixed(1);
+                
+                document.getElementById('qrsVal').innerText = meta.qrs_width > 0.025 ? "Verbreitert" : "Normal";
+                document.getElementById('qrsSlider').value = meta.qrs_width;
+                
+                document.getElementById('stVal').innerText = (meta.st_elevation > 0 ? "+" : "") + meta.st_elevation.toFixed(1) + " mV";
+                document.getElementById('stSlider').value = meta.st_elevation;
+
+                // BUGFIX: Die 3 Ableitungen den korrekten Achsen (xaxis/yaxis) zuweisen!
+                const trace1 = { x: data.time, y: data.lead_I, type: 'scatter', mode: 'lines', line: {color: 'black', width: 1.5}, name: 'I', xaxis: 'x', yaxis: 'y' };
+                const trace2 = { x: data.time, y: data.lead_II, type: 'scatter', mode: 'lines', line: {color: 'black', width: 1.5}, name: 'II', xaxis: 'x2', yaxis: 'y2' };
+                const trace3 = { x: data.time, y: data.lead_III, type: 'scatter', mode: 'lines', line: {color: 'black', width: 1.5}, name: 'III', xaxis: 'x3', yaxis: 'y3' };
+
+                const layout = {
+                    title: { text: 'Einthoven (Vorschub: 25 mm/s, Eichung: 10 mm/mV)', font: {size: 14} },
+                    plot_bgcolor: '#fff5f5',
+                    margin: {l: 50, r: 20, t: 40, b: 40},
+                    showlegend: false,
+                    grid: {rows: 3, columns: 1, pattern: 'independent'}, // 3 Reihen untereinander
+                    
+                    // Ableitung I
+                    xaxis:  { dtick: 0.2, gridcolor: '#ffcccc', zeroline: false, showticklabels: false },
+                    yaxis:  { title: 'I (mV)', range: [-2, 2.5], dtick: 0.5, gridcolor: '#ffcccc' },
+                    
+                    // Ableitung II
+                    xaxis2: { dtick: 0.2, gridcolor: '#ffcccc', zeroline: false, showticklabels: false },
+                    yaxis2: { title: 'II (mV)', range: [-2, 2.5], dtick: 0.5, gridcolor: '#ffcccc' },
+                    
+                    // Ableitung III
+                    xaxis3: { title: 'Zeit (s)', dtick: 0.2, gridcolor: '#ffcccc', zeroline: false },
+                    yaxis3: { title: 'III (mV)', range: [-2, 2.5], dtick: 0.5, gridcolor: '#ffcccc' }
+                };
+
+                Plotly.react('ecgGraph', [trace1, trace2, trace3], layout, {staticPlot: false, displayModeBar: false});
+            });
+    }
+
+    // Direkt beim Start laden
+    window.onload = updateEKG;
+</script>
+{% endblock %}

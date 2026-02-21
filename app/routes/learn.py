@@ -1,7 +1,8 @@
 import json
 import random
+import numpy as np
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy.sql.expression import func, or_
 from sqlalchemy.orm.attributes import flag_modified  
@@ -12,6 +13,10 @@ from ..utils import (get_next_card, update_progress, award_badges, render_learn_
                      get_mc_options, add_xp, fuzzy_match, build_category_tree)
 
 bp = Blueprint('learn', __name__)
+
+# ==========================================
+# --- Quiz / Lern Routen ---
+# ==========================================
 
 @bp.route('/learn/custom', methods=['POST'])
 @login_required
@@ -159,6 +164,11 @@ def learn_errors():
     if not card: flash("Keine Fehler gefunden!", "success"); return redirect(url_for('main.index'))
     return render_learn_card(card, current_user, "errors")
 
+
+# ==========================================
+# --- Exam Routen ---
+# ==========================================
+
 @bp.route('/exam')
 @login_required
 def exam_index():
@@ -300,18 +310,13 @@ def bpr_index():
     scenarios = Scenario.query.all()
     return render_template('bpr_index.html', scenarios=scenarios)
 
-# NEUE ROUTE FÜR ZUFÄLLIGE AUSWAHL
 @bp.route('/bpr/random')
 @login_required
 def bpr_random():
-    # Zieht ein zufälliges Szenario aus der Datenbank
     scenario = Scenario.query.order_by(func.random()).first()
-    
     if not scenario:
         flash("Aktuell sind keine BPR-Szenarien verfügbar.", "warning")
         return redirect(url_for('learn.bpr_index'))
-        
-    # Leitet direkt zum Spiel-Modus des ausgewählten Szenarios weiter
     return redirect(url_for('learn.bpr_play', scenario_id=scenario.id))
 
 @bp.route('/bpr/play/<int:scenario_id>')
@@ -395,3 +400,185 @@ def bpr_choice(choice_id):
     db.session.commit()
     
     return render_template('bpr_swap.html', old_node=node, choice=choice, next_node=next_node, scenario_id=scenario.id, flags=session_db.state_flags or {})
+
+# ==========================================
+# --- EKG Simulator Routen ---
+# ==========================================
+
+@bp.route('/api/simulator/ecg')
+@login_required
+def api_simulator_ecg():
+    preset = request.args.get('preset', 'none')
+    
+    # 1. Parameter abrufen
+    hr = float(request.args.get('hr', 72))
+    qrs_width = float(request.args.get('qrs_width', 0.015))
+    st_elevation = float(request.args.get('st_elevation', 0.0))
+    potassium = float(request.args.get('potassium', 4.0)) 
+    axis = float(request.args.get('axis', 60.0))          
+    
+    # --- PRESET ÜBERSCHREIBUNGEN FÜR PATHOLOGIEN ---
+    if preset != 'none':
+        if preset == 'vt':
+            hr = 170
+            qrs_width = 0.045
+            axis = -120 # Überdrehter Linkstyp bei VT
+            st_elevation = 0.0
+        elif preset == 'svt':
+            hr = 180
+            qrs_width = 0.015
+            axis = 60
+            st_elevation = 0.0
+        elif preset == 'av3':
+            hr = 40 # Typischer Kammer-Ersatzrhythmus
+            qrs_width = 0.025 # Meist leicht verbreitert
+            axis = 60
+        elif preset == 'stemi':
+            hr = 85
+            axis = 60
+            st_elevation = 0.5 # ST-Hebung für II und III wird unten verarbeitet
+        elif preset == 'av1':
+            hr = 65
+        elif preset == 'av2':
+            hr = 75 # Entspricht einer Kammerfrequenz von ca. 37 (bei 2:1 Block)
+            
+    duration = 4.0
+    fs = 250 
+    t = np.linspace(0, duration, int(duration * fs), endpoint=False)
+    beat_interval = 60.0 / hr
+    
+    # --- BASIS-AMPLITUDEN ---
+    v_p = 0.15; v_q = -0.15; v_r = 1.5; v_s = -0.3; v_t = 0.35
+    
+    # --- KALIUM-EFFEKTE ---
+    t_amp, t_width, p_amp_current = v_t, 0.04, v_p
+    if potassium > 5.0:
+        diff = potassium - 5.0
+        t_amp = v_t + (diff * 0.4)
+        t_width = max(0.015, 0.04 - (diff * 0.01))
+        p_amp_current = max(0.0, v_p - (diff * 0.1))
+        qrs_width += (diff * 0.005)
+    elif potassium < 3.5:
+        diff = 3.5 - potassium
+        t_amp = max(0.05, v_t - (diff * 0.2))
+        t_width = 0.06 
+        st_elevation -= (diff * 0.15) 
+
+    # --- ZEITPUNKTE BERECHNEN (RHYTHMUS-GENERATOR) ---
+    t_end = duration
+    p_times = []
+    qrs_times = []
+    t_curr = 0.5
+    
+    if preset in ['none', 'stemi']:
+        while t_curr < t_end:
+            p_times.append(t_curr - 0.16)
+            qrs_times.append(t_curr)
+            t_curr += beat_interval
+            
+    elif preset == 'av1':
+        while t_curr < t_end:
+            p_times.append(t_curr - 0.32) # PQ-Zeit extrem verlängert (>200ms)
+            qrs_times.append(t_curr)
+            t_curr += beat_interval
+            
+    elif preset == 'av2': # 2:1 Blockade
+        count = 0
+        while t_curr < t_end:
+            p_times.append(t_curr - 0.16)
+            if count % 2 == 0:
+                qrs_times.append(t_curr)
+            t_curr += (60.0 / 80.0) # Vorhofrate = 80 bpm
+            count += 1
+            
+    elif preset == 'av3':
+        # Vorhöfe (85 bpm) und Kammern (40 bpm) schlagen entkoppelt
+        tp = 0.2
+        while tp < t_end:
+            p_times.append(tp)
+            tp += (60.0 / 85.0) 
+        tq = 0.5
+        while tq < t_end:
+            qrs_times.append(tq)
+            tq += beat_interval 
+            
+    elif preset == 'vt':
+        while t_curr < t_end:
+            qrs_times.append(t_curr) # P-Wellen fehlen komplett
+            t_curr += beat_interval
+            
+    elif preset == 'svt':
+        while t_curr < t_end:
+            qrs_times.append(t_curr) # P-Wellen fallen in die T-Welle/fehlen
+            t_curr += beat_interval
+
+    # --- VEKTOR-PROJEKTION UND ZEICHNEN ---
+    axis_rad = np.radians(axis)
+    def project(amp, angle_rad, lead_angle_deg):
+        return amp * np.cos(angle_rad - np.radians(lead_angle_deg))
+
+    leads = {'I': np.zeros_like(t), 'II': np.zeros_like(t), 'III': np.zeros_like(t)}
+    lead_angles = {'I': 0, 'II': 60, 'III': 120} 
+    
+    for name, angle in lead_angles.items():
+        p_amp = project(p_amp_current, axis_rad, angle)
+        q_amp = project(v_q, axis_rad, angle)
+        r_amp = project(v_r, axis_rad, angle)
+        s_amp = project(v_s, axis_rad, angle)
+        t_amp_proj = project(t_amp, axis_rad, angle)
+        
+        p_params = [(p_amp, 0.0, 0.02)]
+        qrs_t_params = [
+            (q_amp, -0.04, 0.01),
+            (r_amp, 0.0, qrs_width),
+            (s_amp, 0.04, qrs_width),
+            (t_amp_proj, 0.28, t_width) 
+        ]
+        
+        ecg = leads[name]
+        
+        # P-Wellen zeichnen
+        for pt in p_times:
+            for amp, offset, width in p_params:
+                ecg += amp * np.exp(-((t - (pt + offset)) ** 2) / (2 * width ** 2))
+                
+        # QRS-Komplexe und T-Wellen zeichnen
+        for qt in qrs_times:
+            for amp, offset, width in qrs_t_params:
+                ecg += amp * np.exp(-((t - (qt + offset)) ** 2) / (2 * width ** 2))
+                
+            # Pathologische ST-Hebungen (STEMI Logik für Hinterwand)
+            st_val = st_elevation
+            if preset == 'stemi':
+                if name in ['II', 'III']: st_val = 0.5     # Hebung inferior
+                elif name == 'I': st_val = -0.2            # Reziproke Senkung
+                
+            if st_val != 0:
+                st_start = qt + 0.06
+                st_end = qt + 0.20
+                mask = (t > st_start) & (t < st_end)
+                ecg[mask] += st_val * np.sin(np.pi * (t[mask] - st_start) / (st_end - st_start))
+
+        # Rauschen
+        ecg += 0.02 * np.sin(2 * np.pi * 0.2 * t)
+        leads[name] = ecg.tolist()
+        
+    return jsonify({
+        'time': t.tolist(),
+        'lead_I': leads['I'],
+        'lead_II': leads['II'],
+        'lead_III': leads['III'],
+        'metadata': {
+            'hr': int(hr),
+            'axis': int(axis),
+            'potassium': round(potassium, 1),
+            'qrs_width': round(qrs_width, 3),
+            'st_elevation': round(st_elevation, 1),
+            'preset': preset
+        }
+    })
+
+@bp.route('/learn/ecg-simulator')
+@login_required
+def ecg_simulator():
+    return render_template('ecg_simulator.html')
