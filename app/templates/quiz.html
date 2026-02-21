@@ -61,12 +61,83 @@
     }
     .anatomy-dropzone:hover { transform: translate(-50%, -50%) scale(1.1); }
 
-    .anatomy-dropzone.solved {
-        width: auto !important; height: auto !important; border-radius: 12px !important; padding: 6px 10px !important;
-        background-color: rgba(255, 255, 255, 0.95) !important; border-color: #198754 !important; 
-        flex-direction: column !important; gap: 4px; align-items: stretch !important; 
+    /* --- 4-WAY SMART PINS CSS (mit 90 Grad Rotation) --- */
+    .anatomy-image-container {
+        padding: 20% 15%; /* Mehr Platz für Oben/Unten/Links/Rechts generieren */
+        overflow: visible !important;
     }
-    .anatomy-dropzone.solved .badge { font-size: 0.85em !important; white-space: normal !important; padding: 4px 8px; }
+    @media (max-width: 768px) {
+        .anatomy-image-container { padding: 25% 5%; }
+    }
+
+    .anatomy-dropzone.solved {
+        width: 14px !important;
+        height: 14px !important;
+        background-color: #198754 !important;
+        border: 2px solid white !important;
+        border-radius: 50% !important;
+        padding: 0 !important;
+        box-shadow: 0 0 0 2px #198754 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    .solved-label {
+        position: absolute;
+        background-color: rgba(255, 255, 255, 0.95);
+        border: 1px solid #198754;
+        color: #198754;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.8em;
+        font-weight: bold;
+        white-space: nowrap !important; /* KEIN UMBRUCH MEHR */
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        z-index: 100;
+        line-height: 1.2;
+    }
+
+    .solved-line {
+        position: absolute;
+        background-color: #198754;
+        z-index: 99;
+    }
+
+    /* RICHTUNG LINKS (Horizontal) */
+    .anatomy-dropzone.solved[data-side="left"] .solved-label { right: 100%; margin-right: var(--line-len, 25px); top: 50%; transform: translateY(calc(-50% + var(--offset, 0px))); }
+    .anatomy-dropzone.solved[data-side="left"] .solved-line { right: 100%; width: var(--line-len, 25px); top: 50%; height: 2px; transform: translateY(-50%); }
+    
+    /* RICHTUNG RECHTS (Horizontal) */
+    .anatomy-dropzone.solved[data-side="right"] .solved-label { left: 100%; margin-left: var(--line-len, 25px); top: 50%; transform: translateY(calc(-50% + var(--offset, 0px))); }
+    .anatomy-dropzone.solved[data-side="right"] .solved-line { left: 100%; width: var(--line-len, 25px); top: 50%; height: 2px; transform: translateY(-50%); }
+    
+    /* RICHTUNG OBEN (Vertikal, 90 Grad gedreht, liest sich von unten nach oben) */
+    .anatomy-dropzone.solved[data-side="top"] .solved-label { 
+        bottom: 100%; 
+        margin-bottom: var(--line-len, 25px); 
+        left: 50%; 
+        transform-origin: left bottom;
+        transform: translateX(var(--offset, 0px)) rotate(-90deg); 
+    }
+    .anatomy-dropzone.solved[data-side="top"] .solved-line { bottom: 100%; height: var(--line-len, 25px); left: 50%; width: 2px; transform: translateX(-50%); }
+    
+    /* RICHTUNG UNTEN (Vertikal, 90 Grad gedreht, liest sich von oben nach unten) */
+    .anatomy-dropzone.solved[data-side="bottom"] .solved-label { 
+        top: 100%; 
+        margin-top: var(--line-len, 25px); 
+        left: 50%; 
+        transform-origin: left top;
+        transform: translateX(var(--offset, 0px)) rotate(90deg); 
+    }
+    .anatomy-dropzone.solved[data-side="bottom"] .solved-line { top: 100%; height: var(--line-len, 25px); left: 50%; width: 2px; transform: translateX(-50%); }
+
+    /* Toggle visibility classes */
+    .labels-hidden .solved-label,
+    .labels-hidden .solved-line {
+        display: none !important;
+    }
 
     .cursor-grab { cursor: grab; }
     .cursor-grab:active { cursor: grabbing; }
@@ -112,7 +183,7 @@
         </div>
     </div>
 
-    <div class="card p-3 p-sm-4 shadow mb-4 quiz-container border-0 w-100 overflow-hidden">
+    <div class="card p-3 p-sm-4 shadow mb-4 quiz-container border-0 w-100">
         
         {% if active_reports %}
         <div class="alert alert-warning py-2 mb-3 small border-0 shadow-sm d-flex align-items-center">
@@ -375,8 +446,13 @@
                             <i class="bi bi-hand-index-thumb fw-bold me-1 fs-5"></i> Tippe erst auf einen Begriff und platziere ihn dann auf dem passenden runden Zielpunkt im Bild.
                         </div>
 
-                        <div class="text-center mb-4">
-                            <div class="position-relative d-inline-block" style="max-width: 100%;">
+                        <div class="text-center mb-4 position-relative">
+                            
+                            <button type="button" id="toggle-labels-btn" class="btn btn-light shadow border position-absolute top-0 end-0 m-2 z-3 d-none rounded-pill fw-bold" title="Begriffe ausblenden" style="z-index: 1000;">
+                                <i class="bi bi-eye-slash-fill text-secondary me-1"></i> Ausblenden
+                            </button>
+
+                            <div class="anatomy-image-container position-relative d-inline-block" id="anatomy-img-wrapper" style="max-width: 100%;">
                                 <img src="{{ card.image_url }}" class="rounded shadow-sm img-fluid" style="max-height: 55vh; display: block; margin: 0 auto;">
                                 
                                 {% for item in items %}
@@ -415,6 +491,72 @@
                         </button>
 
                         <script>
+                            // --- Toggle Button Logik ---
+                            const toggleBtn = document.getElementById('toggle-labels-btn');
+                            const imgWrapper = document.getElementById('anatomy-img-wrapper');
+                            if(toggleBtn && imgWrapper) {
+                                toggleBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    imgWrapper.classList.toggle('labels-hidden');
+                                    const icon = this.querySelector('i');
+                                    if(imgWrapper.classList.contains('labels-hidden')) {
+                                        icon.classList.replace('bi-eye-slash-fill', 'bi-eye-fill');
+                                        icon.classList.replace('text-secondary', 'text-primary');
+                                        this.innerHTML = '<i class="bi bi-eye-fill text-primary me-1"></i> Einblenden';
+                                    } else {
+                                        icon.classList.replace('bi-eye-fill', 'bi-eye-slash-fill');
+                                        icon.classList.replace('text-primary', 'text-secondary');
+                                        this.innerHTML = '<i class="bi bi-eye-slash-fill text-secondary me-1"></i> Ausblenden';
+                                        setTimeout(window.resolveAnatomyOverlaps, 50); // Bei Einblenden Overlaps neu berechnen
+                                    }
+                                });
+                            }
+
+                            // --- Anti-Overlap Algorithmus (Unterstützt gedrehte Elemente) ---
+                            window.resolveAnatomyOverlaps = function() {
+                                if(imgWrapper && imgWrapper.classList.contains('labels-hidden')) return;
+
+                                const zones = Array.from(document.querySelectorAll('.anatomy-dropzone.solved'));
+                                let overlap = true;
+                                let iters = 0;
+                                
+                                while(overlap && iters < 50) {
+                                    overlap = false;
+                                    for(let i=0; i<zones.length; i++) {
+                                        for(let j=i+1; j<zones.length; j++) {
+                                            let l1 = zones[i].querySelector('.solved-label');
+                                            let l2 = zones[j].querySelector('.solved-label');
+                                            if(!l1 || !l2) continue;
+                                            
+                                            let r1 = l1.getBoundingClientRect();
+                                            let r2 = l2.getBoundingClientRect();
+                                            
+                                            // Berühren sich die Boxen (mit minimalem 2px Puffer)?
+                                            if (!(r1.right < r2.left - 2 || 
+                                                  r1.left > r2.right + 2 || 
+                                                  r1.bottom < r2.top - 2 || 
+                                                  r1.top > r2.bottom + 2)) {
+                                                
+                                                overlap = true;
+                                                let side = zones[j].getAttribute('data-side');
+                                                let currentOffset = parseInt(zones[j].style.getPropertyValue('--offset')) || 0;
+                                                let currentLen = parseInt(zones[j].style.getPropertyValue('--line-len')) || 25;
+                                                
+                                                // Nudge Logik: Schiebe seitlich (Offset) und nach außen (Len)
+                                                if (side === 'left' || side === 'right') {
+                                                    zones[j].style.setProperty('--offset', (currentOffset + (r2.top >= r1.top ? 6 : -6)) + 'px');
+                                                    zones[j].style.setProperty('--line-len', (currentLen + 3) + 'px');
+                                                } else { // top oder bottom
+                                                    zones[j].style.setProperty('--offset', (currentOffset + (r2.left >= r1.left ? 6 : -6)) + 'px');
+                                                    zones[j].style.setProperty('--line-len', (currentLen + 3) + 'px');
+                                                }
+                                            }
+                                        }
+                                    }
+                                    iters++;
+                                }
+                            };
+
                             let selectedLabel = null;
                             let correctCount = 0;
                             
@@ -455,13 +597,38 @@
                                     if(!alreadySolved && expected === selectedVal) {
                                         this.classList.add('solved');
                                         
+                                        // --- 4-Wege Richtungs-Logik ---
+                                        let xCoord = parseFloat(this.style.left);
+                                        let yCoord = parseFloat(this.style.top);
+                                        
+                                        // Abstand zu den Rändern (in %)
+                                        let distTop = yCoord;
+                                        let distBottom = 100 - yCoord;
+                                        let distLeft = xCoord;
+                                        let distRight = 100 - xCoord;
+                                        
+                                        let min = Math.min(distTop, distBottom, distLeft, distRight);
+                                        let side = 'left';
+                                        if (min === distTop) side = 'top';
+                                        else if (min === distBottom) side = 'bottom';
+                                        else if (min === distRight) side = 'right';
+                                        
+                                        this.setAttribute('data-side', side);
+                                        
+                                        // Fragezeichen entfernen
                                         let icon = this.querySelector('i.bi-question');
                                         if(icon) icon.remove();
                                         
-                                        let badgeClass = type === 'de' ? 'bg-primary' : 'bg-secondary';
-                                        this.innerHTML += `<span class="badge ${badgeClass} shadow-sm text-break">${selectedVal}</span>`;
+                                        // Linie und Text-Label anhängen (mit nowrap Text!)
+                                        this.innerHTML += `
+                                            <div class="solved-line"></div>
+                                            <div class="solved-label text-nowrap">${selectedVal}</div>
+                                        `;
                                         
                                         this.setAttribute('data-solved-' + type, '1');
+                                        
+                                        // Button einblenden
+                                        if(toggleBtn) toggleBtn.classList.remove('d-none');
                                         
                                         selectedLabel.style.visibility = 'hidden';
                                         selectedLabel.classList.remove('anatomy-label-btn'); 
@@ -473,6 +640,9 @@
                                         hiddenInp.value = selectedVal;
                                         document.getElementById('quizForm').appendChild(hiddenInp);
                                         
+                                        // Overlaps lösen (leicht verzögert wegen DOM Rendering)
+                                        setTimeout(window.resolveAnatomyOverlaps, 50);
+
                                         correctCount++;
                                         if(correctCount === totalTargets) {
                                              document.querySelectorAll('.anatomy-dropzone').forEach(z => {
