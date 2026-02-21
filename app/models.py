@@ -63,6 +63,10 @@ class User(UserMixin, db.Model):
     streak = db.Column(db.Integer, default=0)
     xp = db.Column(db.Integer, default=0)
     
+    # --- NEU: Zähler für die historische Erfolgsquote ---
+    total_reviews = db.Column(db.Integer, default=0)
+    correct_reviews = db.Column(db.Integer, default=0)
+    
     badges = db.relationship('Badge', secondary=user_badges, lazy='subquery', backref=db.backref('users', lazy=True))
     group_id = db.Column(db.Integer, db.ForeignKey('user_group.id'), nullable=True)
     
@@ -99,8 +103,7 @@ class UserProgress(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     card_id = db.Column(db.Integer, db.ForeignKey('card.id'), nullable=False)
     
-    # --- NEUE FSRS Spalten ---
-    state = db.Column(db.Integer, default=0) # 0=New, 1=Learning, 2=Review, 3=Relearning
+    state = db.Column(db.Integer, default=0) 
     stability = db.Column(db.Float, default=0.0)
     difficulty = db.Column(db.Float, default=0.0)
     elapsed_days = db.Column(db.Integer, default=0)
@@ -109,12 +112,10 @@ class UserProgress(db.Model):
     lapses = db.Column(db.Integer, default=0)
     last_review = db.Column(db.DateTime, nullable=True)
     
-    # --- Behalten für Kompatibilität mit UI & Statistiken ---
     next_review = db.Column(db.DateTime, default=datetime.utcnow)
     box = db.Column(db.Integer, default=0) 
     last_correct = db.Column(db.Boolean, default=False)
     
-    # --- Veraltet (können technisch entfernt werden, bleiben aber zur Sicherheit drin falls es DB Konflikte gibt) ---
     easiness_factor = db.Column(db.Float, default=2.5)
     interval = db.Column(db.Integer, default=0)
 
@@ -138,10 +139,6 @@ class ExamDetail(db.Model):
     is_correct = db.Column(db.Boolean, default=False)
     user_solution = db.Column(db.Text, nullable=True)
     correct_solution = db.Column(db.Text, nullable=True)
-
-# ==========================================
-# --- BPR / SOP Szenario-Trainer ---
-# ==========================================
 
 class Scenario(db.Model):
     id = db.Column(db.Integer, primary_key=True)

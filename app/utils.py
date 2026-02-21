@@ -152,6 +152,14 @@ def update_progress(user, card, quality):
     elif q_val == 4: rating = Rating.Good
     else: rating = Rating.Easy
 
+    # --- NEU: Zähler für die historische Erfolgsquote erhöhen ---
+    try:
+        user.total_reviews = (user.total_reviews or 0) + 1
+        if rating != Rating.Again:
+            user.correct_reviews = (user.correct_reviews or 0) + 1
+    except AttributeError:
+        pass # Fallback falls Datenbank-Migration noch nicht durchgelaufen ist
+
     now = datetime.utcnow().replace(tzinfo=timezone.utc)
     scheduling_cards = fsrs_scheduler.repeat(fsrs_card, now)
     scheduled_card = scheduling_cards[rating].card
@@ -182,7 +190,6 @@ def get_learning_stats(user):
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
-    # NEU: Feste Basis-Limits für das Dashboard definieren, anstatt get_current_limits() zu nutzen
     BASE_MAX_REVIEWS = 50
     BASE_MAX_NEW_CARDS = 20
     
@@ -209,8 +216,19 @@ def get_learning_stats(user):
     display_new = min(true_new, new_left_today)
     
     total_active = UserProgress.query.filter_by(user_id=user.id).count()
-    correct_count = UserProgress.query.filter_by(user_id=user.id, last_correct=True).count()
-    accuracy = int((correct_count / total_active) * 100) if total_active > 0 else 0
+    
+    # --- NEU: Historische Genauigkeit berechnen ---
+    try:
+        tot_rev = user.total_reviews or 0
+        cor_rev = user.correct_reviews or 0
+        if tot_rev > 0:
+            accuracy = int((cor_rev / tot_rev) * 100)
+        else:
+            # Fallback für die allererste Nutzung / alte Accounts
+            correct_count = UserProgress.query.filter_by(user_id=user.id, last_correct=True).count()
+            accuracy = int((correct_count / total_active) * 100) if total_active > 0 else 0
+    except AttributeError:
+        accuracy = 0
     
     total_seconds = user.total_learning_time or 0
     m, s = divmod(total_seconds, 60)
@@ -284,7 +302,6 @@ def render_learn_card(card, user, context_path):
     p = UserProgress.query.filter_by(user_id=user.id, card_id=card.id).first()
     box = p.box if p else 0
     
-    # NEU: Historischen Status der Karte ermitteln
     card_status = 'neu'
     if p and p.reps and p.reps > 0:
         card_status = 'richtig' if p.last_correct else 'falsch'
