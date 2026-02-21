@@ -32,7 +32,12 @@
                     <div class="card shadow-sm border-0 h-100"><div class="card-body text-center"><h6 class="text-muted mb-1 small text-uppercase">Lernzeit</h6><h4 class="fw-bold mb-0 text-primary">{{ user.total_learning_time | format_duration }}</h4></div></div>
                 </div>
                 <div class="col-6">
-                    <div class="card shadow-sm border-0 h-100"><div class="card-body text-center"><h6 class="text-muted mb-1 small text-uppercase">Streak</h6><h4 class="fw-bold text-danger mb-0"><i class="bi bi-fire"></i> {{ user.streak }}</h4></div></div>
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body text-center">
+                            <h6 class="text-muted mb-1 small text-uppercase">Klasse</h6>
+                            <h5 class="fw-bold text-secondary mb-0 text-truncate">{% if user.study_class %}{{ user.study_class.name }}{% else %}-{% endif %}</h5>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -75,7 +80,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// HTMX FIX: Skript als selbsterhaltende Funktion (IIFE) ausführen, damit es nach jedem weichen Ladevorgang triggert.
 (function() {
     const config = {{ chart_config | safe }};
     const ctx = document.getElementById('skillsChart');
@@ -83,10 +87,8 @@
 
     if (!ctx || !filter) return;
 
-    // Dropdown zurücksetzen (verhindert doppelte Einträge bei HTMX-Reloads)
     filter.innerHTML = '<option value="all">Gesamtübersicht</option>';
 
-    // Dropdown füllen
     Object.keys(config.details).sort().forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat;
@@ -95,13 +97,11 @@
     });
 
     function renderChart(labels, data) {
-        // Altes Diagramm zerstören, bevor ein neues gezeichnet wird (wichtig für HTMX!)
         if (window.profileSkillsChart) {
             window.profileSkillsChart.destroy();
         }
         
         if (labels.length < 3) {
-            // Radar-Charts brauchen min. 3 Punkte zum Zeichnen, sonst Balken anzeigen
             window.profileSkillsChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -152,7 +152,6 @@
         });
     }
 
-    // Event Listener direkt anhängen (onchange überschreibt alte Listeners bei HTMX Swaps)
     filter.onchange = function(e) {
         const val = e.target.value;
         if (val === 'all') {
@@ -162,7 +161,6 @@
         }
     };
 
-    // Initialer Render (Alle Hauptkategorien)
     renderChart(config.main.labels, config.main.data);
 })();
 </script>

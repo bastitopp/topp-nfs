@@ -2,27 +2,6 @@
 
 {% block content %}
 <style>
-    /* Optimierung für die Tab-Leiste auf Mobilgeräten */
-    .nav-leaderboard {
-        padding: 4px;
-        background-color: var(--bs-secondary-bg);
-        border-radius: 50px;
-    }
-
-    .nav-leaderboard .nav-link {
-        font-weight: 600;
-        font-size: 0.9rem;
-        padding: 8px 12px;
-        border-radius: 50px !important;
-        color: var(--bs-secondary-color);
-        transition: all 0.2s ease;
-    }
-
-    .nav-leaderboard .nav-link.active {
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-
-    /* Platzierungs-Spalte flexibler machen */
     .rank-col {
         width: 45px;
         flex-shrink: 0;
@@ -30,7 +9,6 @@
         font-size: 1.1rem;
     }
 
-    /* User-Statistiken rechts ausrichten und Umbruch verhindern */
     .user-stats {
         text-align: right;
         min-width: 85px;
@@ -38,10 +16,6 @@
     }
 
     @media (max-width: 576px) {
-        .nav-leaderboard .nav-link {
-            font-size: 0.8rem;
-            padding: 6px 8px;
-        }
         .list-group-item {
             padding-left: 10px !important;
             padding-right: 10px !important;
@@ -50,125 +24,41 @@
 </style>
 
 <div class="container py-4" style="max-width: 800px;">
-    <h2 class="fw-bold mb-4 text-center"><i class="bi bi-trophy-fill text-warning"></i> Bestenliste</h2>
+    <h2 class="fw-bold mb-4 text-center">Rangliste: <span class="text-primary">{{ class_name }}</span></h2>
     
-    <ul class="nav nav-pills nav-fill mb-4 gap-1 nav-leaderboard shadow-sm" id="leaderTab" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#xp">
-                <i class="bi bi-star-fill text-warning me-1"></i> <span class="d-none d-sm-inline">Nach</span> XP
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#time">
-                <i class="bi bi-clock-history text-info me-1"></i> <span class="d-none d-sm-inline">Nach</span> Zeit
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#streak">
-                <i class="bi bi-fire text-danger me-1"></i> <span class="d-none d-sm-inline">Nach</span> Streak
-            </button>
-        </li>
-    </ul>
-
-    <div class="tab-content">
-        <div class="tab-pane fade show active" id="xp">
-            <div class="list-group shadow-sm border-0">
-                {% for u in by_xp %}
-                    <div class="list-group-item d-flex align-items-center p-3 border-0 border-bottom {{ 'bg-primary bg-opacity-10' if current_user.id == u.id }}">
-                        <div class="rank-col fw-bold text-muted">
-                            {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}.{% endif %}
-                        </div>
-                        
-                        {% if u.profile_image %}
-                            <img src="{{ u.profile_image }}" class="rounded-circle mx-2 mx-sm-3 border shadow-sm" width="48" height="48" style="object-fit: cover;">
-                        {% else %}
-                            <div class="rounded-circle mx-2 mx-sm-3 bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center text-secondary fw-bold border" style="width: 48px; height: 48px; flex-shrink: 0;">
-                                {{ u.username[:2]|upper }}
-                            </div>
-                        {% endif %}
-                        
-                        <div class="flex-grow-1 text-truncate">
-                            <h6 class="mb-0 fw-bold text-truncate">
-                                {{ u.username }}
-                                {% if u.id == current_user.id %} <span class="badge bg-primary ms-1 small">Du</span>{% endif %}
-                            </h6>
-                            {% if u.real_name %}
-                                <div class="small text-muted text-truncate">{{ u.real_name }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="user-stats">
-                            <div class="fw-bold text-primary">{{ u.xp }} <small>XP</small></div>
-                            <div class="small text-muted" style="font-size: 0.75rem;">Level {{ u.get_level() }}</div>
-                        </div>
+    <div class="list-group shadow-sm border-0">
+        {% for u in users %}
+            <div class="list-group-item d-flex align-items-center p-3 border-0 border-bottom {{ 'bg-primary bg-opacity-10' if current_user.id == u.id }}">
+                <div class="rank-col fw-bold text-muted">
+                    {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}.{% endif %}
+                </div>
+                
+                {% if u.profile_image %}
+                    <img src="{{ u.profile_image }}" class="rounded-circle mx-2 mx-sm-3 border shadow-sm" width="48" height="48" style="object-fit: cover;">
+                {% else %}
+                    <div class="rounded-circle mx-2 mx-sm-3 bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center text-secondary fw-bold border" style="width: 48px; height: 48px; flex-shrink: 0;">
+                        {{ u.username[:2]|upper }}
                     </div>
-                {% endfor %}
+                {% endif %}
+                
+                <div class="flex-grow-1 text-truncate">
+                    <h6 class="mb-0 fw-bold text-truncate">
+                        {{ u.username }}
+                        {% if u.id == current_user.id %} <span class="badge bg-primary ms-1 small">Du</span>{% endif %}
+                    </h6>
+                    {% if u.real_name %}
+                        <div class="small text-muted text-truncate">{{ u.real_name }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="user-stats">
+                    <div class="fw-bold text-primary">{{ u.xp }} <small>XP</small></div>
+                    <div class="small text-muted" style="font-size: 0.75rem;">{{ (u.total_learning_time / 60) | round(1) }} Min.</div>
+                </div>
             </div>
-        </div>
-
-        <div class="tab-pane fade" id="time">
-             <div class="list-group shadow-sm border-0">
-                {% for u in by_time %}
-                    <div class="list-group-item d-flex align-items-center p-3 border-0 border-bottom {{ 'bg-primary bg-opacity-10' if current_user.id == u.id }}">
-                        <div class="rank-col fw-bold text-muted">
-                             {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}.{% endif %}
-                        </div>
-                        {% if u.profile_image %}
-                            <img src="{{ u.profile_image }}" class="rounded-circle mx-2 mx-sm-3 border shadow-sm" width="48" height="48" style="object-fit: cover;">
-                        {% else %}
-                            <div class="rounded-circle mx-2 mx-sm-3 bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center text-secondary fw-bold border" style="width: 48px; height: 48px; flex-shrink: 0;">
-                                {{ u.username[:2]|upper }}
-                            </div>
-                        {% endif %}
-                        <div class="flex-grow-1 text-truncate">
-                            <h6 class="mb-0 fw-bold text-truncate">
-                                {{ u.username }}
-                                {% if u.id == current_user.id %} <span class="badge bg-primary ms-1 small">Du</span>{% endif %}
-                            </h6>
-                             {% if u.real_name %}
-                                <div class="small text-muted text-truncate">{{ u.real_name }}</div>
-                            {% endif %}
-                        </div>
-                        <div class="user-stats">
-                            <div class="fw-bold text-info">{{ u.total_learning_time | format_duration }}</div>
-                            <div class="small text-muted" style="font-size: 0.75rem;">Gelernt</div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="tab-pane fade" id="streak">
-             <div class="list-group shadow-sm border-0">
-                {% for u in by_streak %}
-                    <div class="list-group-item d-flex align-items-center p-3 border-0 border-bottom {{ 'bg-primary bg-opacity-10' if current_user.id == u.id }}">
-                        <div class="rank-col fw-bold text-muted">
-                             {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}.{% endif %}
-                        </div>
-                        {% if u.profile_image %}
-                            <img src="{{ u.profile_image }}" class="rounded-circle mx-2 mx-sm-3 border shadow-sm" width="48" height="48" style="object-fit: cover;">
-                        {% else %}
-                            <div class="rounded-circle mx-2 mx-sm-3 bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center text-secondary fw-bold border" style="width: 48px; height: 48px; flex-shrink: 0;">
-                                {{ u.username[:2]|upper }}
-                            </div>
-                        {% endif %}
-                        <div class="flex-grow-1 text-truncate">
-                            <h6 class="mb-0 fw-bold text-truncate">
-                                {{ u.username }}
-                                {% if u.id == current_user.id %} <span class="badge bg-primary ms-1 small">Du</span>{% endif %}
-                            </h6>
-                             {% if u.real_name %}
-                                <div class="small text-muted text-truncate">{{ u.real_name }}</div>
-                            {% endif %}
-                        </div>
-                        <div class="user-stats">
-                            <div class="fw-bold text-danger">{{ u.streak }} <small>Tage</small></div>
-                            <div class="small text-muted" style="font-size: 0.75rem;">Serie</div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
+        {% else %}
+            <div class="p-5 text-center text-muted">Noch keine Benutzer in dieser Klasse.</div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}

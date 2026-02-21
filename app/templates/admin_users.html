@@ -7,6 +7,67 @@
         <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary rounded-pill">Zurück</a>
     </div>
 
+    <div class="accordion mb-4 shadow-sm" id="orgClassAccordion">
+        <div class="accordion-item border-0">
+            <h2 class="accordion-header" id="headingOrgClass">
+                <button class="accordion-button collapsed bg-light fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOrgClass" aria-expanded="false" aria-controls="collapseOrgClass">
+                    <i class="bi bi-building me-2"></i> Organisationen & Klassen verwalten
+                </button>
+            </h2>
+            <div id="collapseOrgClass" class="accordion-collapse collapse" aria-labelledby="headingOrgClass" data-bs-parent="#orgClassAccordion">
+                <div class="accordion-body">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <h5 class="fw-bold text-secondary mb-3">Organisationen</h5>
+                            <form action="{{ url_for('admin.add_org') }}" method="POST" class="d-flex gap-2 mb-3">
+                                <input type="text" name="name" class="form-control form-control-sm" placeholder="Neue Organisation (z.B. Feuerwehr DO)" required>
+                                <button type="submit" class="btn btn-sm btn-primary fw-bold text-nowrap"><i class="bi bi-plus-lg"></i> Hinzufügen</button>
+                            </form>
+                            <ul class="list-group">
+                                {% for org in organizations %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                    <span>{{ org.name }}</span>
+                                    <form action="{{ url_for('admin.delete_org', id=org.id) }}" method="POST" class="m-0" onsubmit="return confirm('Wirklich löschen? Alle zugehörigen Klassen werden ebenfalls entfernt.');">
+                                        <button class="btn btn-sm btn-outline-danger border-0"><i class="bi bi-trash-fill"></i></button>
+                                    </form>
+                                </li>
+                                {% else %}
+                                <li class="list-group-item text-muted small text-center">Keine Organisationen vorhanden</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="fw-bold text-secondary mb-3">Klassen</h5>
+                            <form action="{{ url_for('admin.add_class') }}" method="POST" class="d-flex gap-2 mb-3">
+                                <select name="organization_id" class="form-select form-select-sm" required>
+                                    <option value="" disabled selected>Orga wählen...</option>
+                                    {% for org in organizations %}
+                                        <option value="{{ org.id }}">{{ org.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="text" name="name" class="form-control form-control-sm" placeholder="Klasse (z.B. NFS24-01)" required>
+                                <button type="submit" class="btn btn-sm btn-primary fw-bold text-nowrap"><i class="bi bi-plus-lg"></i> Hinzufügen</button>
+                            </form>
+                            <ul class="list-group">
+                                {% for c in classes %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                    <span><strong>{{ c.organization.name }}</strong> <span class="text-muted mx-1">/</span> {{ c.name }}</span>
+                                    <form action="{{ url_for('admin.delete_class', id=c.id) }}" method="POST" class="m-0" onsubmit="return confirm('Klasse wirklich löschen? Benutzer werden freigestellt.');">
+                                        <button class="btn btn-sm btn-outline-danger border-0"><i class="bi bi-trash-fill"></i></button>
+                                    </form>
+                                </li>
+                                {% else %}
+                                <li class="list-group-item text-muted small text-center">Keine Klassen vorhanden</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white py-3">
             <button class="btn btn-primary rounded-pill w-100 fw-bold" data-bs-toggle="modal" data-bs-target="#addUserModal">
@@ -14,63 +75,113 @@
             </button>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>User</th>
-                            <th>Rolle</th>
-                            <th>Status</th>
-                            <th>Zuletzt online</th>
-                            <th>XP</th>
-                            <th class="text-end">Aktion</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for u in users %}
-                        <tr>
-                            <td>
-                                <div class="fw-bold">{{ u.username }}</div>
-                                <div class="small text-muted">{{ u.real_name or '' }} | {{ u.email or '-' }}</div>
-                            </td>
-                            <td>
-                                {% if u.is_admin %}<span class="badge bg-warning text-dark">Admin</span>{% else %}<span class="badge bg-secondary">User</span>{% endif %}
-                            </td>
-                            <td>
-                                {% if u.is_approved %}
-                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25"><i class="bi bi-check-circle-fill me-1"></i> Aktiv</span>
-                                {% else %}
-                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25"><i class="bi bi-clock-fill me-1"></i> Wartet</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if u.is_online() %}
-                                    <span class="badge bg-success"><i class="bi bi-circle-fill small"></i> Online</span>
-                                {% elif u.last_active %}
-                                    <span class="text-muted">{{ u.last_active.strftime('%d.%m.%Y %H:%M') }}</span>
-                                {% else %}
-                                    <span class="text-muted fst-italic">Nie</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ u.xp }}</td>
-                            <td class="text-end">
-                                {% if not u.is_approved %}
-                                <form action="{{ url_for('admin.approve_user', uid=u.id) }}" method="POST" class="d-inline">
-                                    <button class="btn btn-sm btn-success rounded-circle me-1" title="Freischalten"><i class="bi bi-check-lg"></i></button>
-                                </form>
-                                {% endif %}
-                                <button class="btn btn-sm btn-outline-primary rounded-circle me-1" data-bs-toggle="modal" data-bs-target="#editUser{{ u.id }}"><i class="bi bi-pencil-fill"></i></button>
-                                {% if u.username != 'admin' %}
-                                <form action="{{ url_for('admin.delete_user', uid=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Wirklich löschen?');">
-                                    <button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash-fill"></i></button>
-                                </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <form action="{{ url_for('admin.bulk_assign_class') }}" method="POST" id="bulkAssignForm">
+                
+                <div class="bg-light p-3 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="small fw-bold text-secondary"><i class="bi bi-check2-square"></i> Markierte:</span>
+                        <select name="target_class_id" class="form-select form-select-sm w-auto shadow-sm">
+                            <option value="">-- Keine Klasse (Freistellen) --</option>
+                            {% for c in classes %}
+                                <option value="{{ c.id }}">{{ c.organization.name }} / {{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary fw-bold shadow-sm" onclick="return confirm('Möchtest du die ausgewählten Benutzer wirklich dieser Klasse zuweisen?');">
+                            Zuweisen
+                        </button>
+                    </div>
+
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" id="userSearch" class="form-control border-start-0 ps-0" placeholder="Nutzer suchen...">
+                        </div>
+                        <select id="pageSize" class="form-select form-select-sm shadow-sm w-auto" onchange="currentPage=1; updateView();">
+                            <option value="15">15 / Seite</option>
+                            <option value="50" selected>50 / Seite</option>
+                            <option value="100">100 / Seite</option>
+                            <option value="999999">Alle</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="userTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40px; padding-left: 15px;">
+                                    <input type="checkbox" class="form-check-input border-secondary" id="selectAllUsers" onclick="toggleSelectAll(this)" title="Alle gefilterten Nutzer auswählen">
+                                </th>
+                                <th style="cursor: pointer;" onclick="sortTable(1, false)" class="user-select-none">User <i class="bi bi-arrow-down-up small text-muted ms-1"></i></th>
+                                <th style="cursor: pointer;" onclick="sortTable(2, false)" class="user-select-none">Klasse <i class="bi bi-arrow-down-up small text-muted ms-1"></i></th>
+                                <th style="cursor: pointer;" onclick="sortTable(3, false)" class="user-select-none">Rolle <i class="bi bi-arrow-down-up small text-muted ms-1"></i></th>
+                                <th style="cursor: pointer;" onclick="sortTable(4, false)" class="user-select-none">Status <i class="bi bi-arrow-down-up small text-muted ms-1"></i></th>
+                                <th style="cursor: pointer;" onclick="sortTable(5, false)" class="user-select-none">Zuletzt online <i class="bi bi-arrow-down-up small text-muted ms-1"></i></th>
+                                <th style="cursor: pointer;" onclick="sortTable(6, true)" class="user-select-none text-end">XP <i class="bi bi-arrow-down-up small text-muted ms-1"></i></th>
+                                <th class="text-end pe-3">Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in users %}
+                            <tr class="user-row">
+                                <td style="padding-left: 15px;">
+                                    <input type="checkbox" class="form-check-input border-secondary user-checkbox" name="selected_users" value="{{ u.id }}">
+                                </td>
+                                <td>
+                                    <div class="fw-bold">{{ u.username }}</div>
+                                    <div class="small text-muted">{{ u.real_name or '' }} | {{ u.email or '-' }}</div>
+                                </td>
+                                <td>
+                                    {% if u.study_class %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25">{{ u.study_class.organization.name }} / {{ u.study_class.name }}</span>
+                                    {% else %}
+                                        <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if u.is_admin %}<span class="badge bg-warning text-dark">Admin</span>{% else %}<span class="badge bg-secondary">User</span>{% endif %}
+                                </td>
+                                <td>
+                                    {% if u.is_approved %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25"><i class="bi bi-check-circle-fill me-1"></i> Aktiv</span>
+                                    {% else %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25"><i class="bi bi-clock-fill me-1"></i> Wartet</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if u.is_online() %}
+                                        <span class="badge bg-success"><i class="bi bi-circle-fill small"></i> Online</span>
+                                    {% elif u.last_active %}
+                                        <span class="text-muted">{{ u.last_active.strftime('%d.%m.%Y %H:%M') }}</span>
+                                    {% else %}
+                                        <span class="text-muted fst-italic">Nie</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-bold">{{ u.xp }}</td>
+                                <td class="text-end text-nowrap pe-3">
+                                    {% if not u.is_approved %}
+                                    <button type="submit" formaction="{{ url_for('admin.approve_user', uid=u.id) }}" class="btn btn-sm btn-success rounded-circle me-1" title="Freischalten"><i class="bi bi-check-lg"></i></button>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-circle me-1" data-bs-toggle="modal" data-bs-target="#editUser{{ u.id }}"><i class="bi bi-pencil-fill"></i></button>
+                                    {% if u.username != 'admin' %}
+                                    <button type="submit" formaction="{{ url_for('admin.delete_user', uid=u.id) }}" class="btn btn-sm btn-outline-danger rounded-circle" onclick="return confirm('Wirklich löschen?');"><i class="bi bi-trash-fill"></i></button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card-footer bg-white py-3 d-flex justify-content-between align-items-center">
+                    <div class="small text-muted" id="paginationInfo">Zeige 0 bis 0 von 0 Nutzern</div>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0 shadow-sm" id="paginationControls">
+                            </ul>
+                    </nav>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -82,13 +193,23 @@
             <form action="{{ url_for('admin.edit_user', uid=u.id) }}" method="POST">
                 <div class="modal-header"><h5 class="modal-title">Bearbeiten: {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
-                    <div class="mb-3"><label class="form-label">Username</label><input name="username" class="form-control" value="{{ u.username }}" required></div>
-                    <div class="mb-3"><label class="form-label">E-Mail</label><input name="email" class="form-control" value="{{ u.email }}"></div>
-                    <div class="mb-3"><label class="form-label">Name</label><input name="real_name" class="form-control" value="{{ u.real_name }}"></div>
-                    <div class="mb-3"><label class="form-label">Neues Passwort (leer lassen für keins)</label><input name="new_password" class="form-control" placeholder="***"></div>
-                    <div class="form-check"><input type="checkbox" class="form-check-input" name="is_admin" id="adm{{u.id}}" {% if u.is_admin %}checked{% endif %}><label class="form-check-label" for="adm{{u.id}}">Administrator</label></div>
+                    <div class="mb-3"><label class="form-label fw-bold small">Username</label><input name="username" class="form-control" value="{{ u.username }}" required></div>
+                    <div class="mb-3"><label class="form-label fw-bold small">E-Mail</label><input name="email" class="form-control" value="{{ u.email or '' }}"></div>
+                    <div class="mb-3"><label class="form-label fw-bold small">Name</label><input name="real_name" class="form-control" value="{{ u.real_name or '' }}"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Klasse zuweisen</label>
+                        <select name="study_class_id" class="form-select">
+                            <option value="">-- Keine Klasse --</option>
+                            {% for c in classes %}
+                                <option value="{{ c.id }}" {% if u.study_class_id == c.id %}selected{% endif %}>{{ c.organization.name }} / {{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <hr>
+                    <div class="mb-3"><label class="form-label fw-bold small">Neues Passwort (leer lassen für keins)</label><input name="new_password" type="password" class="form-control" placeholder="***"></div>
+                    <div class="form-check"><input type="checkbox" class="form-check-input" name="is_admin" id="adm{{u.id}}" {% if u.is_admin %}checked{% endif %}><label class="form-check-label fw-bold small" for="adm{{u.id}}">Administrator</label></div>
                 </div>
-                <div class="modal-footer"><button class="btn btn-primary">Speichern</button></div>
+                <div class="modal-footer"><button class="btn btn-primary rounded-pill fw-bold">Speichern</button></div>
             </form>
         </div>
     </div>
@@ -105,24 +226,158 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Username</label>
+                        <label class="form-label fw-bold small">Username</label>
                         <input type="text" name="username" class="form-control" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Passwort</label>
+                        <label class="form-label fw-bold small">Passwort</label>
                         <input type="text" name="password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Initiale Klasse (Optional)</label>
+                        <select name="study_class_id" class="form-select">
+                            <option value="">-- Keine Klasse --</option>
+                            {% for c in classes %}
+                                <option value="{{ c.id }}">{{ c.organization.name }} / {{ c.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="form-check">
                         <input type="checkbox" class="form-check-input" name="is_admin" id="newAdmin">
-                        <label class="form-check-label" for="newAdmin">Administrator Rechte</label>
+                        <label class="form-check-label fw-bold small" for="newAdmin">Administrator Rechte</label>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                    <button type="submit" class="btn btn-primary">Anlegen</button>
+                    <button type="button" class="btn btn-secondary rounded-pill fw-bold" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary rounded-pill fw-bold">Anlegen</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+    // --- USABILITY LOGIK FÜR DIE TABELLE ---
+    
+    let currentPage = 1;
+    let filteredRows = [];
+    let currentSortCol = -1;
+    let currentSortAsc = true;
+
+    // Hauptfunktion zum Filtern und Anzeigen (Pagination)
+    function updateView() {
+        const searchInput = document.getElementById('userSearch').value.toLowerCase();
+        const rowsPerPage = parseInt(document.getElementById('pageSize').value);
+        const allRows = Array.from(document.querySelectorAll('#userTable tbody .user-row'));
+
+        // 1. Filtern
+        filteredRows = allRows.filter(row => {
+            // Kombinierter Text der relevanten Spalten für die Suche
+            const text = row.innerText.toLowerCase();
+            const matches = text.includes(searchInput);
+            if (!matches) {
+                row.classList.add('d-none');
+            }
+            return matches;
+        });
+
+        // 2. Paginierung anwenden
+        const totalRows = filteredRows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+
+        filteredRows.forEach((row, index) => {
+            if (index >= startIdx && index < endIdx) {
+                row.classList.remove('d-none');
+            } else {
+                row.classList.add('d-none');
+            }
+        });
+
+        // 3. UI updaten
+        renderPagination(totalPages);
+        
+        const infoStart = totalRows === 0 ? 0 : startIdx + 1;
+        const infoEnd = Math.min(endIdx, totalRows);
+        document.getElementById('paginationInfo').innerText = `Zeige ${infoStart} bis ${infoEnd} von ${totalRows} Nutzern`;
+        
+        // Checkbox für "Alle auswählen" zurücksetzen, wenn sich die Ansicht ändert
+        document.getElementById('selectAllUsers').checked = false;
+    }
+
+    // Pagination-Buttons zeichnen
+    function renderPagination(totalPages) {
+        const pag = document.getElementById('paginationControls');
+        pag.innerHTML = '';
+        
+        // Vorherige Seite
+        pag.innerHTML += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="javascript:void(0)" onclick="if(currentPage > 1) { currentPage--; updateView(); }">&laquo;</a>
+        </li>`;
+
+        // Seitenzahlen (vereinfacht: zeigt alle an. Bei riesigen Datenmengen müsste man hier limitieren)
+        for (let i = 1; i <= totalPages; i++) {
+            pag.innerHTML += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="javascript:void(0)" onclick="currentPage=${i}; updateView();">${i}</a>
+            </li>`;
+        }
+
+        // Nächste Seite
+        pag.innerHTML += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="javascript:void(0)" onclick="if(currentPage < ${totalPages}) { currentPage++; updateView(); }">&raquo;</a>
+        </li>`;
+    }
+
+    // Sortierfunktion
+    window.sortTable = function(colIndex, isNumeric = false) {
+        const tbody = document.querySelector('#userTable tbody');
+        const rows = Array.from(tbody.querySelectorAll('.user-row'));
+
+        currentSortAsc = currentSortCol === colIndex ? !currentSortAsc : true;
+        currentSortCol = colIndex;
+
+        rows.sort((a, b) => {
+            let valA = a.cells[colIndex].innerText.trim();
+            let valB = b.cells[colIndex].innerText.trim();
+
+            if (isNumeric) {
+                valA = parseFloat(valA.replace(/[^\d.-]/g, '')) || 0;
+                valB = parseFloat(valB.replace(/[^\d.-]/g, '')) || 0;
+                return currentSortAsc ? valA - valB : valB - valA;
+            } else {
+                return currentSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+        });
+
+        // Reihenfolge im DOM anpassen
+        tbody.innerHTML = '';
+        rows.forEach(row => tbody.appendChild(row));
+        
+        // Ansicht aktualisieren
+        updateView();
+    };
+
+    // Suchfeld Listener
+    document.getElementById('userSearch').addEventListener('input', () => {
+        currentPage = 1;
+        updateView();
+    });
+
+    // Massenauswahl (Select All)
+    window.toggleSelectAll = function(source) {
+        // Hakt nur Nutzer an, die auch im aktuellen Filter/Suche enthalten sind!
+        filteredRows.forEach(row => {
+            const cb = row.querySelector('.user-checkbox');
+            if(cb) cb.checked = source.checked;
+        });
+    };
+
+    // Initialisierung beim Laden
+    document.addEventListener("DOMContentLoaded", () => {
+        updateView();
+    });
+</script>
 {% endblock %}

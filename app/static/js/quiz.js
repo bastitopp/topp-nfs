@@ -1,4 +1,7 @@
 function initQuizFeatures() {
+    // Finde das aktive Formular (Lernmodus oder Prüfung)
+    const activeForm = document.getElementById('quizForm') || document.getElementById('examForm') || document.querySelector('form');
+
     // --- Allgemeine Listen-Features (Ordering & Assignment) ---
     const sortList = document.getElementById('sortable_list');
     if (sortList) {
@@ -15,10 +18,9 @@ function initQuizFeatures() {
 
     // --- Formular & Beenden-Schutz ---
     let formChanged = false;
-    const quizForm = document.getElementById('quizForm');
-    if (quizForm) {
-        quizForm.addEventListener('input', () => formChanged = true);
-        quizForm.addEventListener('submit', function(e) { 
+    if (activeForm) {
+        activeForm.addEventListener('input', () => formChanged = true);
+        activeForm.addEventListener('submit', function(e) { 
             this.setAttribute('data-submitting', 'true'); 
             const type = this.getAttribute('data-card-type');
             if(type === 'ordering') submitOrdering();
@@ -29,12 +31,12 @@ function initQuizFeatures() {
 
     // --- Anatomie Single Logic ---
     if(document.querySelector('.anatomy-single-dropzone')) {
-        initAnatomySingle();
+        initAnatomySingle(activeForm);
     }
 
     // --- Anatomie Multi Logic ---
     if(document.querySelector('.anatomy-dropzone')) {
-        initAnatomyMulti();
+        initAnatomyMulti(activeForm);
     }
 }
 
@@ -58,7 +60,7 @@ function submitAssignment() {
 }
 
 // --- Ausgelagerte Anatomie (Single) Logik ---
-function initAnatomySingle() {
+function initAnatomySingle(activeForm) {
     let selectedSingleLabel = null;
     let correctSingleCount = 0;
     let totalSingleTargets = document.querySelectorAll('.anatomy-single-dropzone').length;
@@ -100,7 +102,8 @@ function initAnatomySingle() {
                 
                 correctSingleCount++;
                 if(correctSingleCount === totalSingleTargets) {
-                    document.getElementById('submit-single-btn').classList.remove('d-none');
+                    let submitBtn = document.getElementById('submit-single-btn') || document.querySelector('.btn-next-question') || document.getElementById('submit-btn');
+                    if (submitBtn) submitBtn.classList.remove('d-none');
                 }
             } else {
                 this.classList.add('flash-error');
@@ -111,7 +114,7 @@ function initAnatomySingle() {
 }
 
 // --- Ausgelagerte Anatomie Multi Logik (Legenden-System) ---
-function initAnatomyMulti() {
+function initAnatomyMulti(activeForm) {
     let selectedLabel = null;
     let correctCount = 0;
     let totalTargets = 0;
@@ -190,12 +193,14 @@ function initAnatomyMulti() {
                 selectedLabel.classList.remove('anatomy-label-btn'); 
                 selectedLabel = null;
                 
-                // Wert für das Formular speichern
-                let hiddenInp = document.createElement('input');
-                hiddenInp.type = 'hidden'; 
-                hiddenInp.name = type + '_' + id; 
-                hiddenInp.value = selectedVal;
-                document.getElementById('quizForm').appendChild(hiddenInp);
+                // Wert für das aktive Formular speichern (Quiz ODER Prüfung)
+                if (activeForm) {
+                    let hiddenInp = document.createElement('input');
+                    hiddenInp.type = 'hidden'; 
+                    hiddenInp.name = type + '_' + id; 
+                    hiddenInp.value = selectedVal;
+                    activeForm.appendChild(hiddenInp);
+                }
 
                 // --- 2. Legenden-Eintrag (Zusammenfassen bei 2 Begriffen) ---
                 const legendContainer = document.getElementById('anatomy-legend-container');
@@ -242,8 +247,10 @@ function initAnatomyMulti() {
                 // Checken, ob alle Punkte gelöst sind
                 correctCount++;
                 if(correctCount === totalTargets) {
-                     document.querySelectorAll('.anatomy-dropzone').forEach(z => z.style.borderColor = 'transparent');
-                    document.getElementById('submit-btn').classList.remove('d-none');
+                    document.querySelectorAll('.anatomy-dropzone').forEach(z => z.style.borderColor = 'transparent');
+                    // Suche nach dem Next/Submit Button (robust für Quiz & Exam)
+                    let submitBtn = document.getElementById('submit-btn') || document.querySelector('.btn-next-question');
+                    if(submitBtn) submitBtn.classList.remove('d-none');
                 }
             } else {
                 this.classList.add('flash-error');
@@ -259,8 +266,8 @@ document.addEventListener("htmx:afterSwap", initQuizFeatures);
 
 if (!window.unloadWarningInitialized) {
     window.addEventListener('beforeunload', function (e) {
-        const form = document.getElementById('quizForm');
-        if (window.quizFormChanged && window.quizFormChanged() && form && !form.hasAttribute('data-submitting')) {
+        const activeForm = document.getElementById('quizForm') || document.getElementById('examForm');
+        if (window.quizFormChanged && window.quizFormChanged() && activeForm && !activeForm.hasAttribute('data-submitting')) {
             e.preventDefault(); e.returnValue = '';
         }
     });
@@ -272,16 +279,18 @@ if (!window.keyboardNavInitialized) {
         if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
         
         if (event.key === 'Enter') {
-            const nextBtn = document.querySelector('.btn-next-question');
+            const nextBtn = document.querySelector('.btn-next-question') || document.getElementById('submit-btn');
             const safeBtn = document.querySelector('.btn-quality-safe');
-            if (nextBtn) nextBtn.click();
+            
+            // Verhindern, dass Enter drückt, wenn der Button noch unsichtbar ist (z.B. Anatomie nicht fertig)
+            if (nextBtn && !nextBtn.classList.contains('d-none')) nextBtn.click();
             else if (safeBtn) safeBtn.click();
         }
         if (event.key.toLowerCase() === 's') { const skipBtn = document.getElementById('skipBtn'); if (skipBtn) skipBtn.click(); }
         if (event.key.toLowerCase() === 'r') { const modalTarget = document.querySelector('[data-bs-target="#reportModal"]'); if (modalTarget) modalTarget.click(); }
         if (event.key.toLowerCase() === 'e') { const editBtn = document.querySelector('a[title="Frage bearbeiten"]'); if (editBtn) editBtn.click(); }
         
-        const mcBtns = document.querySelectorAll('button[name="mc_answer"]');
+        const mcBtns = document.querySelectorAll('button[name="mc_answer"], button[name="answer"]');
         if (mcBtns.length > 0 && event.key > 0 && event.key <= mcBtns.length) mcBtns[event.key - 1].click();
         
         if (document.querySelector('.btn-quality-safe')) {

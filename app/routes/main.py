@@ -14,7 +14,6 @@ bp = Blueprint('main', __name__)
 @bp.before_app_request
 def update_last_active():
     if current_user.is_authenticated:
-        # Performance-Tipp: Wir aktualisieren die Datenbank nur alle 5 Minuten
         if current_user.last_active is None or current_user.last_active < datetime.utcnow() - timedelta(minutes=5):
             current_user.last_active = datetime.utcnow()
             db.session.commit()
@@ -27,9 +26,7 @@ def index():
     check_gamification(current_user)
     global_stats = get_learning_stats(current_user)
     
-    # OPTIMIERT: build_category_tree lädt Daten aggregiert
     tree = build_category_tree(current_user)
-    
     msgs = DashboardMessage.query.filter_by(active=True).order_by(DashboardMessage.created_at.desc()).all()
     
     return render_template('index.html', tree=tree, messages=msgs, global_stats=global_stats)
@@ -66,15 +63,12 @@ def profile():
         flash('Profil erfolgreich gespeichert!', 'success')
         return redirect(url_for('main.profile'))
 
-    # --- INTERAKTIVE STATISTIKEN LOGIK ---
-    # Wir holen alle Kategorien und deren Counts
     total_by_cat = db.session.query(Card.category, func.count(Card.id)).group_by(Card.category).all()
     learned_by_cat = db.session.query(Card.category, func.count(Card.id))\
         .join(UserProgress, UserProgress.card_id == Card.id)\
         .filter(UserProgress.user_id == current_user.id, UserProgress.box > 0)\
         .group_by(Card.category).all()
         
-    # Struktur: { "Hauptkat": { "t": total, "l": learned, "subs": { "Unterkat": {"t": total, "l": learned} } } }
     stats_map = {}
     
     for cat, count in total_by_cat:
@@ -100,14 +94,12 @@ def profile():
             if sub in stats_map[main]['subs']:
                 stats_map[main]['subs'][sub]['l'] += count
 
-    # Daten für das initiale Chart (Ebene 1 - Hauptübersicht)
     labels_lvl1 = []
     data_lvl1 = []
     for m in sorted(stats_map.keys()):
         labels_lvl1.append(m)
         data_lvl1.append(int((stats_map[m]['l'] / stats_map[m]['t']) * 100))
     
-    # Daten für alle Detail-Charts (Ebene 2) vorbereiten
     detail_data = {}
     for m in stats_map:
         s_labels = []
@@ -121,7 +113,6 @@ def profile():
         'main': {'labels': labels_lvl1, 'data': data_lvl1},
         'details': detail_data
     }
-    # ----------------------------------------------
 
     return render_template('profile.html', 
                            attempts=ExamAttempt.query.filter_by(user_id=current_user.id).order_by(ExamAttempt.timestamp.desc()).all(), 
@@ -147,11 +138,21 @@ def reset_category(category_path):
     return redirect(url_for('main.index'))
 
 @bp.route('/leaderboard')
-def leaderboard(): 
-    return render_template('leaderboard.html', 
-                           by_xp=User.query.filter(User.username != 'admin').order_by(User.xp.desc()).limit(10).all(),
-                           by_time=User.query.filter(User.username != 'admin').order_by(User.total_learning_time.desc()).limit(10).all(), 
-                           by_streak=User.query.filter(User.username != 'admin').order_by(User.streak.desc()).limit(10).all())
+@login_required
+def leaderboard():
+    if not current_user.study_class_id:
+        users = []
+        class_name = "Keiner Klasse zugewiesen"
+    else:
+        # User der gleichen Klasse laden, sortiert nach XP (absteigend) und Lernzeit (absteigend)
+        users = User.query.filter_by(study_class_id=current_user.study_class_id, is_admin=False)\
+                          .order_by(User.xp.desc(), User.total_learning_time.desc())\
+                          .all()
+        
+        org_name = current_user.study_class.organization.name
+        class_name = f"{org_name} / {current_user.study_class.name}"
+    
+    return render_template('leaderboard.html', users=users, class_name=class_name)
 
 @bp.route('/search')
 def search():

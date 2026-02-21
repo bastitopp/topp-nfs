@@ -4,43 +4,30 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    /* Globaler Schutz gegen horizontales Scrollen */
     body, html { overflow-x: hidden; }
-
-    /* Sanfte Hover-Effekte für die Kategorien */
     .index-cat-row { 
         transition: background-color 0.2s ease; 
         cursor: pointer; 
         touch-action: manipulation; 
         -webkit-tap-highlight-color: transparent;
-        /* Dynamische Einrückung basierend auf Jinja-Variable */
         padding-left: calc(1rem + (var(--nest-level, 0) * 1.5rem)) !important; 
     }
     .index-cat-row:hover { background-color: rgba(0,0,0,0.03) !important; }
-    
-    /* Der Pfeil dreht sich bei aktiver Klasse */
     .index-cat-row.active .transition-icon { transform: rotate(90deg); }
     .transition-icon { transition: transform 0.2s ease-in-out; }
-    
-    /* Das Untermenü System */
     .custom-collapse { display: none; overflow: hidden; }
     .custom-collapse.show { display: block; }
 
-    /* Darkmode Anpassungen */
     [data-bs-theme="dark"] .index-cat-row:hover { background-color: rgba(255,255,255,0.05) !important; }
     [data-bs-theme="dark"] .index-cat-title { color: #d1d5db !important; }
     [data-bs-theme="dark"] .badge-schwerpunkt { background-color: #2c0b0b !important; color: #ff8585 !important; border-color: #631c1c !important; }
 
-    /* --- MOBILE OPTIMIERUNGEN --- */
     @media (max-width: 576px) {
         .index-cat-row { 
-            /* Auf Handys viel weniger einrücken, aber zwingend in einer Zeile bleiben! */
             padding-left: calc(0.5rem + (var(--nest-level, 0) * 0.75rem)) !important;
             padding-right: 0.5rem !important;
         }
         .dashboard-wrapper h1 { font-size: 2rem; }
-        
-        /* Buttons und Icons etwas kleiner, damit der Text Platz hat */
         .cat-action-btn { width: 32px !important; height: 32px !important; }
         .cat-action-btn i { font-size: 1.1rem !important; }
         .index-cat-icon { font-size: 1.2rem !important; }
@@ -54,12 +41,15 @@
         <div>
             <h1 class="fw-bold mb-1 display-5 text-break">Hallo, {{ current_user.real_name if current_user.real_name else current_user.username }}!</h1>
             <div class="d-flex flex-wrap gap-2 mt-2">
-                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-2 small">
-                    <i class="bi bi-fire me-1"></i> {{ current_user.streak }} Tage Streak
-                </span>
-                <span class="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 rounded-pill px-3 py-2 small">
-                    <i class="bi bi-trophy-fill me-1"></i> {{ current_user.badges|length }} Badges
-                </span>
+                {% if current_user.study_class %}
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-2 small">
+                        <i class="bi bi-building me-1"></i> {{ current_user.study_class.organization.name }} / {{ current_user.study_class.name }}
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-2 small">
+                        <i class="bi bi-person me-1"></i> Keiner Klasse zugewiesen
+                    </span>
+                {% endif %}
             </div>
         </div>
         
@@ -262,13 +252,10 @@
 </div>
 
 <script>
-// Schnellstart: Leitet direkt auf die URL /learn/Alle um
-// Das vermeidet riesige URLs und schützt das Backend vor "Bad Gateway"
 function startQuickLearn() {
     window.location.href = "{{ url_for('learn.learn', category_path='Alle') }}";
 }
 
-// Manuelles Toggle System
 window.manualToggle = function(rowElement) {
     const content = rowElement.nextElementSibling;
     if (!content || !content.classList.contains('custom-collapse')) return;
@@ -285,7 +272,6 @@ window.manualToggle = function(rowElement) {
     }
 };
 
-// Chart Render Logik (Nutzt jetzt die echten/ungedeckelten Werte)
 (function() {
     const ctx = document.getElementById('progressChart');
     if (ctx) {

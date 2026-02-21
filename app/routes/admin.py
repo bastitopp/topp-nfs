@@ -10,7 +10,7 @@ from functools import wraps
 from sqlalchemy import or_
 from flask_mail import Message
 from ..extensions import db, mail
-from ..models import Card, User, Tag, DashboardMessage, CardReport, UserProgress, Scenario, ScenarioNode, ScenarioChoice, ChoiceOutcome, UserScenarioSession
+from ..models import Card, User, Tag, DashboardMessage, CardReport, UserProgress, Scenario, ScenarioNode, ScenarioChoice, ChoiceOutcome, UserScenarioSession, Organization, StudyClass
 
 bp = Blueprint('admin', __name__)
 
@@ -368,21 +368,82 @@ def dismiss_report(rid):
         db.session.commit()
     return redirect(url_for('admin.admin_dashboard', tab='reports'))
 
+# --- BENUTZER, ORGA & KLASSEN VERWALTUNG ---
+
 @bp.route('/admin/users')
 @admin_required
 def admin_users():
-    return render_template('admin_users.html', users=User.query.all())
+    users = User.query.all()
+    organizations = Organization.query.all()
+    classes = StudyClass.query.all()
+    return render_template('admin_users.html', users=users, organizations=organizations, classes=classes)
+
+@bp.route('/admin/org/add', methods=['POST'])
+@admin_required
+def add_org():
+    name = request.form.get('name')
+    if name:
+        if not Organization.query.filter_by(name=name).first():
+            db.session.add(Organization(name=name))
+            db.session.commit()
+            flash(f'Organisation "{name}" angelegt.', 'success')
+        else:
+            flash(f'Organisation "{name}" existiert bereits.', 'warning')
+    return redirect(url_for('admin.admin_users'))
+
+@bp.route('/admin/org/delete/<int:id>', methods=['POST'])
+@admin_required
+def delete_org(id):
+    org = Organization.query.get_or_404(id)
+    # Entferne die Klassen und setze Benutzer zurück
+    for c in org.classes:
+        for u in c.users:
+            u.study_class_id = None
+        db.session.delete(c)
+    db.session.delete(org)
+    db.session.commit()
+    flash(f'Organisation "{org.name}" und zugehörige Klassen gelöscht.', 'success')
+    return redirect(url_for('admin.admin_users'))
+
+@bp.route('/admin/class/add', methods=['POST'])
+@admin_required
+def add_class():
+    name = request.form.get('name')
+    org_id = request.form.get('organization_id')
+    if name and org_id:
+        db.session.add(StudyClass(name=name, organization_id=org_id))
+        db.session.commit()
+        flash(f'Klasse "{name}" angelegt.', 'success')
+    return redirect(url_for('admin.admin_users'))
+
+@bp.route('/admin/class/delete/<int:id>', methods=['POST'])
+@admin_required
+def delete_class(id):
+    c = StudyClass.query.get_or_404(id)
+    for u in c.users:
+        u.study_class_id = None
+    db.session.delete(c)
+    db.session.commit()
+    flash(f'Klasse "{c.name}" gelöscht. Benutzer wurden freigestellt.', 'success')
+    return redirect(url_for('admin.admin_users'))
 
 @bp.route('/admin/users/add', methods=['POST'])
 @admin_required
 def add_user():
     username = request.form.get('username')
     password = request.form.get('password')
+    study_class_id = request.form.get('study_class_id')
     is_admin = 'is_admin' in request.form
+    
     if User.query.filter_by(username=username).first():
         flash('Benutzer existiert bereits!', 'danger')
     else:
-        u = User(username=username, is_admin=is_admin, is_approved=True)
+        u = User(
+            username=username, 
+            is_admin=is_admin, 
+            is_approved=True,
+            study_class_id=study_class_id if study_class_id else None
+        )
         u.set_password(password)
         db.session.add(u)
         db.session.commit()
@@ -417,6 +478,10 @@ def edit_user(uid):
     u.email = request.form.get('email')
     u.real_name = request.form.get('real_name')
     u.is_admin = 'is_admin' in request.form
+    
+    study_class_id = request.form.get('study_class_id')
+    u.study_class_id = study_class_id if study_class_id else None
+    
     new_pw = request.form.get('new_password')
     if new_pw:
         u.set_password(new_pw)
@@ -437,6 +502,36 @@ def delete_user(uid):
         db.session.commit()
         flash('Benutzer gelöscht.', 'success')
     return redirect(url_for('admin.admin_users'))
+
+@bp.route('/admin/users/bulk_assign_class', methods=['POST'])
+@admin_required
+def bulk_assign_class():
+    user_ids = request.form.getlist('selected_users')
+    target_class_id = request.form.get('target_class_id')
+
+    if not user_ids:
+        flash('Keine Benutzer ausgewählt.', 'warning')
+        return redirect(url_for('admin.admin_users'))
+
+    # Wenn ein leerer String gesendet wird, bedeutet das "Keine Klasse" (also entfernen)
+    class_id_val = int(target_class_id) if target_class_id else None
+
+    # Alle ausgewählten Benutzer aus der Datenbank holen
+    users_to_update = User.query.filter(User.id.in_(user_ids)).all()
+    
+    for u in users_to_update:
+        u.study_class_id = class_id_val
+
+    db.session.commit()
+    
+    if class_id_val:
+        flash(f'{len(users_to_update)} Benutzer erfolgreich der neuen Klasse zugewiesen.', 'success')
+    else:
+        flash(f'{len(users_to_update)} Benutzer erfolgreich aus ihren Klassen entfernt.', 'success')
+
+    return redirect(url_for('admin.admin_users'))
+
+# --- SONSTIGES ---
 
 @bp.route('/admin/add_med', methods=['POST'])
 @admin_required
@@ -535,7 +630,7 @@ def import_confirm():
 def add_bpr_scenario():
     title = request.form.get('title')
     dispatch = request.form.get('dispatch_text')
-    category = request.form.get('category', 'Allgemein') # NEU
+    category = request.form.get('category', 'Allgemein')
     
     s = Scenario(title=title, dispatch_text=dispatch, category=category)
     db.session.add(s)
@@ -662,7 +757,7 @@ def export_bpr():
         s_data = {
             'title': s.title,
             'dispatch_text': s.dispatch_text,
-            'category': s.category, # NEU
+            'category': s.category,
             'first_node_id': s.first_node_id,
             'nodes': []
         }
@@ -725,7 +820,7 @@ def import_bpr():
             new_s = Scenario(
                 title=s_data.get('title', 'Importiertes Szenario'),
                 dispatch_text=s_data.get('dispatch_text', 'Unbekanntes Stichwort'),
-                category=s_data.get('category', 'Allgemein') # NEU
+                category=s_data.get('category', 'Allgemein')
             )
             db.session.add(new_s)
             db.session.flush()

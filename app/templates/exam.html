@@ -12,32 +12,7 @@
 
     .bg-adaptive { background-color: var(--bs-tertiary-bg) !important; }
 
-    /* NEU: Wunderschönes Multi-Anatomie Styling */
-    .anatomy-number-badge {
-        width: 36px;
-        height: 36px;
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        border-radius: 50%;
-        background-color: var(--bs-primary);
-        color: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .anatomy-row {
-        background-color: var(--bs-body-bg);
-        border: 1px solid var(--bs-border-color);
-        border-radius: 12px;
-        padding: 10px;
-        margin-bottom: 12px;
-        transition: box-shadow 0.2s;
-    }
-    .anatomy-row:focus-within {
-        box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
-        border-color: var(--bs-primary);
-    }
+    /* Anatomy Empty Slot Styling für Anatomy Single */
     .anatomy-empty-slot {
         background-color: transparent !important;
         background-image: linear-gradient(45deg, rgba(128, 128, 128, 0.1) 25%, transparent 25%, transparent 50%, rgba(128, 128, 128, 0.1) 50%, rgba(128, 128, 128, 0.1) 75%, transparent 75%, transparent) !important;
@@ -53,6 +28,38 @@
     }
     [data-bs-theme="dark"] .anatomy-empty-slot {
         background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.1) 75%, transparent 75%, transparent) !important;
+    }
+
+    /* Multi Anatomy Dropzone & Legend Styles (für Prüfungsmodus angepasst) */
+    .anatomy-dropzone {
+        position: absolute; width: 32px; height: 32px;
+        background-color: rgba(255, 255, 255, 0.9); border: 3px solid var(--bs-primary); border-radius: 50%;
+        display: flex; justify-content: center; align-items: center; cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.2s ease; 
+        z-index: 10; transform: translate(-50%, -50%); 
+    }
+    .anatomy-dropzone:hover { transform: translate(-50%, -50%) scale(1.1); }
+    .anatomy-image-container { padding: 2% !important; overflow: visible !important; }
+
+    .anatomy-dropzone.assigned {
+        width: auto !important; height: auto !important;
+        padding: 4px 8px !important; border-radius: 6px !important;
+        background-color: var(--bs-primary) !important; 
+        border: 2px solid white !important; color: white !important;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.3) !important; z-index: 50;
+        display: flex !important; flex-direction: column !important; 
+        justify-content: center !important; align-items: center !important;
+        transform: translate(-50%, -50%) !important;
+    }
+    .anatomy-dropzone.assigned:hover {
+        transform: translate(-50%, -50%) scale(1.05) !important; z-index: 100;
+        box-shadow: 0 0 0 4px rgba(var(--bs-primary-rgb), 0.3) !important;
+    }
+
+    .anatomy-legend-item { transition: all 0.2s ease; cursor: default; }
+    .anatomy-legend-item.legend-hover {
+        transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+        background-color: rgba(var(--bs-primary-rgb), 0.1) !important; border-color: var(--bs-primary) !important;
     }
 </style>
 
@@ -84,10 +91,12 @@
                 
                 <h5 class="fw-bold mb-3">{{ card.question }}</h5>
 
-                {% if card.image_url %}
-                    <div class="text-center mb-4">
-                        <img src="{{ card.image_url }}" class="img-fluid rounded border shadow-sm" style="max-height: 400px; object-fit: contain;">
-                    </div>
+                {% if card.type != 'anatomy_multi' %}
+                    {% if card.image_url %}
+                        <div class="text-center mb-4">
+                            <img src="{{ card.image_url }}" class="img-fluid rounded border shadow-sm" style="max-height: 400px; object-fit: contain;">
+                        </div>
+                    {% endif %}
                 {% endif %}
 
                 {% if card.audio_url %}
@@ -141,30 +150,66 @@
                     </div>
 
                 {% elif card.type == 'anatomy_multi' %}
-                    <p class="small text-muted mb-3">Benenne die markierten Strukturen:</p>
-                    {% for part in opts %}
-                    <div class="anatomy-row d-flex flex-column flex-sm-row align-items-sm-center gap-2">
-                        <div class="anatomy-number-badge shadow-sm">{{ part.id }}</div>
-                        <div class="row g-2 flex-grow-1 m-0 w-100">
-                            <div class="col-12 col-sm-6 p-0 pe-sm-1">
-                                {% if part.de in ['-', '%'] or not part.de %}
-                                    <div class="form-control anatomy-empty-slot" title="Feld entfällt"><i class="bi bi-slash-lg small"></i></div>
-                                {% else %}
-                                    <input type="text" name="q_{{ card.id }}_{{ part.id }}_de" class="form-control" placeholder="Deutsch" autocomplete="off">
-                                {% endif %}
+                    <div class="alert alert-info small text-center mb-3 shadow-sm border-0">
+                        <i class="bi bi-hand-index-thumb fw-bold me-1 fs-5"></i> Ordne die Begriffe den richtigen Punkten auf dem Bild zu.
+                    </div>
+
+                    <div class="text-center mb-4 position-relative exam-anatomy-container" data-card-id="{{ card.id }}">
+                        <div class="anatomy-image-container w-100 text-center">
+                            <div class="position-relative d-inline-block anatomy-img-wrapper" style="max-width: 100%;">
+                                <img src="{{ card.image_url }}" class="rounded shadow-sm img-fluid" style="max-height: 55vh; display: block; margin: 0 auto; pointer-events: none;">
+                                
+                                <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;">
+                                    <defs>
+                                        <marker id="arrowhead-exam-{{ card.id }}" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                                            <polygon points="0 0, 6 2, 0 4" fill="#000000" />
+                                        </marker>
+                                        <marker id="dot-exam-{{ card.id }}" markerWidth="4" markerHeight="4" refX="2" refY="2">
+                                            <circle cx="2" cy="2" r="2" fill="#000000" />
+                                        </marker>
+                                    </defs>
+                                    {% for item in opts %}
+                                        {% if item.has_arrow %}
+                                            <line x1="{{ item.origin_x }}%" y1="{{ item.origin_y }}%" x2="{{ item.x }}%" y2="{{ item.y }}%" stroke="#000000" stroke-width="1.5" marker-end="url(#arrowhead-exam-{{ card.id }})" marker-start="url(#dot-exam-{{ card.id }})" />
+                                        {% endif %}
+                                    {% endfor %}
+                                </svg>
+
+                                {% for item in opts %}
+                                <div class="anatomy-dropzone" 
+                                     style="left: {{ item.origin_x if item.has_arrow else item.x }}%; top: {{ item.origin_y if item.has_arrow else item.y }}%; z-index: 10;"
+                                     data-id="{{ item.id }}" data-de="{{ item.de | e }}" data-lat="{{ item.lat | e }}">
+                                    <i class="bi bi-question fs-5 text-primary fw-bold"></i>
+                                </div>
+                                {% endfor %}
                             </div>
-                            <div class="col-12 col-sm-6 p-0 ps-sm-1">
-                                {% if part.lat in ['-', '%'] or not part.lat %}
-                                    <div class="form-control anatomy-empty-slot" title="Feld entfällt"><i class="bi bi-slash-lg small"></i></div>
-                                {% else %}
-                                    <input type="text" name="q_{{ card.id }}_{{ part.id }}_lat" class="form-control" placeholder="Latein" autocomplete="off">
-                                {% endif %}
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 justify-content-center mt-4 anatomy-labels-pool">
+                            {% set labels = [] %}
+                            {% for item in opts %}
+                                {% if item.de and item.de not in ['-', '%'] %}{% set _ = labels.append({'val': item.de, 'type': 'de', 'id': item.id}) %}{% endif %}
+                                {% if item.lat and item.lat not in ['-', '%'] %}{% set _ = labels.append({'val': item.lat, 'type': 'lat', 'id': item.id}) %}{% endif %}
+                            {% endfor %}
+                            
+                            {% for label in labels | shuffle %}
+                                <button type="button" class="btn btn-outline-{{ 'primary' if label.type == 'de' else 'secondary' }} rounded-pill anatomy-label-btn shadow-sm fw-bold text-wrap lh-sm py-2 px-3" 
+                                        data-val="{{ label.val | e }}" data-type="{{ label.type }}">
+                                    {{ label.val }} <small class="fw-normal opacity-75 d-block d-sm-inline">({{ 'DE' if label.type == 'de' else 'LAT' }})</small>
+                                </button>
+                            {% endfor %}
+                        </div>
+
+                        <div class="anatomy-legend-container card bg-light border-primary border-opacity-25 shadow-sm d-none mt-4 text-start">
+                            <div class="card-header bg-primary bg-opacity-10 text-primary fw-bold border-bottom-0 pb-2">
+                                <i class="bi bi-card-checklist me-1"></i> Deine Zuordnungen
+                            </div>
+                            <div class="card-body p-3">
+                                <div class="anatomy-legend d-flex flex-wrap gap-2"></div>
                             </div>
                         </div>
                     </div>
-                    {% endfor %}
-
-                {% elif card.type == 'ordering' %}
+                    {% elif card.type == 'ordering' %}
                     <input type="hidden" name="q_{{ card.id }}" id="input_q_{{ card.id }}" class="order-input">
                     <div class="small text-muted mb-2">Ziehe die Elemente in die richtige Reihenfolge:</div>
                     <ul class="list-group sortable-list" id="sort_{{ card.id }}" data-target="input_q_{{ card.id }}">
@@ -212,28 +257,125 @@
 </div>
 
 <script>
-    let timeMinutes = {{ estimated_time|default(30) }};
+    // --- TIMER LOGIK (Bulletproof gegen JS-Abstürze) ---
+    // parseInt verhindert Fehler, falls die Variable in Jinja leer / None ist.
+    let timeMinutes = parseInt("{{ estimated_time or 30 }}", 10) || 30;
     let timeSeconds = timeMinutes * 60;
     const display = document.getElementById('timerDisplay');
+    const form = document.getElementById('examForm');
+    
+    // Timer direkt initial anzeigen, um "--:--" zu verhindern
+    function updateTimerDisplay() {
+        let m = Math.floor(timeSeconds / 60);
+        let s = timeSeconds % 60;
+        if (timeSeconds < 120 && timeSeconds > 0) display.classList.add('text-danger', 'blink');
+        else display.classList.remove('blink');
+        display.innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+    }
+    updateTimerDisplay();
     
     const timerInterval = setInterval(() => {
         if (timeSeconds <= 0) {
             clearInterval(timerInterval);
             display.classList.add('text-danger');
+            display.classList.remove('blink');
             display.innerText = "00:00";
             alert("Die Zeit ist abgelaufen! Deine Prüfung wird nun automatisch abgegeben.");
             submitExam();
         } else {
             timeSeconds--;
-            let m = Math.floor(timeSeconds / 60);
-            let s = timeSeconds % 60;
-            if (timeSeconds < 120) display.classList.add('text-danger', 'blink');
-            display.innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+            updateTimerDisplay();
         }
     }, 1000);
 
-    const form = document.getElementById('examForm');
-    
+    // --- ANATOMIE MULTI LOGIK ---
+    function initExamAnatomyMulti() {
+        document.querySelectorAll('.exam-anatomy-container').forEach(container => {
+            const cardId = container.getAttribute('data-card-id');
+            let selectedLabel = null;
+            
+            // 1. Label/Begriff anklicken
+            container.querySelectorAll('.anatomy-label-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    container.querySelectorAll('.anatomy-label-btn').forEach(b => {
+                        b.classList.remove('btn-primary', 'btn-secondary', 'text-white');
+                        let type = b.getAttribute('data-type');
+                        b.classList.add(type === 'de' ? 'btn-outline-primary' : 'btn-outline-secondary');
+                    });
+                    let type = this.getAttribute('data-type');
+                    this.classList.remove(type === 'de' ? 'btn-outline-primary' : 'btn-outline-secondary');
+                    this.classList.add(type === 'de' ? 'btn-primary' : 'btn-secondary', 'text-white');
+                    selectedLabel = this;
+                });
+            });
+
+            // 2. Zielpunkt (Dropzone) anklicken
+            container.querySelectorAll('.anatomy-dropzone').forEach(zone => {
+                zone.addEventListener('click', function() {
+                    if(!selectedLabel) return;
+                    
+                    let type = selectedLabel.getAttribute('data-type');
+                    let selectedVal = selectedLabel.getAttribute('data-val');
+                    let id = this.getAttribute('data-id');
+                    
+                    // Im Prüfungs-Modus erlauben wir die Zuweisung (ohne Richtig/Falsch Feedback)
+                    let alreadyAssigned = this.getAttribute('data-assigned-' + type);
+                    
+                    if(!alreadyAssigned) {
+                        this.setAttribute('data-assigned-' + type, selectedVal);
+                        this.classList.add('assigned');
+                        
+                        let assignedDe = this.getAttribute('data-assigned-de');
+                        let assignedLat = this.getAttribute('data-assigned-lat');
+                        
+                        let labelHtml = '';
+                        if (assignedDe) {
+                            labelHtml += `<div class="fw-bold" style="white-space: nowrap; line-height: 1.2;">${assignedDe} <span style="font-weight: normal; font-size: 0.85em; opacity: 0.9;">(DE)</span></div>`;
+                        }
+                        if (assignedLat) {
+                            labelHtml += `<div style="white-space: nowrap; line-height: 1.2; font-size: 0.9em;">${assignedLat} <span style="font-size: 0.85em; opacity: 0.9;">(LAT)</span></div>`;
+                        }
+                        this.innerHTML = labelHtml;
+                        
+                        // Button aus der Liste entfernen
+                        selectedLabel.style.visibility = 'hidden';
+                        selectedLabel.classList.remove('anatomy-label-btn'); 
+                        selectedLabel = null;
+                        
+                        // Unsichtbares Input-Feld für das Formular erstellen (z.B. name="q_5_1_de")
+                        let hiddenInp = document.createElement('input');
+                        hiddenInp.type = 'hidden'; 
+                        hiddenInp.name = `q_${cardId}_${id}_${type}`;
+                        hiddenInp.value = selectedVal;
+                        form.appendChild(hiddenInp);
+
+                        // In der Legende anzeigen
+                        const legendContainer = container.querySelector('.anatomy-legend-container');
+                        const legend = container.querySelector('.anatomy-legend');
+                        if(legendContainer) legendContainer.classList.remove('d-none');
+                        
+                        let existingLegendItem = container.querySelector('#legend-item-' + cardId + '-' + id);
+                        let typeLabel = type === 'de' ? 'DE' : 'LAT';
+
+                        if (existingLegendItem) {
+                            let textContainer = existingLegendItem.querySelector('.legend-text');
+                            textContainer.innerHTML += ` <span class="text-muted mx-1">/</span> ${selectedVal} <small class="text-muted fw-normal">(${typeLabel})</small>`;
+                        } else {
+                            const legendBadge = document.createElement('div');
+                            legendBadge.id = 'legend-item-' + cardId + '-' + id;
+                            legendBadge.className = `anatomy-legend-item badge bg-white text-dark border border-primary border-opacity-50 d-flex align-items-center gap-2 p-2 shadow-sm fs-6`;
+                            legendBadge.innerHTML = `<span class="badge-num badge bg-primary text-white rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">${id}</span> <span class="legend-text fw-medium">${selectedVal} <small class="text-muted fw-normal">(${typeLabel})</small></span>`;
+                            
+                            if(legend) legend.appendChild(legendBadge);
+                        }
+                    }
+                });
+            });
+        });
+    }
+
+    // --- FORMULAR LOGIK ---
     function collectData() {
         document.querySelectorAll('.sortable-list').forEach(list => {
             const targetId = list.getAttribute('data-target');
@@ -282,6 +424,9 @@
                 new Sortable(dz, { group: groupName, animation: 150 });
             });
         });
+
+        // Anatomie-Feature initialisieren
+        initExamAnatomyMulti();
     });
 </script>
 {% endblock %}

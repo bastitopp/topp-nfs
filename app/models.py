@@ -15,6 +15,19 @@ user_badges = db.Table('user_badges',
     db.Column('earned_at', db.DateTime, default=datetime.utcnow)
 )
 
+# --- NEU: Organisationen und Klassen ---
+class Organization(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    classes = db.relationship('StudyClass', backref='organization', lazy=True)
+
+class StudyClass(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
+    users = db.relationship('User', backref='study_class', lazy=True)
+# ---------------------------------------
+
 class UserGroup(db.Model):
     __tablename__ = 'user_group'
     id = db.Column(db.Integer, primary_key=True)
@@ -69,6 +82,7 @@ class User(UserMixin, db.Model):
     
     badges = db.relationship('Badge', secondary=user_badges, lazy='subquery', backref=db.backref('users', lazy=True))
     group_id = db.Column(db.Integer, db.ForeignKey('user_group.id'), nullable=True)
+    study_class_id = db.Column(db.Integer, db.ForeignKey('study_class.id'), nullable=True) # NEU
     
     def set_password(self, pw): self.password_hash = generate_password_hash(pw)
     def check_password(self, pw): return check_password_hash(self.password_hash, pw)
@@ -144,7 +158,7 @@ class Scenario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     dispatch_text = db.Column(db.String(255), nullable=False)
-    category = db.Column(db.String(100), nullable=True) # NEU hinzugefügt für zukünftige Gruppierung
+    category = db.Column(db.String(100), nullable=True) 
     first_node_id = db.Column(db.Integer)
     nodes = db.relationship('ScenarioNode', backref='scenario', lazy=True, cascade="all, delete-orphan")
 
