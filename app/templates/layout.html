@@ -10,8 +10,11 @@
 
     <script>
         (function() {
-            const stored = localStorage.getItem('t');
-            const theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            // Alte manuelle Einstellungen aus dem Browser-Speicher löschen
+            localStorage.removeItem('t');
+            
+            // Immer direkt das System-Theme abfragen
+            const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
             document.documentElement.setAttribute('data-bs-theme', theme);
         })();
     </script>
@@ -261,7 +264,10 @@
         function toggleTheme() {
             const current = document.documentElement.getAttribute('data-bs-theme');
             const next = current === 'light' ? 'dark' : 'light';
-            localStorage.setItem('t', next);
+            
+            // Kein localStorage.setItem mehr! Der manuelle Wechsel gilt jetzt 
+            // nur noch temporär bis zum Neuladen oder bis das System umschaltet.
+            
             document.documentElement.setAttribute('data-bs-theme', next);
             updateIcons(next);
         }
@@ -280,6 +286,14 @@
         // NEU: HTMX Event: Führt Theme-Aktualisierungen auch nach einem weichen Seitenwechsel aus
         document.addEventListener('htmx:afterSwap', () => {
             updateIcons(document.documentElement.getAttribute('data-bs-theme'));
+        });
+
+        // NEU: Hört in Echtzeit auf Änderungen der Systemeinstellungen (Hell/Dunkel)
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            const newTheme = event.matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-bs-theme', newTheme);
+            updateIcons(newTheme);
+            localStorage.removeItem('t'); 
         });
     </script>
 </body>
