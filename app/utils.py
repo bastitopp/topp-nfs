@@ -319,4 +319,8 @@ def render_learn_card(card, user, context_path):
             for i in g.get('items', []): pool.append({'val': i, 'group': g.get('name')})
         random.shuffle(pool)
         
-    return render_template('quiz.html', card=card, options=opts, pool_items=pool, finished=False, box=box, current_category=context_path, calc_data=calc_data, card_status=card_status)
+    # --- NEU: Verbleibende Karten in der Session berechnen ---
+    stats = get_learning_stats(user)
+    verbleibend = max(0, stats.get('daily_total', 0) - stats.get('daily_done', 0))
+        
+    return render_template('quiz.html', card=card, options=opts, pool_items=pool, finished=False, box=box, current_category=context_path, calc_data=calc_data, card_status=card_status, remaining_cards=verbleibend)

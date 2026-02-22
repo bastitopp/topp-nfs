@@ -8,25 +8,60 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}?v=4">
 <script src="{{ url_for('static', filename='js/quiz.js') }}?v=4" defer></script>
 
+<style>
+    /* FEATURE 4: XP Animation CSS */
+    .xp-floater {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        color: #ffc107;
+        font-weight: 900;
+        font-size: 1.2rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        pointer-events: none;
+        animation: floatUp 1.5s ease-out forwards;
+        z-index: 100;
+    }
+    @keyframes floatUp {
+        0% { opacity: 0; transform: translateY(-50%) scale(0.5); }
+        20% { opacity: 1; transform: translateY(-120%) scale(1.2); }
+        100% { opacity: 0; transform: translateY(-300%) scale(1); }
+    }
+    /* FEATURE 1: Queue Progress Divider */
+    .queue-divider { width: 1px; background: rgba(0,0,0,0.1); height: 20px; margin: 0 10px; }
+    [data-bs-theme="dark"] .queue-divider { background: rgba(255,255,255,0.1); }
+</style>
+
 <div class="container py-2 py-sm-3" style="max-width: 800px;">
     {% if not finished %}
-    <div class="d-flex align-items-center mb-3 bg-white p-2 rounded-pill shadow-sm border">
+    
+    <div class="d-flex align-items-center mb-3 bg-white p-2 rounded-pill shadow-sm border position-relative" id="xp-container">
         <div class="badge bg-primary rounded-pill me-2">Lvl {{ current_user.get_level() }}</div>
         <div class="progress flex-grow-1" style="height: 8px;"><div class="progress-bar bg-warning" style="width: {{ current_user.get_level_progress() }}%"></div></div>
-        <div class="ms-2 small text-muted text-nowrap">{{ current_user.xp }} XP</div>
+        <div class="ms-2 small fw-bold text-muted text-nowrap d-flex align-items-center">
+            <span id="xp-text">{{ current_user.xp }} XP</span>
+            
+            {% if remaining_cards is defined %}
+            <div class="queue-divider d-none d-sm-block"></div>
+            <span class="d-none d-sm-flex align-items-center text-secondary" title="Verbleibende Karten in dieser Sitzung">
+                <i class="bi bi-stack me-1"></i> {{ remaining_cards }}
+            </span>
+            {% endif %}
+        </div>
     </div>
 
     {% set active_reports = card.reports | selectattr('resolved', 'equalto', False) | list %}
 
     <div class="d-flex justify-content-between align-items-center mb-3 mb-sm-4">
         <a href="{{ url_for('main.index') }}" class="btn btn-light btn-sm rounded-pill px-3 shadow-sm text-nowrap">← Exit</a>
-        <div class="d-flex flex-wrap gap-2 justify-content-end">
+        <div class="d-flex flex-wrap gap-2 justify-content-end align-items-center">
+
             {% if current_user.is_admin %}
                 <a href="{{ url_for('admin.edit_card', card_id=card.id, next=url_for('learn.learn', category_path=current_category)) }}" class="btn btn-sm btn-outline-primary border-0" title="Frage bearbeiten"><i class="bi bi-pencil-fill"></i></a>
             {% endif %}
             
             {% if not feedback %}
-                <a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 px-sm-3" title="Überspringen [S]">Überspringen</a>
+                <a id="skipBtn" href="{{ url_for('learn.learn', category_path=current_category, skip_id=card.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 px-sm-3 loader-link" title="Überspringen [S]">Überspringen</a>
             {% endif %}
             
             {% if active_reports %}
@@ -93,7 +128,7 @@
         {% endif %}
 
         <div class="answer-section">
-            <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="quizForm" class="w-100" data-card-type="{{ card.type }}">
+            <form action="{{ url_for('learn.submit', card_id=card.id) }}" method="POST" id="quizForm" class="w-100 submit-loader-form" data-card-type="{{ card.type }}">
                 <input type="hidden" name="start_time" value="{{ now.timestamp() }}">
                 <input type="hidden" name="origin_path" value="{{ current_category }}">
 
@@ -115,18 +150,18 @@
             <div class="mt-4 pt-4 border-top">
                 {% if is_correct %}
                     <p class="small text-muted text-center mb-3 fw-bold">Wie sicher warst du dir?</p>
-                    <form action="{{ url_for('learn.submit_quality', card_id=card.id) }}" method="POST" class="d-flex flex-column flex-sm-row gap-2 gap-sm-3">
+                    <form action="{{ url_for('learn.submit_quality', card_id=card.id) }}" method="POST" class="d-flex flex-column flex-sm-row gap-2 gap-sm-3 submit-loader-form">
                         <input type="hidden" name="origin_path" value="{{ current_category }}">
-                        <button type="submit" name="quality" value="3" class="btn btn-outline-warning flex-grow-1 py-3 rounded-pill fw-bold fs-5">
-                            Geraten <span class="badge bg-warning text-dark ms-2">[1]</span>
+                        <button type="submit" name="quality" value="3" class="btn btn-outline-warning flex-grow-1 py-3 rounded-pill fw-bold fs-5 loading-btn">
+                            <span class="btn-text">Geraten <span class="badge bg-warning text-dark ms-2">[1]</span></span>
                         </button>
-                        <button type="submit" name="quality" value="5" class="btn btn-primary btn-quality-safe flex-grow-1 py-3 rounded-pill fw-bold shadow-sm fs-5">
-                            Gewusst <span class="badge bg-white text-primary ms-2">[2]</span>
+                        <button type="submit" name="quality" value="5" class="btn btn-primary btn-quality-safe flex-grow-1 py-3 rounded-pill fw-bold shadow-sm fs-5 loading-btn">
+                            <span class="btn-text">Gewusst <span class="badge bg-white text-primary ms-2">[2]</span></span>
                         </button>
                     </form>
                 {% else %}
-                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-next-question w-100 py-3 rounded-pill fw-bold shadow fs-5">
-                        Nächste Frage <span class="badge bg-white text-primary ms-2 d-none d-sm-inline">[Enter]</span>
+                    <a href="{{ url_for('learn.learn', category_path=current_category) }}" class="btn btn-primary btn-next-question loader-link w-100 py-3 rounded-pill fw-bold shadow fs-5 text-center">
+                        <span class="btn-text">Nächste Frage <span class="badge bg-white text-primary ms-2 d-none d-sm-inline">[Enter]</span></span>
                     </a>
                 {% endif %}
             </div>
@@ -135,19 +170,29 @@
 
     <div class="modal fade" id="reportModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <form action="{{ url_for('learn.report_card', card_id=card.id) }}" method="POST" class="modal-content border-0 shadow">
+            <form action="{{ url_for('learn.report_card', card_id=card.id) }}" method="POST" class="modal-content border-0 shadow submit-loader-form">
                 <input type="hidden" name="origin_path" value="{{ current_category }}">
                 <div class="modal-header bg-danger text-white border-0">
                     <h5 class="modal-title fw-bold"><i class="bi bi-flag-fill me-2"></i>Fehler melden</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <p class="text-muted small mb-3">Ist die Frage unverständlich, falsch oder enthält Rechtschreibfehler? Bitte beschreibe das Problem kurz.</p>
-                    <textarea name="reason" class="form-control bg-light" rows="4" required placeholder="Was genau ist falsch?"></textarea>
+                    <p class="text-muted small mb-3">Bitte wähle die Art des Fehlers und beschreibe ihn kurz.</p>
+                    
+                    <select name="reason_category" class="form-select mb-3 bg-light shadow-sm border-0" required>
+                        <option value="" disabled selected>Art des Fehlers wählen...</option>
+                        <option value="Rechtschreibung">Rechtschreib- / Tippfehler</option>
+                        <option value="Inhalt">Inhaltlich falsch</option>
+                        <option value="Medien">Bild/Audio fehlt oder ist defekt</option>
+                        <option value="Verständnis">Frage ist unverständlich</option>
+                        <option value="Sonstiges">Sonstiges</option>
+                    </select>
+
+                    <textarea name="reason" class="form-control bg-light border-0 shadow-sm" rows="3" required placeholder="Was genau ist falsch? (Bitte kurz erläutern)"></textarea>
                 </div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Abbrechen</button>
-                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">Meldung absenden</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm loading-btn"><span class="btn-text">Meldung absenden</span></button>
                 </div>
             </form>
         </div>
@@ -160,8 +205,8 @@
             
             <div class="d-flex flex-column flex-sm-row justify-content-center gap-3 mb-5">
                 <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary btn-lg rounded-pill px-4 py-3 shadow-sm fw-bold w-100 w-sm-auto"><i class="bi bi-house-door-fill me-2"></i> Zurück</a>
-                <a href="{{ url_for('learn.learn', category_path=category, ignore_limit='true') }}" class="btn btn-primary btn-lg rounded-pill px-4 py-3 shadow fw-bold w-100 w-sm-auto">
-                    <i class="bi bi-fire me-2"></i> Weiterlernen
+                <a href="{{ url_for('learn.learn', category_path=category, ignore_limit='true') }}" class="btn btn-primary btn-lg rounded-pill px-4 py-3 shadow fw-bold w-100 w-sm-auto loader-link">
+                    <span class="btn-text"><i class="bi bi-fire me-2"></i> Weiterlernen</span>
                 </a>
             </div>
         </div>
@@ -170,4 +215,98 @@
         </script>
     {% endif %}
 </div>
+
+<script>
+// 1. Die Funktion global an 'window' binden, damit HTMX sie nicht jedes Mal neu erfindet
+window.handleQuizShortcuts = function(e) {
+    // Shortcuts blockieren, wenn der Nutzer gerade in ein Textfeld tippt (z.B. bei Anatomie)
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    const key = e.key.toLowerCase();
+
+    if (key === 's') {
+        const skipBtn = document.getElementById('skipBtn');
+        if (skipBtn) skipBtn.click();
+    } else if (key === 'r') {
+        const reportBtn = document.querySelector('[data-bs-target="#reportModal"]');
+        if (reportBtn) reportBtn.click();
+    } else if (key === '1') {
+        const guessBtn = document.querySelector('button[name="quality"][value="3"]');
+        if (guessBtn) guessBtn.click();
+    } else if (key === '2') {
+        const knowBtn = document.querySelector('button[name="quality"][value="5"]');
+        if (knowBtn) knowBtn.click();
+    } else if (e.key === 'Enter') {
+        const nextBtn = document.querySelector('.btn-next-question');
+        if (nextBtn) {
+            e.preventDefault(); // Verhindert unerwünschtes Scrollen oder Formular-Doppelsenden
+            nextBtn.click();
+        }
+    }
+};
+
+function initQuizFeatures() {
+    // NEU: Globalen Listener sauber entfernen und neu setzen (dank window-Binding klappt das jetzt!)
+    document.removeEventListener('keydown', window.handleQuizShortcuts);
+    document.addEventListener('keydown', window.handleQuizShortcuts);
+
+    // Lade-Zustände für Formulare (verhindert Doppel-Klicks)
+    document.querySelectorAll('.submit-loader-form:not(.initialized)').forEach(form => {
+        form.classList.add('initialized');
+        form.addEventListener('submit', function(e) {
+            const btns = form.querySelectorAll('button[type="submit"]');
+            setTimeout(() => {
+                btns.forEach(b => {
+                    if (!b.disabled) {
+                        b.disabled = true;
+                        const textSpan = b.querySelector('.btn-text');
+                        if(textSpan) {
+                            textSpan.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Bitte warten...';
+                        } else {
+                            b.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                        }
+                    }
+                });
+            }, 10);
+        });
+    });
+
+    // Lade-Zustände für A-Tags
+    document.querySelectorAll('.loader-link:not(.initialized)').forEach(link => {
+        link.classList.add('initialized');
+        link.addEventListener('click', function(e) {
+            if(!this.classList.contains('disabled')) {
+                this.classList.add('disabled');
+                this.style.pointerEvents = 'none';
+                const textSpan = this.querySelector('.btn-text');
+                if(textSpan) {
+                    textSpan.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Lädt...';
+                } else {
+                    this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                }
+            }
+        });
+    });
+}
+
+// Initialisierung beim ersten Seitenaufruf
+initQuizFeatures();
+
+// Initialisierung nach jedem HTMX-Swap
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    initQuizFeatures();
+});
+
+// Animiertes XP Feedback
+{% if feedback and is_correct %}
+const xpContainer = document.getElementById("xp-container");
+if (xpContainer) {
+    const floater = document.createElement("div");
+    floater.className = "xp-floater";
+    floater.innerHTML = "+ XP <i class='bi bi-star-fill small'></i>";
+    xpContainer.appendChild(floater);
+    setTimeout(() => floater.remove(), 2000);
+}
+{% endif %}
+</script>
 {% endblock %}
