@@ -123,6 +123,12 @@
         #scrollTopBtn { position: fixed; bottom: 95px; right: 20px; width: 45px; height: 45px; z-index: 1040; transition: 0.3s; opacity: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
         @media (min-width: 992px) { #scrollTopBtn { bottom: 80px; } }
         .show-scroll-btn { opacity: 1 !important; pointer-events: auto !important; }
+
+        /* FEATURE 7: iOS Install Popup */
+        #ios-install-popup { position: fixed; bottom: 95px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; background-color: var(--bs-primary); color: white; padding: 15px; border-radius: 16px; z-index: 1060; display: none; box-shadow: 0 10px 25px rgba(13, 110, 253, 0.4); animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #ios-install-popup .popup-arrow { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bs-primary); }
+        #ios-install-popup .btn-close-white { filter: invert(1) grayscale(100%) brightness(200%); opacity: 0.8; font-size: 0.8rem; }
+        @keyframes slideUp { from { bottom: 0; opacity: 0; } to { bottom: 95px; opacity: 1; } }
     </style>
 </head>
 <body class="d-flex flex-column" hx-boost="true">
@@ -131,6 +137,17 @@
 
     <div id="offline-banner" class="bg-danger text-white text-center py-1 fw-bold shadow-sm" style="display: none; position: sticky; top: 0; z-index: 1070; font-size: 0.85rem;">
         <i class="bi bi-wifi-off me-2"></i>Keine Internetverbindung. App ist im Offline-Modus.
+    </div>
+
+    <div id="ios-install-popup">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <strong class="d-flex align-items-center"><i class="bi bi-apple me-2 fs-5"></i>App installieren</strong>
+            <button type="button" class="btn-close btn-close-white" aria-label="Close" onclick="dismissIosPopup()"></button>
+        </div>
+        <p class="mb-0" style="font-size: 0.85rem; line-height: 1.4;">
+            Tippe unten auf das Teilen-Symbol <i class="bi bi-box-arrow-up mx-1"></i> und wähle <strong>"Zum Home-Bildschirm"</strong>, um die App offline und als Vollbild zu nutzen.
+        </p>
+        <div class="popup-arrow"></div>
     </div>
 
     <nav class="navbar navbar-expand-lg navbar-top sticky-top border-bottom">
@@ -318,41 +335,60 @@
 
         // --- FEATURE 5: VERBESSERTE Pull-to-Refresh Logik ---
         let pStart = { y: 0, x: 0 };
-        
         document.addEventListener('touchstart', e => {
-            pStart.y = e.touches[0].screenY;
-            pStart.x = e.touches[0].screenX;
+            pStart.y = e.touches[0].screenY; pStart.x = e.touches[0].screenX;
         }, {passive: true});
 
         document.addEventListener('touchend', e => {
             if (window.scrollY <= 10) {
                 let yDiff = e.changedTouches[0].screenY - pStart.y;
                 let xDiff = Math.abs(e.changedTouches[0].screenX - pStart.x);
-                
                 if (yDiff > 150 && xDiff < 60) {
                     let bar = document.getElementById('top-progress-bar');
-                    if(bar) {
-                        bar.style.opacity = '1';
-                        bar.style.width = '40%';
-                    }
+                    if(bar) { bar.style.opacity = '1'; bar.style.width = '40%'; }
                     setTimeout(() => location.reload(), 200);
                 }
             }
         }, {passive: true});
 
-        // --- FEATURE 6: Service Worker Registrierung (Offline Caching) ---
+        // --- FEATURE 6: Service Worker Registrierung ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                // Die Registrierung läuft jetzt über den Root-Pfad
                 navigator.serviceWorker.register("/sw.js")
-                    .then(registration => {
-                        console.log('Service Worker erfolgreich registriert! Scope:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.error('Service Worker Registrierung fehlgeschlagen:', error);
-                    });
+                    .then(registration => console.log('Service Worker registriert! Scope:', registration.scope))
+                    .catch(err => console.error('SW Registrierung fehlgeschlagen:', err));
             });
         }
+
+        // --- FEATURE 7: iOS Install Popup Logik ---
+        function dismissIosPopup() {
+            document.getElementById('ios-install-popup').style.display = 'none';
+            localStorage.setItem('iosPopupDismissed', 'true');
+        }
+
+        window.addEventListener('load', () => {
+            // Check ob iOS (iPhone, iPad, iPod)
+            const isIos = () => {
+                const userAgent = window.navigator.userAgent.toLowerCase();
+                return /iphone|ipad|ipod/.test(userAgent);
+            };
+            
+            // Check ob die App bereits als PWA/Standalone läuft
+            const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+            
+            // Check ob der User das Popup schon mal weggedrückt hat
+            const isDismissed = localStorage.getItem('iosPopupDismissed') === 'true';
+
+            // Check ob der Browser Safari ist (Chrome auf iOS hat andere Buttons)
+            const isSafari = window.navigator.userAgent.toLowerCase().includes('safari') && !window.navigator.userAgent.toLowerCase().includes('crios');
+
+            if (isIos() && !isStandalone && !isDismissed && isSafari) {
+                // Wir warten 2 Sekunden nach dem Laden, damit es nicht zu aggressiv wirkt
+                setTimeout(() => {
+                    document.getElementById('ios-install-popup').style.display = 'block';
+                }, 2000);
+            }
+        });
     </script>
 </body>
 </html>
