@@ -4,12 +4,14 @@ function initQuizFeatures() {
 
     // --- Allgemeine Listen-Features (Ordering & Assignment) ---
     const sortList = document.getElementById('sortable_list');
-    if (sortList) {
+    if (sortList && !sortList.hasAttribute('data-init')) {
+        sortList.setAttribute('data-init', 'true');
         new Sortable(sortList, { animation: 150, ghostClass: 'bg-info', dragClass: 'shadow-lg', delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3 });
     }
 
     const poolEl = document.getElementById('assignment_pool');
-    if (poolEl) {
+    if (poolEl && !poolEl.hasAttribute('data-init')) {
+        poolEl.setAttribute('data-init', 'true');
         new Sortable(poolEl, { group: 'shared', animation: 150, ghostClass: 'opacity-50', delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3 });
         document.querySelectorAll('.assignment-dropzone').forEach(dz => {
             new Sortable(dz, { group: 'shared', animation: 150, ghostClass: 'bg-info', delay: 100, delayOnTouchOnly: true, fallbackTolerance: 3 });
@@ -17,17 +19,20 @@ function initQuizFeatures() {
     }
 
     // --- Formular & Beenden-Schutz ---
-    let formChanged = false;
-    if (activeForm) {
-        activeForm.addEventListener('input', () => formChanged = true);
+    if (activeForm && !activeForm.hasAttribute('data-init')) {
+        activeForm.setAttribute('data-init', 'true');
+        if (typeof window.quizFormChangedFlag === 'undefined') {
+            window.quizFormChangedFlag = false;
+        }
+        activeForm.addEventListener('input', () => window.quizFormChangedFlag = true);
         activeForm.addEventListener('submit', function(e) { 
             this.setAttribute('data-submitting', 'true'); 
             const type = this.getAttribute('data-card-type');
             if(type === 'ordering') submitOrdering();
             if(type === 'assignment') submitAssignment();
         });
+        window.quizFormChanged = () => window.quizFormChangedFlag;
     }
-    window.quizFormChanged = () => formChanged;
 
     // --- Anatomie Single Logic ---
     if(document.querySelector('.anatomy-single-dropzone')) {
@@ -61,6 +66,11 @@ function submitAssignment() {
 
 // --- Ausgelagerte Anatomie (Single) Logik ---
 function initAnatomySingle(activeForm) {
+    // Verhindert mehrfaches Binden von Event-Listenern
+    let container = document.querySelector('.anatomy-single-dropzone');
+    if (container && container.hasAttribute('data-init')) return;
+    if (container) container.setAttribute('data-init', 'true');
+
     let selectedSingleLabel = null;
     let correctSingleCount = 0;
     let totalSingleTargets = document.querySelectorAll('.anatomy-single-dropzone').length;
@@ -115,6 +125,11 @@ function initAnatomySingle(activeForm) {
 
 // --- Ausgelagerte Anatomie Multi Logik (Legenden-System) ---
 function initAnatomyMulti(activeForm) {
+    // Verhindert mehrfaches Binden von Event-Listenern
+    let labelsContainer = document.getElementById('anatomy-labels');
+    if (labelsContainer && labelsContainer.hasAttribute('data-init')) return;
+    if (labelsContainer) labelsContainer.setAttribute('data-init', 'true');
+
     let selectedLabel = null;
     let correctCount = 0;
     let totalTargets = 0;
@@ -222,7 +237,7 @@ function initAnatomyMulti(activeForm) {
                 let existingLegendItem = document.getElementById('legend-item-' + id);
                 let typeLabel = type === 'de' ? 'DE' : 'LAT';
 
-                if (existingLegendItem) {
+                        if (existingLegendItem) {
                     // Wenn der Eintrag für die Nummer schon existiert
                     let textContainer = existingLegendItem.querySelector('.legend-text');
                     textContainer.innerHTML += ' <span class="text-muted mx-1">/</span> ' + selectedVal + ' <small class="text-muted fw-normal">(' + typeLabel + ')</small>';
@@ -275,6 +290,8 @@ function initAnatomyMulti(activeForm) {
 // --- Event Listeners & Shortcuts ---
 document.addEventListener("DOMContentLoaded", initQuizFeatures);
 document.addEventListener("htmx:afterSwap", initQuizFeatures);
+// NEU: Haken bei htmx:load, um sicherzustellen, dass die Event-Listener nach dynamischem Nachladen zuverlässig greifen
+document.addEventListener("htmx:load", initQuizFeatures);
 
 if (!window.unloadWarningInitialized) {
     window.addEventListener('beforeunload', function (e) {
