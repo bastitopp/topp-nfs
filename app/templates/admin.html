@@ -83,6 +83,11 @@
                         <div id="field_anatomy_multi" class="mb-3 d-none p-4 bg-white rounded-4 shadow-sm border">
                             <h5 class="fw-bold text-primary mb-3"><i class="bi bi-pin-map-fill me-2"></i>Interaktives Bild erstellen</h5>
                             
+                            <div class="form-check form-switch mb-4">
+                                <input class="form-check-input" type="checkbox" id="showLabelsCheckbox" checked onchange="window.syncAnatomyJson()">
+                                <label class="form-check-label fw-bold small text-secondary" for="showLabelsCheckbox">Begriffe nach der Zuordnung direkt auf den Punkten anzeigen (sonst nur als Nummer in der Legende)</label>
+                            </div>
+                            
                             <label class="fw-bold small mb-2 text-secondary">1. Bild hochladen & Zielpunkte setzen</label>
                             <p class="small text-muted mb-3">Lade oben ein Bild hoch. Klicke dann direkt auf das Bild, um die roten Zielpunkte zu platzieren. <strong>Tipp: Punkte und Pfeile können per Drag&Drop verschoben werden.</strong></p>
                             
@@ -199,9 +204,17 @@ window.anatomyMarkers = [];
 window.anatomyNextId = 1;
 
 window.syncAnatomyJson = function() {
-    const jsonStr = JSON.stringify(window.anatomyMarkers);
+    const checkbox = document.getElementById('showLabelsCheckbox');
+    const showLabels = checkbox ? checkbox.checked : true; // Standard ist true
+    
+    // Wir speichern nun ein Objekt mit Markern und der Einstellung
+    const data = {
+        markers: window.anatomyMarkers,
+        show_labels: showLabels
+    };
+    
     const multi = document.getElementById('multi_json_input');
-    if (multi) multi.value = jsonStr;
+    if (multi) multi.value = JSON.stringify(data);
 };
 
 window.updateMarkerText = function(index, lang, value) {
@@ -340,7 +353,10 @@ window.addAnatomyMarker = function(e) {
         id: window.anatomyNextId++, 
         de: "", lat: "", 
         x: x.toFixed(2), y: y.toFixed(2),
-        has_arrow: false
+        // NEU: Startpunkt leicht verschoben ansetzen und Pfeil direkt aktivieren
+        origin_x: Math.max(0, x - 10).toFixed(2), 
+        origin_y: Math.max(0, y - 10).toFixed(2),
+        has_arrow: true
     });
     window.updateAnatomyView();
 };
