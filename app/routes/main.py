@@ -141,6 +141,11 @@ def reset_category(category_path):
 @bp.route('/leaderboard')
 @login_required
 def leaderboard():
+    # Sicherheitscheck: Abweisen, falls kein Admin
+    if not current_user.is_admin:
+        flash('Zugriff verweigert! Diese Ansicht ist nur für Administratoren.', 'danger')
+        return redirect(url_for('main.index'))
+
     if not current_user.study_class_id:
         users = []
         class_name = "Keiner Klasse zugewiesen"

@@ -76,13 +76,23 @@ class User(UserMixin, db.Model):
     streak = db.Column(db.Integer, default=0)
     xp = db.Column(db.Integer, default=0)
     
+    # --- NEU: Bezahl- und Abo-System ---
+    # Aktuell Standard auf True gesetzt, damit bestehende Nutzer nicht ausgesperrt werden.
+    # Wenn Stripe live ist, setze default=False.
+    is_premium = db.Column(db.Boolean, default=True) 
+    trial_end_date = db.Column(db.DateTime, nullable=True)
+    subscription_end_date = db.Column(db.DateTime, nullable=True)
+    stripe_customer_id = db.Column(db.String(120), unique=True, nullable=True)
+    stripe_subscription_id = db.Column(db.String(120), unique=True, nullable=True)
+    subscription_plan = db.Column(db.String(50), nullable=True)
+    
     # --- Zähler für die historische Erfolgsquote ---
     total_reviews = db.Column(db.Integer, default=0)
     correct_reviews = db.Column(db.Integer, default=0)
     
     badges = db.relationship('Badge', secondary=user_badges, lazy='subquery', backref=db.backref('users', lazy=True))
     group_id = db.Column(db.Integer, db.ForeignKey('user_group.id'), nullable=True)
-    study_class_id = db.Column(db.Integer, db.ForeignKey('study_class.id'), nullable=True) # NEU
+    study_class_id = db.Column(db.Integer, db.ForeignKey('study_class.id'), nullable=True)
     
     def set_password(self, pw): self.password_hash = generate_password_hash(pw)
     def check_password(self, pw): return check_password_hash(self.password_hash, pw)
@@ -94,10 +104,24 @@ class User(UserMixin, db.Model):
         return int((xp_in_level / 500) * 100)
         
     def is_online(self):
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         if not self.last_active:
             return False
         return datetime.utcnow() - self.last_active < timedelta(minutes=10)
+
+    # --- HILFSFUNKTIONEN FÜR ABOS ---
+    def is_trial_active(self):
+        if not self.trial_end_date: return False
+        return datetime.utcnow() < self.trial_end_date
+        
+    def is_subscription_active(self):
+        if not self.subscription_end_date: return False
+        return datetime.utcnow() < self.subscription_end_date
+        
+    def has_access(self):
+        """ Gibt True zurück, wenn der Nutzer auf Premium-Inhalte zugreifen darf """
+        if self.is_admin: return True
+        return self.is_premium or self.is_trial_active() or self.is_subscription_active()
 
 class Card(db.Model):
     id = db.Column(db.Integer, primary_key=True)

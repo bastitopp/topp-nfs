@@ -3,6 +3,7 @@ import json
 import csv
 import io
 import html as pyhtml
+from datetime import datetime # NEU FÜR DATUMSVERARBEITUNG
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -395,7 +396,6 @@ def add_org():
 @admin_required
 def delete_org(id):
     org = Organization.query.get_or_404(id)
-    # Entferne die Klassen und setze Benutzer zurück
     for c in org.classes:
         for u in c.users:
             u.study_class_id = None
@@ -434,6 +434,7 @@ def add_user():
     password = request.form.get('password')
     study_class_id = request.form.get('study_class_id')
     is_admin = 'is_admin' in request.form
+    is_premium = 'is_premium' in request.form
     
     if User.query.filter_by(username=username).first():
         flash('Benutzer existiert bereits!', 'danger')
@@ -442,9 +443,22 @@ def add_user():
             username=username, 
             is_admin=is_admin, 
             is_approved=True,
+            is_premium=is_premium,
             study_class_id=study_class_id if study_class_id else None
         )
         u.set_password(password)
+        
+        # Datums-Felder verarbeiten
+        t_end = request.form.get('trial_end_date')
+        if t_end:
+            try: u.trial_end_date = datetime.strptime(t_end, '%Y-%m-%d')
+            except: pass
+            
+        s_end = request.form.get('subscription_end_date')
+        if s_end:
+            try: u.subscription_end_date = datetime.strptime(s_end, '%Y-%m-%d')
+            except: pass
+
         db.session.add(u)
         db.session.commit()
         flash('Benutzer angelegt.', 'success')
@@ -478,13 +492,30 @@ def edit_user(uid):
     u.email = request.form.get('email')
     u.real_name = request.form.get('real_name')
     u.is_admin = 'is_admin' in request.form
+    u.is_premium = 'is_premium' in request.form
     
     study_class_id = request.form.get('study_class_id')
     u.study_class_id = study_class_id if study_class_id else None
     
+    # Datums-Felder verarbeiten
+    t_end = request.form.get('trial_end_date')
+    if t_end:
+        try: u.trial_end_date = datetime.strptime(t_end, '%Y-%m-%d')
+        except: pass
+    else:
+        u.trial_end_date = None
+        
+    s_end = request.form.get('subscription_end_date')
+    if s_end:
+        try: u.subscription_end_date = datetime.strptime(s_end, '%Y-%m-%d')
+        except: pass
+    else:
+        u.subscription_end_date = None
+    
     new_pw = request.form.get('new_password')
     if new_pw:
         u.set_password(new_pw)
+        
     db.session.commit()
     flash('Benutzer aktualisiert.', 'success')
     return redirect(url_for('admin.admin_users'))
@@ -513,10 +544,7 @@ def bulk_assign_class():
         flash('Keine Benutzer ausgewählt.', 'warning')
         return redirect(url_for('admin.admin_users'))
 
-    # Wenn ein leerer String gesendet wird, bedeutet das "Keine Klasse" (also entfernen)
     class_id_val = int(target_class_id) if target_class_id else None
-
-    # Alle ausgewählten Benutzer aus der Datenbank holen
     users_to_update = User.query.filter(User.id.in_(user_ids)).all()
     
     for u in users_to_update:
