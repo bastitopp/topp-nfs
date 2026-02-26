@@ -147,17 +147,22 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="application/json" id="chart-config-data">
+    {{ chart_config | safe }}
+</script>
+
 <script>
-(function() {
-    const config = {{ chart_config | safe }};
+function initProfileChart() {
+    const dataElement = document.getElementById('chart-config-data');
     const ctx = document.getElementById('skillsChart');
     const filter = document.getElementById('categoryFilter');
 
-    if (!ctx || !filter) return;
+    if (!ctx || !filter || !dataElement) return;
+
+    // Nur einlesen, wenn config noch nicht an den Event-Listener gebunden wurde
+    const config = JSON.parse(dataElement.textContent);
 
     filter.innerHTML = '<option value="all">Gesamtübersicht</option>';
-
     Object.keys(config.details).sort().forEach(cat => {
         const opt = document.createElement('option');
         opt.value = cat;
@@ -221,6 +226,8 @@
         });
     }
 
+    // Vorherige Listener entfernen (Schutz vor doppelter Ausführung)
+    filter.onchange = null;
     filter.onchange = function(e) {
         const val = e.target.value;
         if (val === 'all') {
@@ -231,6 +238,10 @@
     };
 
     renderChart(config.main.labels, config.main.data);
-})();
+}
+
+// Skript ausführen, sobald HTMX oder der Browser geladen ist
+document.addEventListener("DOMContentLoaded", initProfileChart);
+document.addEventListener("htmx:load", initProfileChart);
 </script>
 {% endblock %}

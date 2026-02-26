@@ -37,7 +37,7 @@
 
 <div class="dashboard-wrapper animate__animated animate__fadeIn">
 
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
         <div>
             <h1 class="fw-bold mb-1 display-5 text-break">Hallo, {{ current_user.real_name if current_user.real_name else current_user.username }}!</h1>
             <div class="d-flex flex-wrap gap-2 mt-2">
@@ -61,39 +61,37 @@
         </div>
     </div>
 
-    {% if not current_user.is_admin %}
-        {% if current_user.is_premium %}
-            {% elif current_user.is_subscription_active() %}
-            <div class="alert alert-success border-0 shadow-sm d-flex align-items-center mb-4 rounded-4">
-                <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; flex-shrink: 0;">
-                    <i class="bi bi-calendar-check fs-5"></i>
-                </div>
-                <div>
-                    <h6 class="fw-bold mb-0 text-success">Abo aktiv</h6>
-                    <span class="small text-dark">Dein Premium-Abo läuft bis zum <strong>{{ current_user.subscription_end_date.strftime('%d.%m.%Y') }}</strong>.</span>
-                </div>
+    {% if current_user.is_admin %}
+        <div class="alert alert-secondary border-0 shadow-sm py-2 px-3 mb-4 rounded-3 d-flex align-items-center">
+            <i class="bi bi-shield-lock-fill me-2 fs-5"></i>
+            <span class="small fw-medium"><strong>Admin-Zugang</strong> (Unbegrenzt)</span>
+        </div>
+    {% elif current_user.is_premium %}
+        <div class="alert alert-success border-0 shadow-sm py-2 px-3 mb-4 rounded-3 d-flex align-items-center">
+            <i class="bi bi-star-fill text-warning me-2 fs-5"></i>
+            <span class="small fw-medium"><strong>Premium-Zugang</strong> (Unendlich)</span>
+        </div>
+    {% elif current_user.is_subscription_active() %}
+        <div class="alert alert-success border-0 shadow-sm py-2 px-3 mb-4 rounded-3 d-flex align-items-center">
+            <i class="bi bi-calendar-check me-2 fs-5"></i>
+            <span class="small fw-medium"><strong>Premium-Abo</strong> (Gültig bis {{ current_user.subscription_end_date.strftime('%d.%m.%Y') }})</span>
+        </div>
+    {% elif current_user.is_trial_active() %}
+        <div class="alert border-0 shadow-sm py-2 px-3 mb-4 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2" style="background-color: #e0f2fe; color: #082f49;">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-clock-history me-2 fs-5 text-info"></i>
+                <span class="small fw-medium"><strong>Testphase</strong> (Endet am {{ current_user.trial_end_date.strftime('%d.%m.%Y') }})</span>
             </div>
-        {% elif current_user.is_trial_active() %}
-            <div class="alert alert-info border-0 shadow-sm d-flex align-items-center mb-4 rounded-4" style="background-color: #e0f2fe;">
-                <div class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; flex-shrink: 0;">
-                    <i class="bi bi-clock-history fs-5"></i>
-                </div>
-                <div>
-                    <h6 class="fw-bold mb-0 text-dark">Testphase aktiv</h6>
-                    <span class="small text-dark">Du nutzt alle Funktionen kostenlos bis zum <strong>{{ current_user.trial_end_date.strftime('%d.%m.%Y') }}</strong>.</span>
-                </div>
+            <a href="#" class="btn btn-sm btn-primary rounded-pill fw-bold px-3 shadow-sm" style="font-size: 0.8rem;">Premium freischalten</a>
+        </div>
+    {% else %}
+        <div class="alert alert-danger border-0 shadow-sm py-2 px-3 mb-4 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-lock-fill me-2 fs-5"></i>
+                <span class="small fw-medium"><strong>Zugang abgelaufen</strong></span>
             </div>
-        {% else %}
-            <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center mb-4 rounded-4">
-                <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; flex-shrink: 0;">
-                    <i class="bi bi-lock-fill fs-5"></i>
-                </div>
-                <div>
-                    <h6 class="fw-bold mb-0 text-danger">Zugang abgelaufen</h6>
-                    <span class="small text-dark">Deine Testphase ist beendet. <a href="{{ url_for('main.profile') }}" class="fw-bold text-danger text-decoration-underline">Jetzt Premium freischalten</a></span>
-                </div>
-            </div>
-        {% endif %}
+            <a href="#" class="btn btn-sm btn-danger rounded-pill fw-bold px-3 shadow-sm" style="font-size: 0.8rem;">Zugang verlängern</a>
+        </div>
     {% endif %}
 
     <div class="card border-0 shadow-sm mb-4">

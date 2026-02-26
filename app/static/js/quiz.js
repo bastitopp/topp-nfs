@@ -19,8 +19,8 @@ function initQuizFeatures() {
     }
 
     // --- Formular & Beenden-Schutz ---
-    if (activeForm && !activeForm.hasAttribute('data-init')) {
-        activeForm.setAttribute('data-init', 'true');
+    if (activeForm && !activeForm.hasAttribute('data-init-form')) {
+        activeForm.setAttribute('data-init-form', 'true');
         if (typeof window.quizFormChangedFlag === 'undefined') {
             window.quizFormChangedFlag = false;
         }
@@ -34,14 +34,12 @@ function initQuizFeatures() {
         window.quizFormChanged = () => window.quizFormChangedFlag;
     }
 
-    // --- Anatomie Single Logic ---
+    // --- Anatomie Logic ---
     if(document.querySelector('.anatomy-single-dropzone')) {
-        initAnatomySingle(activeForm);
+        initAnatomySingle();
     }
-
-    // --- Anatomie Multi Logic ---
     if(document.querySelector('.anatomy-dropzone')) {
-        initAnatomyMulti(activeForm);
+        initAnatomyMulti();
     }
 }
 
@@ -65,17 +63,17 @@ function submitAssignment() {
 }
 
 // --- Ausgelagerte Anatomie (Single) Logik ---
-function initAnatomySingle(activeForm) {
-    // Verhindert mehrfaches Binden von Event-Listenern
-    let container = document.querySelector('.anatomy-single-dropzone');
-    if (container && container.hasAttribute('data-init')) return;
-    if (container) container.setAttribute('data-init', 'true');
+function initAnatomySingle() {
+    // Wenn es neue (unbound) Buttons gibt, resetten wir den Status für die aktuelle Frage
+    let newBtns = document.querySelectorAll('.anatomy-single-btn:not(.bound)');
+    if (newBtns.length > 0) {
+        window.anatomySingleSelectedLabel = null;
+        window.anatomySingleCorrectCount = 0;
+        window.anatomySingleTotalTargets = document.querySelectorAll('.anatomy-single-dropzone').length;
+    }
 
-    let selectedSingleLabel = null;
-    let correctSingleCount = 0;
-    let totalSingleTargets = document.querySelectorAll('.anatomy-single-dropzone').length;
-
-    document.querySelectorAll('.anatomy-single-btn').forEach(btn => {
+    document.querySelectorAll('.anatomy-single-btn:not(.bound)').forEach(btn => {
+        btn.classList.add('bound');
         btn.addEventListener('click', function(e) {
             e.preventDefault();
             document.querySelectorAll('.anatomy-single-btn').forEach(b => {
@@ -86,17 +84,18 @@ function initAnatomySingle(activeForm) {
             let type = this.getAttribute('data-type');
             this.classList.remove(type === 'de' ? 'btn-outline-primary' : 'btn-outline-secondary');
             this.classList.add(type === 'de' ? 'btn-primary' : 'btn-secondary', 'text-white');
-            selectedSingleLabel = this;
+            window.anatomySingleSelectedLabel = this;
         });
     });
 
-    document.querySelectorAll('.anatomy-single-dropzone').forEach(zone => {
+    document.querySelectorAll('.anatomy-single-dropzone:not(.bound)').forEach(zone => {
+        zone.classList.add('bound');
         zone.addEventListener('click', function() {
-            if(!selectedSingleLabel) return;
+            if(!window.anatomySingleSelectedLabel) return;
             
             let expectedType = this.getAttribute('data-type');
             let expectedVal = this.getAttribute('data-answer');
-            let selectedVal = selectedSingleLabel.getAttribute('data-val');
+            let selectedVal = window.anatomySingleSelectedLabel.getAttribute('data-val');
             
             if(expectedVal === selectedVal) {
                 this.classList.remove('bg-light');
@@ -106,12 +105,12 @@ function initAnatomySingle(activeForm) {
                 
                 document.getElementById('single_input_' + expectedType).value = selectedVal;
                 
-                selectedSingleLabel.style.visibility = 'hidden';
-                selectedSingleLabel.classList.remove('anatomy-single-btn');
-                selectedSingleLabel = null;
+                window.anatomySingleSelectedLabel.style.visibility = 'hidden';
+                window.anatomySingleSelectedLabel.classList.remove('anatomy-single-btn');
+                window.anatomySingleSelectedLabel = null;
                 
-                correctSingleCount++;
-                if(correctSingleCount === totalSingleTargets) {
+                window.anatomySingleCorrectCount++;
+                if(window.anatomySingleCorrectCount === window.anatomySingleTotalTargets) {
                     let submitBtn = document.getElementById('submit-single-btn') || document.querySelector('.btn-next-question') || document.getElementById('submit-btn');
                     if (submitBtn) submitBtn.classList.remove('d-none');
                 }
@@ -123,26 +122,30 @@ function initAnatomySingle(activeForm) {
     });
 }
 
-// --- Ausgelagerte Anatomie Multi Logik (Legenden-System) ---
-function initAnatomyMulti(activeForm) {
-    // Verhindert mehrfaches Binden von Event-Listenern
+// --- Ausgelagerte Anatomie Multi Logik ---
+function initAnatomyMulti() {
     let labelsContainer = document.getElementById('anatomy-labels');
-    if (labelsContainer && labelsContainer.hasAttribute('data-init')) return;
-    if (labelsContainer) labelsContainer.setAttribute('data-init', 'true');
-
-    let selectedLabel = null;
-    let correctCount = 0;
-    let totalTargets = 0;
     
-    document.querySelectorAll('.anatomy-dropzone').forEach(z => {
-        let de = z.getAttribute('data-de');
-        let lat = z.getAttribute('data-lat');
-        if(de && de !== '-' && de !== '%') totalTargets++;
-        if(lat && lat !== '-' && lat !== '%') totalTargets++;
-    });
+    // Prüfen, ob eine GANZ NEUE Frage geladen wurde
+    if (labelsContainer && !labelsContainer.hasAttribute('data-multi-init')) {
+        labelsContainer.setAttribute('data-multi-init', 'true');
+        
+        // Globale State-Variablen zurücksetzen, damit sie HTMX überleben
+        window.anatomyMultiSelectedLabel = null;
+        window.anatomyMultiCorrectCount = 0;
+        window.anatomyMultiTotalTargets = 0;
+        
+        document.querySelectorAll('.anatomy-dropzone').forEach(z => {
+            let de = z.getAttribute('data-de');
+            let lat = z.getAttribute('data-lat');
+            if(de && de !== '-' && de !== '%') window.anatomyMultiTotalTargets++;
+            if(lat && lat !== '-' && lat !== '%') window.anatomyMultiTotalTargets++;
+        });
+    }
 
     // Event-Listener für das Anklicken der Antwort-Buttons
-    document.querySelectorAll('.anatomy-label-btn').forEach(btn => {
+    document.querySelectorAll('.anatomy-label-btn:not(.bound)').forEach(btn => {
+        btn.classList.add('bound'); // Sofort markieren, damit es nicht doppelt gebunden wird
         btn.addEventListener('click', function(e) {
             e.preventDefault();
             document.querySelectorAll('.anatomy-label-btn').forEach(b => {
@@ -153,37 +156,34 @@ function initAnatomyMulti(activeForm) {
             let type = this.getAttribute('data-type');
             this.classList.remove(type === 'de' ? 'btn-outline-primary' : 'btn-outline-secondary');
             this.classList.add(type === 'de' ? 'btn-primary' : 'btn-secondary', 'text-white');
-            selectedLabel = this;
+            window.anatomyMultiSelectedLabel = this;
         });
     });
 
     // Event-Listener für das Ablegen auf dem Bild-Punkt
-    document.querySelectorAll('.anatomy-dropzone').forEach(zone => {
+    document.querySelectorAll('.anatomy-dropzone:not(.bound)').forEach(zone => {
+        zone.classList.add('bound');
         zone.addEventListener('click', function() {
-            if(!selectedLabel) return;
+            if(!window.anatomyMultiSelectedLabel) return;
             
-            let type = selectedLabel.getAttribute('data-type');
+            let type = window.anatomyMultiSelectedLabel.getAttribute('data-type');
             let expected = this.getAttribute('data-' + type);
-            let selectedVal = selectedLabel.getAttribute('data-val');
+            let selectedVal = window.anatomyMultiSelectedLabel.getAttribute('data-val');
             let id = this.getAttribute('data-id');
             let alreadySolved = this.getAttribute('data-solved-' + type) === '1';
             
             if(!alreadySolved && expected === selectedVal) {
                 
-                // 1. Prüfen, ob der Punkt 1 oder 2 Labels benötigt
                 this.setAttribute('data-solved-' + type, '1');
-                this.setAttribute('data-assigned-' + type, selectedVal); // Wert speichern
+                this.setAttribute('data-assigned-' + type, selectedVal);
                 
                 let needsDe = this.getAttribute('data-de') && this.getAttribute('data-de') !== '-' && this.getAttribute('data-de') !== '%';
                 let needsLat = this.getAttribute('data-lat') && this.getAttribute('data-lat') !== '-' && this.getAttribute('data-lat') !== '%';
-                
                 let solvedDe = this.getAttribute('data-solved-de') === '1';
                 let solvedLat = this.getAttribute('data-solved-lat') === '1';
-                
                 let assignedDe = this.getAttribute('data-assigned-de');
                 let assignedLat = this.getAttribute('data-assigned-lat');
                 
-                // Ist ALLES da, was der Punkt verlangt?
                 let isFullySolved = (!needsDe || solvedDe) && (!needsLat || solvedLat);
 
                 if (isFullySolved) {
@@ -194,55 +194,44 @@ function initAnatomyMulti(activeForm) {
                 }
                 
                 let showLabelsAttr = this.getAttribute('data-show-labels');
-                let showLabels = showLabelsAttr !== 'false'; // Standardmäßig true
+                let showLabels = showLabelsAttr !== 'false';
 
                 if (showLabels) {
-                    // Bezeichnungen direkt auf dem Punkt anzeigen
                     let labelHtml = '';
-                    if (assignedDe) {
-                        labelHtml += '<div class="fw-bold" style="white-space: nowrap; line-height: 1.2;">' + assignedDe + ' <span style="font-weight: normal; font-size: 0.85em; opacity: 0.9;">(DE)</span></div>';
-                    }
-                    if (assignedLat) {
-                        labelHtml += '<div style="white-space: nowrap; line-height: 1.2; font-size: 0.9em;">' + assignedLat + ' <span style="font-size: 0.85em; opacity: 0.9;">(LAT)</span></div>';
-                    }
+                    if (assignedDe) labelHtml += '<div class="fw-bold" style="white-space: nowrap; line-height: 1.2;">' + assignedDe + ' <span style="font-weight: normal; font-size: 0.85em; opacity: 0.9;">(DE)</span></div>';
+                    if (assignedLat) labelHtml += '<div style="white-space: nowrap; line-height: 1.2; font-size: 0.9em;">' + assignedLat + ' <span style="font-size: 0.85em; opacity: 0.9;">(LAT)</span></div>';
                     this.innerHTML = labelHtml;
                 } else {
-                    // Nur die ID als sauberes Badge anzeigen (für mehr Übersicht)
                     this.innerHTML = '<div class="fw-bold fs-5">' + id + '</div>';
                 }
                 
-                // Button aus der Liste entfernen
-                selectedLabel.style.visibility = 'hidden';
-                selectedLabel.classList.remove('anatomy-label-btn'); 
-                selectedLabel = null;
+                window.anatomyMultiSelectedLabel.style.visibility = 'hidden';
+                window.anatomyMultiSelectedLabel.classList.remove('anatomy-label-btn'); 
+                window.anatomyMultiSelectedLabel = null;
                 
-                // Wert für das aktive Formular speichern (Quiz ODER Prüfung)
-                if (activeForm) {
+                let currentActiveForm = document.getElementById('quizForm') || document.getElementById('examForm') || document.querySelector('form');
+                if (currentActiveForm) {
                     let hiddenInp = document.createElement('input');
                     hiddenInp.type = 'hidden'; 
                     hiddenInp.name = type + '_' + id; 
                     hiddenInp.value = selectedVal;
-                    activeForm.appendChild(hiddenInp);
+                    currentActiveForm.appendChild(hiddenInp);
                 }
 
-                // --- 2. Legenden-Eintrag (Zusammenfassen bei 2 Begriffen) ---
                 const legendContainer = document.getElementById('anatomy-legend-container');
                 const legend = document.getElementById('anatomy-legend');
                 const placeholder = document.getElementById('anatomy-legend-placeholder');
                 
-                // Platzhalter sofort ausblenden, sobald etwas zugeordnet wurde
                 if(placeholder) placeholder.style.display = 'none';
                 if(legendContainer) legendContainer.classList.remove('d-none');
                 
                 let existingLegendItem = document.getElementById('legend-item-' + id);
                 let typeLabel = type === 'de' ? 'DE' : 'LAT';
 
-                        if (existingLegendItem) {
-                    // Wenn der Eintrag für die Nummer schon existiert
+                if (existingLegendItem) {
                     let textContainer = existingLegendItem.querySelector('.legend-text');
                     textContainer.innerHTML += ' <span class="text-muted mx-1">/</span> ' + selectedVal + ' <small class="text-muted fw-normal">(' + typeLabel + ')</small>';
                     
-                    // Mache die Legende grün
                     let badgeNum = existingLegendItem.querySelector('.badge-num');
                     badgeNum.classList.remove('bg-warning', 'text-dark');
                     badgeNum.classList.add('bg-success', 'text-white');
@@ -250,11 +239,9 @@ function initAnatomyMulti(activeForm) {
                     existingLegendItem.classList.add('border-success');
                     
                 } else {
-                    // Neu anlegen
                     const legendBadge = document.createElement('div');
                     legendBadge.id = 'legend-item-' + id;
                     
-                    // Farbe je nachdem, ob noch ein Begriff fehlt (gelb) oder nicht (grün)
                     let isPartial = !isFullySolved;
                     let borderClass = isPartial ? 'border-warning' : 'border-success';
                     let badgeClass = isPartial ? 'bg-warning text-dark' : 'bg-success text-white';
@@ -262,7 +249,6 @@ function initAnatomyMulti(activeForm) {
                     legendBadge.className = 'anatomy-legend-item badge bg-white text-dark border ' + borderClass + ' border-opacity-50 d-flex align-items-center gap-2 p-2 shadow-sm fs-6';
                     legendBadge.innerHTML = '<span class="badge-num badge ' + badgeClass + ' rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">' + id + '</span> <span class="legend-text fw-medium">' + selectedVal + ' <small class="text-muted fw-normal">(' + typeLabel + ')</small></span>';
                     
-                    // Hover-Effekte synchronisieren
                     legendBadge.addEventListener('mouseenter', () => this.classList.add('pin-hover'));
                     legendBadge.addEventListener('mouseleave', () => this.classList.remove('pin-hover'));
                     this.addEventListener('mouseenter', () => legendBadge.classList.add('legend-hover'));
@@ -271,11 +257,9 @@ function initAnatomyMulti(activeForm) {
                     if(legend) legend.appendChild(legendBadge);
                 }
 
-                // Checken, ob alle Punkte gelöst sind
-                correctCount++;
-                if(correctCount === totalTargets) {
+                window.anatomyMultiCorrectCount++;
+                if(window.anatomyMultiCorrectCount === window.anatomyMultiTotalTargets) {
                     document.querySelectorAll('.anatomy-dropzone').forEach(z => z.style.borderColor = 'transparent');
-                    // Suche nach dem Next/Submit Button (robust für Quiz & Exam)
                     let submitBtn = document.getElementById('submit-btn') || document.querySelector('.btn-next-question');
                     if(submitBtn) submitBtn.classList.remove('d-none');
                 }
@@ -289,8 +273,8 @@ function initAnatomyMulti(activeForm) {
 
 // --- Event Listeners & Shortcuts ---
 document.addEventListener("DOMContentLoaded", initQuizFeatures);
-document.addEventListener("htmx:afterSwap", initQuizFeatures);
-// NEU: Haken bei htmx:load, um sicherzustellen, dass die Event-Listener nach dynamischem Nachladen zuverlässig greifen
+// htmx:afterSettle ist extrem wichtig, da es wartet, bis die DOM-Änderungen von HTMX wirklich abgeschlossen sind
+document.addEventListener("htmx:afterSettle", initQuizFeatures);
 document.addEventListener("htmx:load", initQuizFeatures);
 
 if (!window.unloadWarningInitialized) {
@@ -311,7 +295,6 @@ if (!window.keyboardNavInitialized) {
             const nextBtn = document.querySelector('.btn-next-question') || document.getElementById('submit-btn');
             const safeBtn = document.querySelector('.btn-quality-safe');
             
-            // Verhindern, dass Enter drückt, wenn der Button noch unsichtbar ist (z.B. Anatomie nicht fertig)
             if (nextBtn && !nextBtn.classList.contains('d-none')) nextBtn.click();
             else if (safeBtn) safeBtn.click();
         }
