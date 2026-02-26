@@ -1,7 +1,6 @@
 import os
 import json
 from datetime import datetime, timedelta
-# HIER WURDE send_from_directory HINZUGEFÜGT:
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_from_directory
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -13,11 +12,24 @@ from ..utils import check_gamification, build_category_tree, get_learning_stats
 bp = Blueprint('main', __name__)
 
 @bp.before_app_request
-def update_last_active():
+def check_user_status():
     if current_user.is_authenticated:
+        # 1. Zuletzt online aktualisieren
         if current_user.last_active is None or current_user.last_active < datetime.utcnow() - timedelta(minutes=5):
             current_user.last_active = datetime.utcnow()
             db.session.commit()
+
+        # 2. ZUGANGSSPERRE FÜR ABGELAUFENE ACCOUNTS
+        if request.endpoint:
+            # Erlaube grundlegende Endpunkte, die immer funktionieren müssen
+            is_auth_route = request.endpoint.startswith('auth.')
+            is_allowed_route = request.endpoint in ['main.profile', 'static', 'main.service_worker']
+            
+            # Wenn die Route NICHT auf der Whitelist steht und der Nutzer keinen Zugang hat -> Sperren!
+            if not (is_auth_route or is_allowed_route):
+                if not current_user.has_access():
+                    flash('Dein Zugang ist abgelaufen. Bitte schalte Premium frei, um weiterzulernen.', 'danger')
+                    return redirect(url_for('main.profile'))
 
 @bp.route('/')
 def index():
@@ -166,8 +178,6 @@ def search():
     results = Card.query.filter(or_(Card.question.ilike(f'%{q}%'), Card.answer.ilike(f'%{q}%'))).all() if q else []
     return render_template('search.html', query=q, results=results)
 
-# --- NEU: Service Worker Route für Offline-Funktionalität ---
 @bp.route('/sw.js')
 def service_worker():
-    # Sendet die sw.js so, als läge sie direkt auf der Haupt-Ebene
     return send_from_directory(current_app.static_folder, 'sw.js', mimetype='application/javascript')

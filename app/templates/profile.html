@@ -4,6 +4,75 @@
     <h2 class="fw-bold mb-4">Mein Profil</h2>
     <div class="row g-4">
         <div class="col-md-6">
+            
+            <div class="card shadow-sm border-0 mb-4 rounded-4 animate__animated animate__fadeIn">
+                <div class="card-header bg-white py-3 border-bottom-0 rounded-top-4">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-star-fill text-warning me-2"></i> Premium Zugang & Abo</h5>
+                </div>
+                <div class="card-body bg-light rounded-bottom-4">
+                    
+                    {% if current_user.is_admin %}
+                        <div class="alert alert-secondary border-0 mb-0">
+                            <i class="bi bi-shield-lock-fill me-2"></i>Du bist Administrator und hast automatisch vollen Zugriff.
+                        </div>
+                        
+                    {% elif current_user.is_premium %}
+                        <div class="alert alert-success bg-white border-success border-opacity-25 shadow-sm mb-0 d-flex align-items-center p-3">
+                            <i class="bi bi-check-circle-fill text-success fs-2 me-3"></i>
+                            <div>
+                                <h6 class="fw-bold mb-0">Lebenslanger Premium-Zugang</h6>
+                                <small class="text-muted">Dein Account ist dauerhaft für alle Funktionen freigeschaltet. Viel Erfolg beim Lernen!</small>
+                            </div>
+                        </div>
+                        
+                    {% elif current_user.is_subscription_active() %}
+                        <div class="alert alert-success bg-white border-0 shadow-sm mb-3 d-flex align-items-center p-3">
+                            <i class="bi bi-calendar-check text-success fs-2 me-3"></i>
+                            <div>
+                                <h6 class="fw-bold mb-0">Premium-Abo ist aktiv</h6>
+                                <small class="text-muted">Gültig bis zum <strong>{{ current_user.subscription_end_date.strftime('%d.%m.%Y') }}</strong>.</small>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-primary fw-bold rounded-pill px-4" disabled>
+                            <i class="bi bi-box-arrow-up-right me-1"></i> Abo verwalten (Demnächst)
+                        </button>
+                        
+                    {% elif current_user.is_trial_active() %}
+                        <div class="alert alert-info bg-white border-0 shadow-sm mb-4 d-flex align-items-center p-3">
+                            <i class="bi bi-clock-history text-info fs-2 me-3"></i>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">Kostenlose Testphase</h6>
+                                <small class="text-muted">Noch gültig bis zum <strong>{{ current_user.trial_end_date.strftime('%d.%m.%Y') }}</strong>.</small>
+                            </div>
+                        </div>
+                        <div class="text-center p-3 border border-warning border-opacity-50 rounded-4 bg-white shadow-sm">
+                            <h6 class="fw-bold">Gefällt dir die App?</h6>
+                            <p class="small text-muted mb-3">Sichere dir deinen Zugang, bevor die Testphase abläuft, um nahtlos weiterlernen zu können.</p>
+                            <button class="btn btn-warning fw-bold text-dark w-100 rounded-pill shadow-sm" disabled>
+                                <i class="bi bi-star-fill me-1"></i> Premium freischalten (Demnächst)
+                            </button>
+                        </div>
+                        
+                    {% else %}
+                        <div class="alert alert-danger bg-white border-0 shadow-sm mb-4 d-flex align-items-center p-3">
+                            <i class="bi bi-lock-fill text-danger fs-2 me-3"></i>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-danger">Zugang abgelaufen</h6>
+                                <small class="text-muted">Deine Testphase oder dein Abo ist beendet.</small>
+                            </div>
+                        </div>
+                        <div class="text-center p-3 border border-warning border-opacity-50 rounded-4 bg-white shadow-sm">
+                            <h6 class="fw-bold">Lerne ohne Einschränkungen weiter!</h6>
+                            <p class="small text-muted mb-3">Schalte Premium frei, um sofort wieder Zugriff auf alle Lernkarten, EKG, BPR-Szenarien und Prüfungen zu erhalten.</p>
+                            <button class="btn btn-warning fw-bold text-dark w-100 rounded-pill shadow-sm py-2" disabled>
+                                <i class="bi bi-star-fill me-1"></i> Jetzt Premium freischalten (Demnächst)
+                            </button>
+                        </div>
+                    {% endif %}
+                    
+                </div>
+            </div>
+
             <div class="card shadow-sm border-0 h-100 animate__animated animate__fadeIn">
                 <div class="card-header bg-white fw-bold">Daten bearbeiten</div>
                 <div class="card-body">
