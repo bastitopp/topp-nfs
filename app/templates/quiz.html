@@ -5,8 +5,8 @@
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 
-<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}?v=4">
-<script src="{{ url_for('static', filename='js/quiz.js') }}?v=4" defer></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}?v=5">
+<script src="{{ url_for('static', filename='js/quiz.js') }}?v=5" defer></script>
 
 <style>
     /* FEATURE 4: XP Animation CSS */
@@ -125,6 +125,13 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if card.explanation %}
+                <div class="explanation-box shadow-sm mb-4 animate__animated animate__fadeIn">
+                    <h6 class="fw-bold text-info"><i class="bi bi-info-circle-fill me-1"></i> Erklärung</h6>
+                    <div class="markdown-content text-muted">{{ card.explanation | markdown }}</div>
+                </div>
+            {% endif %}
         {% endif %}
 
         <div class="answer-section">
@@ -140,13 +147,6 @@
         </div>
 
         {% if feedback %}
-            {% if card.explanation %}
-                <div class="explanation-box shadow-sm mt-4 animate__animated animate__fadeIn">
-                    <h6 class="fw-bold text-info"><i class="bi bi-info-circle-fill me-1"></i> Erklärung</h6>
-                    <div class="markdown-content text-muted">{{ card.explanation | markdown }}</div>
-                </div>
-            {% endif %}
-            
             <div class="mt-4 pt-4 border-top">
                 {% if is_correct %}
                     <p class="small text-muted text-center mb-3 fw-bold">Wie sicher warst du dir?</p>

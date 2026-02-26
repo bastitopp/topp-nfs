@@ -178,15 +178,23 @@ function initAnatomyMulti(activeForm) {
                     this.classList.add('partially-solved');
                 }
                 
-                // Bezeichnungen direkt auf dem Punkt anzeigen (mit Sprachhinweis, ohne Umbruch, untereinander)
-                let labelHtml = '';
-                if (assignedDe) {
-                    labelHtml += `<div class="fw-bold" style="white-space: nowrap; line-height: 1.2;">${assignedDe} <span style="font-weight: normal; font-size: 0.85em; opacity: 0.9;">(DE)</span></div>`;
+                let showLabelsAttr = this.getAttribute('data-show-labels');
+                let showLabels = showLabelsAttr !== 'false'; // Standardmäßig true
+
+                if (showLabels) {
+                    // Bezeichnungen direkt auf dem Punkt anzeigen
+                    let labelHtml = '';
+                    if (assignedDe) {
+                        labelHtml += '<div class="fw-bold" style="white-space: nowrap; line-height: 1.2;">' + assignedDe + ' <span style="font-weight: normal; font-size: 0.85em; opacity: 0.9;">(DE)</span></div>';
+                    }
+                    if (assignedLat) {
+                        labelHtml += '<div style="white-space: nowrap; line-height: 1.2; font-size: 0.9em;">' + assignedLat + ' <span style="font-size: 0.85em; opacity: 0.9;">(LAT)</span></div>';
+                    }
+                    this.innerHTML = labelHtml;
+                } else {
+                    // Nur die ID als sauberes Badge anzeigen (für mehr Übersicht)
+                    this.innerHTML = '<div class="fw-bold fs-5">' + id + '</div>';
                 }
-                if (assignedLat) {
-                    labelHtml += `<div style="white-space: nowrap; line-height: 1.2; font-size: 0.9em;">${assignedLat} <span style="font-size: 0.85em; opacity: 0.9;">(LAT)</span></div>`;
-                }
-                this.innerHTML = labelHtml;
                 
                 // Button aus der Liste entfernen
                 selectedLabel.style.visibility = 'hidden';
@@ -205,6 +213,10 @@ function initAnatomyMulti(activeForm) {
                 // --- 2. Legenden-Eintrag (Zusammenfassen bei 2 Begriffen) ---
                 const legendContainer = document.getElementById('anatomy-legend-container');
                 const legend = document.getElementById('anatomy-legend');
+                const placeholder = document.getElementById('anatomy-legend-placeholder');
+                
+                // Platzhalter sofort ausblenden, sobald etwas zugeordnet wurde
+                if(placeholder) placeholder.style.display = 'none';
                 if(legendContainer) legendContainer.classList.remove('d-none');
                 
                 let existingLegendItem = document.getElementById('legend-item-' + id);
@@ -213,7 +225,7 @@ function initAnatomyMulti(activeForm) {
                 if (existingLegendItem) {
                     // Wenn der Eintrag für die Nummer schon existiert
                     let textContainer = existingLegendItem.querySelector('.legend-text');
-                    textContainer.innerHTML += ` <span class="text-muted mx-1">/</span> ${selectedVal} <small class="text-muted fw-normal">(${typeLabel})</small>`;
+                    textContainer.innerHTML += ' <span class="text-muted mx-1">/</span> ' + selectedVal + ' <small class="text-muted fw-normal">(' + typeLabel + ')</small>';
                     
                     // Mache die Legende grün
                     let badgeNum = existingLegendItem.querySelector('.badge-num');
@@ -232,8 +244,8 @@ function initAnatomyMulti(activeForm) {
                     let borderClass = isPartial ? 'border-warning' : 'border-success';
                     let badgeClass = isPartial ? 'bg-warning text-dark' : 'bg-success text-white';
 
-                    legendBadge.className = `anatomy-legend-item badge bg-white text-dark border ${borderClass} border-opacity-50 d-flex align-items-center gap-2 p-2 shadow-sm fs-6`;
-                    legendBadge.innerHTML = `<span class="badge-num badge ${badgeClass} rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">${id}</span> <span class="legend-text fw-medium">${selectedVal} <small class="text-muted fw-normal">(${typeLabel})</small></span>`;
+                    legendBadge.className = 'anatomy-legend-item badge bg-white text-dark border ' + borderClass + ' border-opacity-50 d-flex align-items-center gap-2 p-2 shadow-sm fs-6';
+                    legendBadge.innerHTML = '<span class="badge-num badge ' + badgeClass + ' rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">' + id + '</span> <span class="legend-text fw-medium">' + selectedVal + ' <small class="text-muted fw-normal">(' + typeLabel + ')</small></span>';
                     
                     // Hover-Effekte synchronisieren
                     legendBadge.addEventListener('mouseenter', () => this.classList.add('pin-hover'));

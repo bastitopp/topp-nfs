@@ -132,6 +132,13 @@
                     </div>
 
                     <label class="fw-bold small mb-3 text-secondary">2. Begriffe zuordnen</label>
+                    <div class="form-check form-switch mb-4 p-3 bg-light rounded border shadow-sm d-flex align-items-center">
+                        <input class="form-check-input ms-0 me-3 mt-0" type="checkbox" id="show_anatomy_labels" onchange="window.toggleShowLabels(this.checked)" style="transform: scale(1.3);">
+                        <label class="form-check-label small fw-bold text-secondary mb-0" for="show_anatomy_labels">
+                            Lösungen nach Zuordnung direkt im Bild ausschreiben<br>
+                            <span class="text-muted fw-normal" style="font-size: 0.85em;">(Deaktiviere dies bei überladenen Bildern, damit nur die Nummern eingeblendet werden)</span>
+                        </label>
+                    </div>
                     <div id="anatomy-labels-list" class="mb-3"></div>
                 </div>
 
@@ -158,30 +165,52 @@ function loadAnatomyData() {
         if (!content) return [];
         
         let parsed = JSON.parse(content);
-        
         if (typeof parsed === 'string') {
             parsed = JSON.parse(parsed);
         }
         
-        return Array.isArray(parsed) ? parsed : [];
+        // NEU: Unterscheidung zwischen altem Array-Format und neuem Objekt-Format
+        if (!Array.isArray(parsed) && parsed.markers !== undefined) {
+            window.anatomyShowLabels = parsed.show_labels;
+            return parsed.markers;
+        } else {
+            window.anatomyShowLabels = true;
+            return Array.isArray(parsed) ? parsed : [];
+        }
     } catch(e) {
         console.error("Fehler beim Laden der Anatomie-Daten:", e);
         return [];
     }
 }
 
+window.anatomyShowLabels = true;
 window.anatomyMarkers = loadAnatomyData();
 window.anatomyNextId = 1;
 
+// Zustand der Checkbox beim Laden initialisieren
+const cbShowLabels = document.getElementById('show_anatomy_labels');
+if(cbShowLabels) cbShowLabels.checked = window.anatomyShowLabels;
+
 window.syncAnatomyJson = function() {
-    const jsonStr = JSON.stringify(window.anatomyMarkers);
+    const jsonStr = JSON.stringify({
+        show_labels: window.anatomyShowLabels,
+        markers: window.anatomyMarkers
+    });
+    // Fallback für andere Fragetypen, die nur ein Array erwarten
+    const fallbackStr = JSON.stringify(window.anatomyMarkers); 
+
     const multi = document.getElementById('multi_json_input');
     const ordering = document.getElementById('ordering_json_textarea');
     const fallback = document.getElementById('fallback_options_input');
     
     if (multi) multi.value = jsonStr;
-    if (ordering) ordering.value = jsonStr;
-    if (fallback) fallback.value = jsonStr;
+    if (ordering) ordering.value = fallbackStr;
+    if (fallback) fallback.value = fallbackStr;
+};
+
+window.toggleShowLabels = function(checked) {
+    window.anatomyShowLabels = checked;
+    window.syncAnatomyJson();
 };
 
 window.updateMarkerText = function(index, lang, value) {
