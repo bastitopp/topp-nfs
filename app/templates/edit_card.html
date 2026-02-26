@@ -9,17 +9,17 @@
 
     <div class="card shadow-sm border-0 animate__animated animate__fadeIn">
         <div class="card-body bg-light">
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" id="editCardForm">
                 {% if next_url %}
                 <input type="hidden" name="next" value="{{ next_url }}">
                 {% endif %}
                 
-                <script id="anatomy_raw_data" type="application/json">
+                <script class="anatomy-raw-data" type="application/json">
                     {{ card.options | safe if card.options else '[]' }}
                 </script>
 
-                <input type="hidden" name="multi_json" id="multi_json_input" value="{{ card.options | e if card.options else '[]' }}">
-                <input type="hidden" name="options" id="fallback_options_input" value="{{ card.options | e if card.options else '[]' }}">
+                <input type="hidden" name="multi_json" class="multi-json-input" value="{{ card.options | e if card.options else '[]' }}">
+                <input type="hidden" name="options" class="fallback-options-input" value="{{ card.options | e if card.options else '[]' }}">
                 
                 <div class="row g-3 mb-3">
                     <div class="col-md-8">
@@ -28,7 +28,7 @@
                     </div>
                     <div class="col-md-4">
                         <label class="fw-bold small">Typ</label>
-                        <select name="type" id="typeSelect" class="form-select" onchange="updateFormFields()">
+                        <select name="type" class="form-select type-select" onchange="window.updateFormFields()">
                             <option value="flashcard" {% if card.type == 'flashcard' %}selected{% endif %}>Karteikarte</option>
                             <option value="mc" {% if card.type == 'mc' %}selected{% endif %}>Multiple Choice</option>
                             <option value="anatomy" {% if card.type == 'anatomy' %}selected{% endif %}>Anatomie</option>
@@ -54,7 +54,7 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="fw-bold small">Bild ändern</label>
-                        <input type="file" name="image" id="imageInput" class="form-control" onchange="window.handleImageUpload(event)">
+                        <input type="file" name="image" class="form-control" onchange="window.handleImageUpload(event)">
                         {% if card.image_url %}
                             <div class="mt-2 small text-muted">Aktuell: <a href="{{ card.image_url }}" target="_blank">Bild ansehen</a></div>
                         {% endif %}
@@ -68,14 +68,14 @@
                     </div>
                 </div>
 
-                <div id="field_standard_answer" class="mb-3 {% if card.type not in ['flashcard', 'mc', 'calculation', 'case_study', 'anatomy'] %}d-none{% endif %}">
+                <div class="mb-3 field-standard-answer {% if card.type not in ['flashcard', 'mc', 'calculation', 'case_study', 'anatomy'] %}d-none{% endif %}">
                     <label class="fw-bold small">Richtige Antwort / Lösung <span class="text-muted fw-normal">(bei Anatomie: Deutsch)</span></label>
                     <input name="answer" class="form-control" value="{{ card.answer | e if card.answer else '' }}">
                 </div>
 
-                <div id="field_mc_options" class="mb-3 p-3 bg-white rounded border {% if card.type != 'mc' %}d-none{% endif %}">
+                <div class="mb-3 p-3 bg-white rounded border field-mc-options {% if card.type != 'mc' %}d-none{% endif %}">
                     <label class="fw-bold small mb-2 text-secondary"><i class="bi bi-ui-radios me-1"></i> Falsche Antwort-Optionen (Multiple Choice)</label>
-                    <div id="mcOptionsContainer">
+                    <div class="mc-options-container">
                         {% if card.type == 'mc' and card.options %}
                             {% set parsed_opts = card.options | from_json %}
                             {% for opt in parsed_opts %}
@@ -93,58 +93,58 @@
                             </div>
                         {% endif %}
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-success mt-2 fw-bold" onclick="addMcOption()">+ Weitere Option</button>
+                    <button type="button" class="btn btn-sm btn-outline-success mt-2 fw-bold" onclick="window.addMcOption()">+ Weitere Option</button>
                 </div>
 
-                <div id="field_anatomy" class="row g-3 mb-3 {% if card.type != 'anatomy' %}d-none{% endif %}">
+                <div class="row g-3 mb-3 field-anatomy {% if card.type != 'anatomy' %}d-none{% endif %}">
                     <div class="col-md-12">
                         <label class="fw-bold small">Latein</label>
                         <input name="answer_lat" class="form-control" value="{{ card.answer_lat | e if card.answer_lat else '' }}">
                     </div>
                 </div>
 
-                <div id="field_anatomy_multi" class="mb-3 p-4 bg-white rounded-4 shadow-sm border {% if card.type != 'anatomy_multi' %}d-none{% endif %}">
+                <div class="mb-3 p-4 bg-white rounded-4 shadow-sm border field-anatomy-multi {% if card.type != 'anatomy_multi' %}d-none{% endif %}">
                     <h5 class="fw-bold text-primary mb-3"><i class="bi bi-pin-map-fill me-2"></i>Interaktives Bild bearbeiten</h5>
                     
                     <label class="fw-bold small mb-2 text-secondary">1. Zielpunkte platzieren & verschieben</label>
-                    <p class="small text-muted mb-3">Klicke ins Bild, um neue Zielpunkte zu setzen. <strong>Du kannst bestehende Punkte und Pfeile nun einfach mit der Maus per Drag & Drop verschieben!</strong></p>
+                    <p class="small text-muted mb-3">Klicke ins Bild, um neue Zielpunkte zu setzen. <strong>Du kannst bestehende Punkte und Pfeile einfach mit der Maus per Drag & Drop verschieben!</strong></p>
                     
                     <div class="text-center bg-light rounded-4 border p-3 mb-4 shadow-inner">
                         <div style="position: relative; display: inline-block; cursor: crosshair; max-width: 100%; touch-action: none;" 
-                             id="admin-img-container" 
+                             class="admin-img-container" 
                              onclick="window.addAnatomyMarker(event)"
                              onmousemove="window.doDrag(event)"
                              onmouseup="window.stopDrag(event)"
                              onmouseleave="window.stopDrag(event)"
                              ontouchmove="window.doTouchDrag(event)"
                              ontouchend="window.stopDrag(event)">
-                            <img id="admin-anatomy-img" src="{{ card.image_url if card.image_url else '' }}" class="rounded shadow-sm img-fluid" style="max-height: 55vh; display: {% if card.image_url %}block{% else %}none{% endif %}; pointer-events: none;">
+                            <img class="admin-anatomy-img rounded shadow-sm img-fluid" src="{{ card.image_url if card.image_url else '' }}" style="max-height: 55vh; display: {% if card.image_url %}block{% else %}none{% endif %}; pointer-events: none;">
                             
-                            <svg id="anatomy-svg-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                            <svg class="anatomy-svg-layer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
                                 <defs>
-                                    <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                                    <marker id="arrowhead-edit" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
                                         <polygon points="0 0, 6 2, 0 4" fill="#000000" />
                                     </marker>
                                 </defs>
-                                <g id="anatomy-svg-lines"></g>
+                                <g class="anatomy-svg-lines"></g>
                             </svg>
                         </div>
                     </div>
 
                     <label class="fw-bold small mb-3 text-secondary">2. Begriffe zuordnen</label>
                     <div class="form-check form-switch mb-4 p-3 bg-light rounded border shadow-sm d-flex align-items-center">
-                        <input class="form-check-input ms-0 me-3 mt-0" type="checkbox" id="show_anatomy_labels" onchange="window.toggleShowLabels(this.checked)" style="transform: scale(1.3);">
-                        <label class="form-check-label small fw-bold text-secondary mb-0" for="show_anatomy_labels">
+                        <input class="form-check-input ms-0 me-3 mt-0 show-anatomy-labels" type="checkbox" onchange="window.toggleShowLabels(this.checked)" style="transform: scale(1.3);">
+                        <label class="form-check-label small fw-bold text-secondary mb-0">
                             Lösungen nach Zuordnung direkt im Bild ausschreiben<br>
                             <span class="text-muted fw-normal" style="font-size: 0.85em;">(Deaktiviere dies bei überladenen Bildern, damit nur die Nummern eingeblendet werden)</span>
                         </label>
                     </div>
-                    <div id="anatomy-labels-list" class="mb-3"></div>
+                    <div class="anatomy-labels-list mb-3"></div>
                 </div>
 
-                <div id="field_json" class="mb-3 {% if card.type not in ['ordering', 'assignment', 'calculation'] %}d-none{% endif %}">
+                <div class="mb-3 field-json {% if card.type not in ['ordering', 'assignment', 'calculation'] %}d-none{% endif %}">
                     <label class="fw-bold small">JSON Daten (Optionen)</label>
-                    <textarea name="ordering_json" id="ordering_json_textarea" class="form-control font-monospace" rows="5">{{ card.options if card.options else '[]' }}</textarea>
+                    <textarea name="ordering_json" class="form-control font-monospace ordering-json-textarea" rows="5">{{ card.options if card.options else '[]' }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
@@ -156,52 +156,29 @@
 </div>
 
 <script>
-function loadAnatomyData() {
-    try {
-        const rawScript = document.getElementById('anatomy_raw_data');
-        if (!rawScript) return [];
-        
-        let content = rawScript.textContent.trim();
-        if (!content) return [];
-        
-        let parsed = JSON.parse(content);
-        if (typeof parsed === 'string') {
-            parsed = JSON.parse(parsed);
-        }
-        
-        // NEU: Unterscheidung zwischen altem Array-Format und neuem Objekt-Format
-        if (!Array.isArray(parsed) && parsed.markers !== undefined) {
-            window.anatomyShowLabels = parsed.show_labels;
-            return parsed.markers;
-        } else {
-            window.anatomyShowLabels = true;
-            return Array.isArray(parsed) ? parsed : [];
-        }
-    } catch(e) {
-        console.error("Fehler beim Laden der Anatomie-Daten:", e);
-        return [];
-    }
-}
-
+// Zustand komplett neu überschreiben bei jedem Laden
+window.anatomyMarkers = [];
 window.anatomyShowLabels = true;
-window.anatomyMarkers = loadAnatomyData();
 window.anatomyNextId = 1;
 
-// Zustand der Checkbox beim Laden initialisieren
-const cbShowLabels = document.getElementById('show_anatomy_labels');
-if(cbShowLabels) cbShowLabels.checked = window.anatomyShowLabels;
+// Helfer, um IMMER nur im neuen Formular zu suchen (ignoriert HTMX-Ghost-Elemente)
+window.getFormContext = function() {
+    return document.getElementById('editCardForm');
+};
 
 window.syncAnatomyJson = function() {
+    const form = window.getFormContext();
+    if(!form) return;
+
     const jsonStr = JSON.stringify({
         show_labels: window.anatomyShowLabels,
         markers: window.anatomyMarkers
     });
-    // Fallback für andere Fragetypen, die nur ein Array erwarten
     const fallbackStr = JSON.stringify(window.anatomyMarkers); 
 
-    const multi = document.getElementById('multi_json_input');
-    const ordering = document.getElementById('ordering_json_textarea');
-    const fallback = document.getElementById('fallback_options_input');
+    const multi = form.querySelector('.multi-json-input');
+    const ordering = form.querySelector('.ordering-json-textarea');
+    const fallback = form.querySelector('.fallback-options-input');
     
     if (multi) multi.value = jsonStr;
     if (ordering) ordering.value = fallbackStr;
@@ -235,12 +212,7 @@ window.toggleArrow = function(index) {
 };
 
 function escapeHtml(unsafe) {
-    return (unsafe||'').toString()
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;")
-         .replace(/"/g, "&quot;")
-         .replace(/'/g, "&#039;");
+    return (unsafe||'').toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 let draggedMarkerIndex = -1;
@@ -248,62 +220,46 @@ let draggedMarkerPart = null;
 let hasDragged = false;
 
 window.startDrag = function(e, index, part) {
-    e.preventDefault();
-    e.stopPropagation();
-    draggedMarkerIndex = index;
-    draggedMarkerPart = part || 'origin';
-    hasDragged = false;
+    e.preventDefault(); e.stopPropagation();
+    draggedMarkerIndex = index; draggedMarkerPart = part || 'origin'; hasDragged = false;
 };
 
 window.doDrag = function(e) {
     if(draggedMarkerIndex === -1) return;
     hasDragged = true;
     
-    const imgContainer = document.getElementById('admin-img-container');
-    const rect = imgContainer.getBoundingClientRect();
-    let clickX = e.clientX - rect.left;
-    let clickY = e.clientY - rect.top;
+    const form = window.getFormContext();
+    if(!form) return;
+    const imgContainer = form.querySelector('.admin-img-container');
+    if(!imgContainer) return;
     
+    const rect = imgContainer.getBoundingClientRect();
+    let clickX = e.clientX - rect.left; let clickY = e.clientY - rect.top;
     if(clickX < 0) clickX = 0; if(clickY < 0) clickY = 0;
     if(clickX > rect.width) clickX = rect.width; if(clickY > rect.height) clickY = rect.height;
 
-    const x = (clickX / rect.width) * 100;
-    const y = (clickY / rect.height) * 100;
-    
+    const x = (clickX / rect.width) * 100; const y = (clickY / rect.height) * 100;
     const marker = window.anatomyMarkers[draggedMarkerIndex];
 
     if (draggedMarkerPart === 'target') {
-        marker.x = x.toFixed(2);
-        marker.y = y.toFixed(2);
-        const dot = document.getElementById('marker_target_' + draggedMarkerIndex);
-        if(dot) {
-            dot.style.left = `calc(${marker.x}% - 8px)`;
-            dot.style.top = `calc(${marker.y}% - 8px)`;
-        }
+        marker.x = x.toFixed(2); marker.y = y.toFixed(2);
+        const dot = form.querySelector('#marker_target_' + draggedMarkerIndex);
+        if(dot) { dot.style.left = `calc(${marker.x}% - 8px)`; dot.style.top = `calc(${marker.y}% - 8px)`; }
     } else {
-        if (marker.has_arrow) {
-            marker.origin_x = x.toFixed(2);
-            marker.origin_y = y.toFixed(2);
-        } else {
-            marker.x = x.toFixed(2);
-            marker.y = y.toFixed(2);
-        }
-        const dot = document.getElementById('marker_dot_' + draggedMarkerIndex);
+        if (marker.has_arrow) { marker.origin_x = x.toFixed(2); marker.origin_y = y.toFixed(2); } 
+        else { marker.x = x.toFixed(2); marker.y = y.toFixed(2); }
+        const dot = form.querySelector('#marker_dot_' + draggedMarkerIndex);
         if(dot) {
             let px = marker.has_arrow ? marker.origin_x : marker.x;
             let py = marker.has_arrow ? marker.origin_y : marker.y;
-            dot.style.left = `calc(${px}% - 14px)`;
-            dot.style.top = `calc(${py}% - 14px)`;
+            dot.style.left = `calc(${px}% - 14px)`; dot.style.top = `calc(${py}% - 14px)`;
         }
     }
-    
     if (marker.has_arrow) {
-        const line = document.getElementById('marker_line_' + draggedMarkerIndex);
+        const line = form.querySelector('#marker_line_' + draggedMarkerIndex);
         if (line) {
-            line.setAttribute('x1', marker.origin_x + '%');
-            line.setAttribute('y1', marker.origin_y + '%');
-            line.setAttribute('x2', marker.x + '%');
-            line.setAttribute('y2', marker.y + '%');
+            line.setAttribute('x1', marker.origin_x + '%'); line.setAttribute('y1', marker.origin_y + '%');
+            line.setAttribute('x2', marker.x + '%'); line.setAttribute('y2', marker.y + '%');
         }
     }
 };
@@ -311,8 +267,7 @@ window.doDrag = function(e) {
 window.doTouchDrag = function(e) {
     if(draggedMarkerIndex === -1) return;
     e.preventDefault(); 
-    const touch = e.touches[0];
-    window.doDrag({clientX: touch.clientX, clientY: touch.clientY});
+    window.doDrag({clientX: e.touches[0].clientX, clientY: e.touches[0].clientY});
 };
 
 window.stopDrag = function(e) {
@@ -324,30 +279,26 @@ window.stopDrag = function(e) {
 };
 
 window.addAnatomyMarker = function(e) {
-    if(hasDragged) return;
-    if(e.target.closest('button') || e.target.closest('.admin-marker')) return; 
+    if(hasDragged || e.target.closest('button') || e.target.closest('.admin-marker')) return; 
     
-    const imgContainer = document.getElementById('admin-img-container');
-    const anatomyImg = document.getElementById('admin-anatomy-img');
+    const form = window.getFormContext();
+    if(!form) return;
+    const imgContainer = form.querySelector('.admin-img-container');
+    const anatomyImg = form.querySelector('.admin-anatomy-img');
     
     if(!anatomyImg || anatomyImg.style.display === 'none') {
-        alert("Bitte lade zuerst ein Bild hoch, bevor du Punkte setzt!");
-        return;
+        alert("Bitte lade zuerst ein Bild hoch!"); return;
     }
     
     const rect = imgContainer.getBoundingClientRect();
-    let clickX = e.clientX - rect.left;
-    let clickY = e.clientY - rect.top;
-    
+    let clickX = e.clientX - rect.left; let clickY = e.clientY - rect.top;
     if(clickX < 0) clickX = 0; if(clickY < 0) clickY = 0;
     if(clickX > rect.width) clickX = rect.width; if(clickY > rect.height) clickY = rect.height;
 
-    const x = (clickX / rect.width) * 100;
-    const y = (clickY / rect.height) * 100;
+    const x = (clickX / rect.width) * 100; const y = (clickY / rect.height) * 100;
     
     window.anatomyMarkers.push({ 
-        id: window.anatomyNextId++, 
-        de: "", lat: "", 
+        id: window.anatomyNextId++, de: "", lat: "", 
         x: x.toFixed(2), y: y.toFixed(2),
         has_arrow: false
     });
@@ -355,13 +306,20 @@ window.addAnatomyMarker = function(e) {
 };
 
 window.updateAnatomyView = function() {
-    document.querySelectorAll('.admin-marker').forEach(el => el.remove());
-    const labelsList = document.getElementById('anatomy-labels-list');
-    const imgContainer = document.getElementById('admin-img-container');
-    const svgLines = document.getElementById('anatomy-svg-lines');
+    const form = window.getFormContext();
+    if(!form) return;
+
+    const imgContainer = form.querySelector('.admin-img-container');
+    const labelsList = form.querySelector('.anatomy-labels-list');
+    const svgLines = form.querySelector('.anatomy-svg-lines');
     
-    if(labelsList) labelsList.innerHTML = '';
-    if(svgLines) svgLines.innerHTML = '';
+    if(!imgContainer || !labelsList || !svgLines) return;
+
+    imgContainer.querySelectorAll('.admin-marker').forEach(el => el.remove());
+    labelsList.innerHTML = '';
+    svgLines.innerHTML = '';
+
+    if (!window.anatomyMarkers) window.anatomyMarkers = [];
 
     window.anatomyMarkers.forEach((marker, index) => {
         let isArrow = marker.has_arrow;
@@ -372,92 +330,67 @@ window.updateAnatomyView = function() {
         dot.id = 'marker_dot_' + index;
         dot.className = 'admin-marker bg-danger rounded-circle position-absolute border border-white border-2 shadow';
         dot.style.width = '28px'; dot.style.height = '28px';
-        dot.style.left = `calc(${px}% - 14px)`;
-        dot.style.top = `calc(${py}% - 14px)`;
-        dot.style.cursor = 'grab';
-        dot.style.zIndex = '10';
+        dot.style.left = `calc(${px}% - 14px)`; dot.style.top = `calc(${py}% - 14px)`;
+        dot.style.cursor = 'grab'; dot.style.zIndex = '10';
         dot.innerHTML = `<span class="text-white small fw-bold d-flex justify-content-center align-items-center h-100" style="pointer-events: none;">${index + 1}</span>`;
         
         dot.onmousedown = (e) => window.startDrag(e, index, 'origin');
-        dot.ontouchstart = (e) => {
-            const touch = e.touches[0];
-            window.startDrag({preventDefault: ()=>e.preventDefault(), stopPropagation: ()=>e.stopPropagation(), clientX: touch.clientX, clientY: touch.clientY}, index, 'origin');
-        };
+        dot.ontouchstart = (e) => { window.startDrag({preventDefault: ()=>e.preventDefault(), stopPropagation: ()=>e.stopPropagation(), clientX: e.touches[0].clientX, clientY: e.touches[0].clientY}, index, 'origin'); };
 
-        if(imgContainer) imgContainer.appendChild(dot);
+        imgContainer.appendChild(dot);
 
         if (isArrow) {
             let targetDot = document.createElement('div');
             targetDot.id = 'marker_target_' + index;
             targetDot.className = 'admin-marker bg-warning rounded-circle position-absolute border border-white border-2 shadow';
             targetDot.style.width = '16px'; targetDot.style.height = '16px';
-            targetDot.style.left = `calc(${marker.x}% - 8px)`;
-            targetDot.style.top = `calc(${marker.y}% - 8px)`;
-            targetDot.style.cursor = 'grab';
-            targetDot.style.zIndex = '11';
+            targetDot.style.left = `calc(${marker.x}% - 8px)`; targetDot.style.top = `calc(${marker.y}% - 8px)`;
+            targetDot.style.cursor = 'grab'; targetDot.style.zIndex = '11';
             
             targetDot.onmousedown = (e) => window.startDrag(e, index, 'target');
-            targetDot.ontouchstart = (e) => {
-                const touch = e.touches[0];
-                window.startDrag({preventDefault: ()=>e.preventDefault(), stopPropagation: ()=>e.stopPropagation(), clientX: touch.clientX, clientY: touch.clientY}, index, 'target');
-            };
+            targetDot.ontouchstart = (e) => { window.startDrag({preventDefault: ()=>e.preventDefault(), stopPropagation: ()=>e.stopPropagation(), clientX: e.touches[0].clientX, clientY: e.touches[0].clientY}, index, 'target'); };
 
-            if(imgContainer) imgContainer.appendChild(targetDot);
+            imgContainer.appendChild(targetDot);
 
             let line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.id = 'marker_line_' + index;
-            line.setAttribute('x1', marker.origin_x + '%');
-            line.setAttribute('y1', marker.origin_y + '%');
-            line.setAttribute('x2', marker.x + '%');
-            line.setAttribute('y2', marker.y + '%');
-            line.setAttribute('stroke', '#000000');
-            line.setAttribute('stroke-width', '1.5');
-            line.setAttribute('marker-end', 'url(#arrowhead)');
-            if(svgLines) svgLines.appendChild(line);
+            line.setAttribute('x1', marker.origin_x + '%'); line.setAttribute('y1', marker.origin_y + '%');
+            line.setAttribute('x2', marker.x + '%'); line.setAttribute('y2', marker.y + '%');
+            line.setAttribute('stroke', '#000000'); line.setAttribute('stroke-width', '1.5');
+            line.setAttribute('marker-end', 'url(#arrowhead-edit)');
+            svgLines.appendChild(line);
         }
 
         let li = document.createElement('div');
         li.className = 'd-flex align-items-center gap-3 p-3 mb-3 bg-white border rounded-4 shadow-sm';
-        
-        let safeDe = escapeHtml(marker.de);
-        let safeLat = escapeHtml(marker.lat);
-        
+        let safeDe = escapeHtml(marker.de); let safeLat = escapeHtml(marker.lat);
         li.innerHTML = `
             <div class="d-flex flex-column align-items-center gap-2">
-                <div class="d-flex justify-content-center align-items-center bg-danger text-white rounded-circle shadow-sm" style="width: 38px; height: 38px; flex-shrink: 0; font-size: 1.1rem; font-weight: bold;">
-                    ${index + 1}
-                </div>
-                <button type="button" class="btn btn-sm ${isArrow ? 'btn-primary' : 'btn-outline-secondary'} rounded-pill px-2 py-0" onclick="window.toggleArrow(${index})" title="Pfeil ein-/ausschalten">
-                    <i class="bi ${isArrow ? 'bi-cursor-fill' : 'bi-cursor'}"></i>
-                </button>
+                <div class="d-flex justify-content-center align-items-center bg-danger text-white rounded-circle shadow-sm" style="width: 38px; height: 38px; flex-shrink: 0; font-size: 1.1rem; font-weight: bold;">${index + 1}</div>
+                <button type="button" class="btn btn-sm ${isArrow ? 'btn-primary' : 'btn-outline-secondary'} rounded-pill px-2 py-0" onclick="window.toggleArrow(${index})" title="Pfeil ein-/ausschalten"><i class="bi ${isArrow ? 'bi-cursor-fill' : 'bi-cursor'}"></i></button>
             </div>
             <div class="row g-2 flex-grow-1">
                 <div class="col-md-6">
-                    <div class="form-floating">
-                        <input type="text" class="form-control fw-bold text-primary border-primary border-opacity-25 shadow-sm" id="de_${index}" placeholder="Deutsch" value="${safeDe}" oninput="window.updateMarkerText(${index}, 'de', this.value)">
-                        <label for="de_${index}" class="text-muted"><i class="bi bi-translate"></i> Begriff (Deutsch)</label>
-                    </div>
+                    <div class="form-floating"><input type="text" class="form-control fw-bold text-primary border-primary border-opacity-25 shadow-sm" id="de_${index}" placeholder="Deutsch" value="${safeDe}" oninput="window.updateMarkerText(${index}, 'de', this.value)"><label for="de_${index}" class="text-muted"><i class="bi bi-translate"></i> Begriff (Deutsch)</label></div>
                 </div>
                 <div class="col-md-6">
-                    <div class="form-floating">
-                        <input type="text" class="form-control text-secondary border-secondary border-opacity-25" id="lat_${index}" placeholder="Latein" value="${safeLat}" oninput="window.updateMarkerText(${index}, 'lat', this.value)">
-                        <label for="lat_${index}" class="text-muted"><i class="bi bi-journal-medical"></i> Latein (Optional)</label>
-                    </div>
+                    <div class="form-floating"><input type="text" class="form-control text-secondary border-secondary border-opacity-25" id="lat_${index}" placeholder="Latein" value="${safeLat}" oninput="window.updateMarkerText(${index}, 'lat', this.value)"><label for="lat_${index}" class="text-muted"><i class="bi bi-journal-medical"></i> Latein (Optional)</label></div>
                 </div>
             </div>
-            <button type="button" class="btn btn-outline-danger border-0 rounded-circle" style="width: 44px; height: 44px; flex-shrink: 0;" onclick="window.removeAnatomyMarker(${index})" title="Punkt entfernen">
-                <i class="bi bi-trash-fill fs-5"></i>
-            </button>
+            <button type="button" class="btn btn-outline-danger border-0 rounded-circle" style="width: 44px; height: 44px; flex-shrink: 0;" onclick="window.removeAnatomyMarker(${index})"><i class="bi bi-trash-fill fs-5"></i></button>
         `;
-        if(labelsList) labelsList.appendChild(li);
+        labelsList.appendChild(li);
     });
     
     window.syncAnatomyJson();
 };
 
 window.handleImageUpload = function(event) {
+    const form = window.getFormContext();
+    if(!form) return;
+
     if (event.target.files && event.target.files[0]) {
-        const anatomyImg = document.getElementById('admin-anatomy-img');
+        const anatomyImg = form.querySelector('.admin-anatomy-img');
         if(anatomyImg) {
             anatomyImg.onload = function() {
                 anatomyImg.style.display = 'block';
@@ -469,89 +402,80 @@ window.handleImageUpload = function(event) {
     }
 };
 
-// --- 2. Initialisierung mit Safari-Puls ---
-function initAnatomySystem() {
-    let maxId = 0;
-    window.anatomyMarkers.forEach(m => { if (parseInt(m.id) > maxId) maxId = parseInt(m.id); });
-    window.anatomyNextId = maxId + 1;
+window.updateFormFields = function() {
+    const form = window.getFormContext();
+    if(!form) return;
     
-    // Erster Standard-Versuch
-    window.updateAnatomyView();
-    
-    const imgContainer = document.getElementById('admin-img-container');
-    const anatomyImg = document.getElementById('admin-anatomy-img');
-    
-    // Resize-Beobachter (für saubere Desktop-Browser)
-    if (window.ResizeObserver && imgContainer) {
-        new ResizeObserver(() => {
-            if (anatomyImg && anatomyImg.offsetHeight > 0) {
-                if (document.querySelectorAll('.admin-marker').length === 0 && window.anatomyMarkers.length > 0) {
-                    window.updateAnatomyView();
-                }
-            }
-        }).observe(imgContainer);
-    }
-    
-    // SAFARI-PULS: Pollt für die ersten 2 Sekunden, ob das Bild plötzlich eine Höhe hat
-    if (anatomyImg) {
-        let checkCount = 0;
-        let safariTimer = setInterval(function() {
-            checkCount++;
-            
-            // Wenn das Bild eine reale Höhe auf dem Bildschirm einnimmt...
-            if (anatomyImg.offsetHeight > 0) {
-                // ...und die Punkte noch fehlen, zeichnen wir sie neu!
-                if (window.anatomyMarkers.length > 0 && document.querySelectorAll('.admin-marker').length === 0) {
-                    window.updateAnatomyView();
-                }
-                clearInterval(safariTimer); // Ziel erreicht, Timer stoppen
-            }
-            
-            // Nach 2 Sekunden (40 Durchläufe à 50ms) aufgeben
-            if (checkCount > 40) {
-                clearInterval(safariTimer);
-            }
-        }, 50);
-    }
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAnatomySystem);
-} else {
-    initAnatomySystem();
-}
-
-window.addEventListener('load', function() {
-    if (document.querySelectorAll('.admin-marker').length === 0 && window.anatomyMarkers.length > 0) {
-        window.updateAnatomyView();
-    }
-});
-
-function updateFormFields() {
-    const typeSelect = document.getElementById('typeSelect');
+    const typeSelect = form.querySelector('.type-select');
     if(!typeSelect) return;
     const type = typeSelect.value;
     
-    ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id => {
-        const el = document.getElementById(id);
+    ['.field-standard-answer','.field-mc-options','.field-anatomy','.field-anatomy-multi','.field-json'].forEach(cls => {
+        const el = form.querySelector(cls);
         if(el) el.classList.add('d-none');
     });
 
     if (['flashcard', 'mc', 'calculation', 'case_study', 'anatomy'].includes(type)) {
-        document.getElementById('field_standard_answer').classList.remove('d-none');
-        if (type === 'mc') document.getElementById('field_mc_options').classList.remove('d-none');
+        const el = form.querySelector('.field-standard-answer'); if(el) el.classList.remove('d-none');
+        if (type === 'mc') { const mc = form.querySelector('.field-mc-options'); if(mc) mc.classList.remove('d-none'); }
     }
     
-    if (type === 'anatomy') document.getElementById('field_anatomy').classList.remove('d-none');
-    else if (type === 'anatomy_multi') document.getElementById('field_anatomy_multi').classList.remove('d-none');
-    else if (['ordering', 'assignment', 'calculation'].includes(type)) document.getElementById('field_json').classList.remove('d-none');
-}
+    if (type === 'anatomy') { const ana = form.querySelector('.field-anatomy'); if(ana) ana.classList.remove('d-none'); }
+    else if (type === 'anatomy_multi') { const anam = form.querySelector('.field-anatomy-multi'); if(anam) anam.classList.remove('d-none'); }
+    else if (['ordering', 'assignment', 'calculation'].includes(type)) { const jsonf = form.querySelector('.field-json'); if(jsonf) jsonf.classList.remove('d-none'); }
+};
 
-function addMcOption() {
+window.addMcOption = function() {
+    const form = window.getFormContext();
+    if(!form) return;
     const row = `<div class="input-group mb-2 shadow-sm"><input type="text" name="mc_options" class="form-control" placeholder="Weitere falsche Antwort"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button></div>`;
-    document.getElementById('mcOptionsContainer').insertAdjacentHTML('beforeend', row);
-}
+    const container = form.querySelector('.mc-options-container');
+    if (container) container.insertAdjacentHTML('beforeend', row);
+};
 
-updateFormFields();
+// --- ABSOLUT KUGELSICHERER LAUNCHER ---
+window.initAnatomyEditor = function() {
+    const form = window.getFormContext();
+    if (!form) return; // Sind nicht auf der Seite
+
+    try {
+        const rawDataEl = form.querySelector('.anatomy-raw-data');
+        const rawText = rawDataEl ? rawDataEl.textContent.trim() : '[]';
+        let parsed = JSON.parse(rawText || '[]');
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        
+        if (!Array.isArray(parsed) && parsed.markers !== undefined) {
+            window.anatomyShowLabels = parsed.show_labels;
+            window.anatomyMarkers = parsed.markers;
+        } else {
+            window.anatomyShowLabels = true;
+            window.anatomyMarkers = Array.isArray(parsed) ? parsed : [];
+        }
+    } catch(e) {
+        window.anatomyMarkers = [];
+    }
+
+    const cbShowLabels = form.querySelector('.show-anatomy-labels');
+    if(cbShowLabels) cbShowLabels.checked = window.anatomyShowLabels;
+
+    let maxId = 0;
+    window.anatomyMarkers.forEach(m => { if (parseInt(m.id) > maxId) maxId = parseInt(m.id); });
+    window.anatomyNextId = maxId + 1;
+
+    window.updateFormFields();
+    window.updateAnatomyView();
+};
+
+// Polling: Versuche die Punkte in der ersten Sekunde 10x zu zeichnen.
+// Falls das Bild kurzzeitig 0 Pixel hoch ist, wird es dadurch später nochmal gezeichnet.
+let bootAttempts = 0;
+let bootInterval = setInterval(function() {
+    bootAttempts++;
+    if (document.getElementById('editCardForm')) {
+        window.initAnatomyEditor();
+    }
+    if (bootAttempts >= 10) clearInterval(bootInterval);
+}, 100);
+
 </script>
 {% endblock %}

@@ -6,6 +6,9 @@
     .admin-cat-row:hover { background-color: #f8f9fa !important; }
     .admin-cat-row[aria-expanded="true"] .transition-icon { transform: rotate(90deg); }
     .transition-icon { transition: transform 0.2s ease-in-out; }
+    /* Manueller Collapse für HTMX Stabilität */
+    .collapse { display: none; }
+    .collapse.show { display: block; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -31,7 +34,7 @@
 
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white border-bottom-0 py-3">
-                <button class="btn btn-success w-100 rounded-pill fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#createForm"><i class="bi bi-plus-circle"></i> Standard Frage erstellen</button>
+                <button class="btn btn-success w-100 rounded-pill fw-bold" type="button" onclick="document.getElementById('createForm').classList.toggle('show')"><i class="bi bi-plus-circle"></i> Standard Frage erstellen</button>
             </div>
             <div class="collapse" id="createForm">
                 <div class="card-body bg-light">
@@ -186,16 +189,22 @@
 
 {% if tab == 'questions' %}
 <script>
-if (!window.toggleCat) {
-    window.toggleCat = function(id, el, event) {
-        if (event.target.closest('input, button, a')) return;
-        const target = document.getElementById(id);
-        if (target) {
-            bootstrap.Collapse.getOrCreateInstance(target, { toggle: false }).toggle();
-            el.setAttribute('aria-expanded', el.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');
-        }
-    };
-}
+// --- HTMX HILFSFUNKTION ---
+// Sucht immer das NEUESTE Element im DOM, damit bei Übergängen das alte ignoriert wird
+window.getEl = function(id) {
+    const els = document.querySelectorAll('#' + id);
+    return els.length > 0 ? els[els.length - 1] : null;
+};
+
+// --- KATEGORIEN AUFKLAPPEN ---
+window.toggleCat = function(id, el, event) {
+    if (event.target.closest('input, button, a')) return;
+    const target = window.getEl(id);
+    if (target) {
+        target.classList.toggle('show');
+        el.setAttribute('aria-expanded', target.classList.contains('show') ? 'true' : 'false');
+    }
+};
 
 // ---------------------------------------------------------
 // GLOBALE FUNKTIONEN FÜR DEN ANATOMIE-EDITOR (MODERN)
@@ -204,16 +213,15 @@ window.anatomyMarkers = [];
 window.anatomyNextId = 1;
 
 window.syncAnatomyJson = function() {
-    const checkbox = document.getElementById('showLabelsCheckbox');
-    const showLabels = checkbox ? checkbox.checked : true; // Standard ist true
+    const checkbox = window.getEl('showLabelsCheckbox');
+    const showLabels = checkbox ? checkbox.checked : true;
     
-    // Wir speichern nun ein Objekt mit Markern und der Einstellung
     const data = {
         markers: window.anatomyMarkers,
         show_labels: showLabels
     };
     
-    const multi = document.getElementById('multi_json_input');
+    const multi = window.getEl('multi_json_input');
     if (multi) multi.value = JSON.stringify(data);
 };
 
@@ -263,7 +271,9 @@ window.doDrag = function(e) {
     if(draggedMarkerIndex === -1) return;
     hasDragged = true;
     
-    const imgContainer = document.getElementById('admin-img-container');
+    const imgContainer = window.getEl('admin-img-container');
+    if(!imgContainer) return;
+    
     const rect = imgContainer.getBoundingClientRect();
     let clickX = e.clientX - rect.left;
     let clickY = e.clientY - rect.top;
@@ -279,7 +289,7 @@ window.doDrag = function(e) {
     if (draggedMarkerPart === 'target') {
         marker.x = x.toFixed(2);
         marker.y = y.toFixed(2);
-        const dot = document.getElementById('marker_target_' + draggedMarkerIndex);
+        const dot = window.getEl('marker_target_' + draggedMarkerIndex);
         if(dot) {
             dot.style.left = `calc(${marker.x}% - 8px)`;
             dot.style.top = `calc(${marker.y}% - 8px)`;
@@ -292,7 +302,7 @@ window.doDrag = function(e) {
             marker.x = x.toFixed(2);
             marker.y = y.toFixed(2);
         }
-        const dot = document.getElementById('marker_dot_' + draggedMarkerIndex);
+        const dot = window.getEl('marker_dot_' + draggedMarkerIndex);
         if(dot) {
             let px = marker.has_arrow ? marker.origin_x : marker.x;
             let py = marker.has_arrow ? marker.origin_y : marker.y;
@@ -302,7 +312,7 @@ window.doDrag = function(e) {
     }
     
     if (marker.has_arrow) {
-        const line = document.getElementById('marker_line_' + draggedMarkerIndex);
+        const line = window.getEl('marker_line_' + draggedMarkerIndex);
         if (line) {
             line.setAttribute('x1', marker.origin_x + '%');
             line.setAttribute('y1', marker.origin_y + '%');
@@ -331,8 +341,8 @@ window.addAnatomyMarker = function(e) {
     if(hasDragged) return;
     if(e.target.closest('button') || e.target.closest('.admin-marker')) return; 
     
-    const anatomyImg = document.getElementById('admin-anatomy-img');
-    const imgContainer = document.getElementById('admin-img-container');
+    const anatomyImg = window.getEl('admin-anatomy-img');
+    const imgContainer = window.getEl('admin-img-container');
     
     if(!anatomyImg || anatomyImg.style.display === 'none') {
         alert("Bitte lade zuerst ein Bild hoch, bevor du Punkte setzt!");
@@ -353,7 +363,6 @@ window.addAnatomyMarker = function(e) {
         id: window.anatomyNextId++, 
         de: "", lat: "", 
         x: x.toFixed(2), y: y.toFixed(2),
-        // NEU: Startpunkt leicht verschoben ansetzen und Pfeil direkt aktivieren
         origin_x: Math.max(0, x - 10).toFixed(2), 
         origin_y: Math.max(0, y - 10).toFixed(2),
         has_arrow: true
@@ -362,13 +371,15 @@ window.addAnatomyMarker = function(e) {
 };
 
 window.updateAnatomyView = function() {
-    document.querySelectorAll('.admin-marker').forEach(el => el.remove());
-    const labelsList = document.getElementById('anatomy-labels-list');
-    const imgContainer = document.getElementById('admin-img-container');
-    const svgLines = document.getElementById('anatomy-svg-lines');
+    const imgContainer = window.getEl('admin-img-container');
+    const labelsList = window.getEl('anatomy-labels-list');
+    const svgLines = window.getEl('anatomy-svg-lines');
     
-    if(labelsList) labelsList.innerHTML = '';
-    if(svgLines) svgLines.innerHTML = '';
+    if(!imgContainer || !labelsList || !svgLines) return;
+
+    imgContainer.querySelectorAll('.admin-marker').forEach(el => el.remove());
+    labelsList.innerHTML = '';
+    svgLines.innerHTML = '';
 
     window.anatomyMarkers.forEach((marker, index) => {
         let isArrow = marker.has_arrow;
@@ -391,7 +402,7 @@ window.updateAnatomyView = function() {
             window.startDrag({preventDefault: ()=>e.preventDefault(), stopPropagation: ()=>e.stopPropagation(), clientX: touch.clientX, clientY: touch.clientY}, index, 'origin');
         };
 
-        if(imgContainer) imgContainer.appendChild(dot);
+        imgContainer.appendChild(dot);
 
         if (isArrow) {
             let targetDot = document.createElement('div');
@@ -409,7 +420,7 @@ window.updateAnatomyView = function() {
                 window.startDrag({preventDefault: ()=>e.preventDefault(), stopPropagation: ()=>e.stopPropagation(), clientX: touch.clientX, clientY: touch.clientY}, index, 'target');
             };
 
-            if(imgContainer) imgContainer.appendChild(targetDot);
+            imgContainer.appendChild(targetDot);
 
             let line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.id = 'marker_line_' + index;
@@ -420,7 +431,7 @@ window.updateAnatomyView = function() {
             line.setAttribute('stroke', '#000000');
             line.setAttribute('stroke-width', '1.5');
             line.setAttribute('marker-end', 'url(#arrowhead)');
-            if(svgLines) svgLines.appendChild(line);
+            svgLines.appendChild(line);
         }
 
         let li = document.createElement('div');
@@ -456,7 +467,7 @@ window.updateAnatomyView = function() {
                 <i class="bi bi-trash-fill fs-5"></i>
             </button>
         `;
-        if(labelsList) labelsList.appendChild(li);
+        labelsList.appendChild(li);
     });
     
     window.syncAnatomyJson();
@@ -464,7 +475,7 @@ window.updateAnatomyView = function() {
 
 window.handleImageUpload = function(event) {
     if (event.target.files && event.target.files[0]) {
-        const anatomyImg = document.getElementById('admin-anatomy-img');
+        const anatomyImg = window.getEl('admin-anatomy-img');
         if(anatomyImg) {
             anatomyImg.onload = function() {
                 anatomyImg.style.display = 'block';
@@ -477,31 +488,46 @@ window.handleImageUpload = function(event) {
 };
 
 function updateFormFields() {
-    const type = document.getElementById('typeSelect').value;
-    ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id=>document.getElementById(id).classList.add('d-none'));
+    const typeSelect = window.getEl('typeSelect');
+    if(!typeSelect) return;
+    const type = typeSelect.value;
     
-    if(type==='flashcard'||type==='mc') { 
-        document.getElementById('field_standard_answer').classList.remove('d-none'); 
-        if(type==='mc') document.getElementById('field_mc_options').classList.remove('d-none'); 
+    ['field_standard_answer','field_mc_options','field_anatomy','field_anatomy_multi','field_json'].forEach(id => {
+        const el = window.getEl(id);
+        if(el) el.classList.add('d-none');
+    });
+
+    if (['flashcard', 'mc', 'calculation', 'case_study', 'anatomy'].includes(type)) {
+        window.getEl('field_standard_answer').classList.remove('d-none');
+        if (type === 'mc') window.getEl('field_mc_options').classList.remove('d-none');
     }
-    else if(type==='anatomy') document.getElementById('field_anatomy').classList.remove('d-none');
-    else if(type==='anatomy_multi') document.getElementById('field_anatomy_multi').classList.remove('d-none');
-    else if(type==='ordering'||type==='assignment') document.getElementById('field_json').classList.remove('d-none');
+    
+    if (type === 'anatomy') window.getEl('field_anatomy').classList.remove('d-none');
+    else if (type === 'anatomy_multi') window.getEl('field_anatomy_multi').classList.remove('d-none');
+    else if (['ordering', 'assignment', 'calculation'].includes(type)) window.getEl('field_json').classList.remove('d-none');
 }
 
 function addMcOption() {
     const row = `<div class="input-group mb-2 shadow-sm"><input type="text" name="mc_options" class="form-control" placeholder="Weitere falsche Antwort"><button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button></div>`;
-    document.getElementById('mcOptionsContainer').insertAdjacentHTML('beforeend', row);
+    window.getEl('mcOptionsContainer').insertAdjacentHTML('beforeend', row);
 }
 
-document.getElementById('adminSearchInput').addEventListener('input', function(e) {
-    if(this.value.trim().length > 0) { document.getElementById('treeContainer').classList.add('d-none'); document.getElementById('searchContainer').classList.remove('d-none'); }
-    else { document.getElementById('treeContainer').classList.remove('d-none'); document.getElementById('searchContainer').classList.add('d-none'); }
+window.getEl('adminSearchInput').addEventListener('input', function(e) {
+    const tree = window.getEl('treeContainer');
+    const search = window.getEl('searchContainer');
+    if(this.value.trim().length > 0) { 
+        tree.classList.add('d-none'); 
+        search.classList.remove('d-none'); 
+    } else { 
+        tree.classList.remove('d-none'); 
+        search.classList.add('d-none'); 
+    }
 });
 
 function openEditCategory(name) {
-    document.getElementById('oldCategoryInput').value = name; document.getElementById('newCategoryInput').value = name;
-    new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
+    window.getEl('oldCategoryInput').value = name; 
+    window.getEl('newCategoryInput').value = name;
+    new bootstrap.Modal(window.getEl('editCategoryModal')).show();
 }
 
 updateFormFields();
